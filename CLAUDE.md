@@ -12,18 +12,23 @@ explicitly instructed after backtesting is complete.
 ## Commands
 
 ```bash
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
 # Install dependencies
 pip install -r requirements.txt
 
 # Run the entry point
-python app/main.py
+python -m app.main
 
 # Run tests
 pytest
 
-# Run a specific test file
-pytest tests/test_scoring.py
-```
+Also, prefer:
+
+```bash
+python -m app.main
 
 ## Architecture
 
