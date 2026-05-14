@@ -95,7 +95,7 @@ app/
   reports/         # Report rendering (not yet implemented)
   models/          # Shared Pydantic models (not yet implemented)
   utils/           # Logging and helpers
-tests/             # pytest suite (41 tests, no live API calls)
+tests/             # pytest suite no live API calls
 data/
   raw/             # Cached API responses (git-ignored)
   processed/       # Cleaned data (git-ignored)
