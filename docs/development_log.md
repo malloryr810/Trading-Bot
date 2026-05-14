@@ -1,5 +1,13 @@
 # Development Log
 
+## 2026-05-14 — Typed signal model foundation
+
+- Added `app/models/signal.py` with `Signal` Pydantic model and `SignalCategory`, `SignalDirection`, `SignalStrength` enums
+- Validated: name/description non-blank, `score_impact` ∈ [-1.0, 1.0], `confidence` ∈ [0.0, 1.0]
+- Optional fields: `value`, `source`, `timestamp`, `metadata` (safe default factory)
+- Added `is_bullish`, `is_bearish`, `is_neutral` convenience properties
+- Added 22 unit tests in `tests/test_signal.py`; full suite 63/63 passing
+
 ## 2026-05-14 — Documentation update and foundation review
 
 - README rewritten to accurately reflect implemented state; removed references to unbuilt features
