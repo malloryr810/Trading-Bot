@@ -1,5 +1,13 @@
 # Development Log
 
+## 2026-05-14 — CLI pipeline wired in app/main.py
+
+- Implemented `analyze_ticker(ticker)` — orchestrates the full technical analysis pipeline
+- Implemented `format_rating_output(rating)` — renders a human-readable terminal summary
+- Implemented `main(argv)` — CLI entry point; handles missing ticker (exit 1 + usage), `DataFetchError`, `TechnicalAnalysisError`, and `ScoringError` gracefully (stderr + exit 1)
+- Added 24 unit tests in `tests/test_main.py`; entire pipeline mocked — no live API calls
+- Full suite 194/194 passing; smoke test `python -m app.main AAPL` produces structured output
+
 ## 2026-05-14 — Technical-only scoring module
 
 - Added `app/analysis/scoring.py` with `ScoringError` and `score_technical_signals()`

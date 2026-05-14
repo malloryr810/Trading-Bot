@@ -22,10 +22,19 @@ support personal investment decisions.
 | `app/analysis/technicals.py` | Computes SMA, RSI, MACD, volume SMA, daily return; produces a signal summary |
 | `app/models/signal.py` | Typed `Signal` Pydantic model with enums for category, direction, and strength |
 | `app/analysis/technicals.py` — `build_technical_signals` | Converts a technical summary dict into 7 typed `Signal` objects |
-| `app/models/rating.py` | Typed `Rating` model that the future scoring engine will return |
+| `app/models/rating.py` | Typed `Rating` model that the scoring engine returns |
 | `app/analysis/scoring.py` | Technical-only scoring from `Signal` objects into a `Rating` |
+| `app/main.py` | CLI entry point — runs the full pipeline and prints a terminal summary |
 
 All implemented modules have unit test coverage with no live API calls.
+
+## Running the CLI
+
+```bash
+python -m app.main AAPL
+```
+
+Output is a technical-only analysis. Fundamentals, news, and risk are not yet included. This tool does not place trades.
 
 ## What Is Not Yet Implemented
 
@@ -34,7 +43,6 @@ All implemented modules have unit test coverage with no live API calls.
 - Risk analysis
 - Composite scoring engine
 - Report generation
-- CLI interface
 - Trading of any kind
 
 ## Data Flow
