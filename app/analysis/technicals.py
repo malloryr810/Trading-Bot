@@ -197,7 +197,7 @@ def _validate_summary_input(summary: object) -> None:
         )
     if not summary:
         raise TechnicalAnalysisError("indicator_summary must not be empty.")
-    missing = REQUIRED_SUMMARY_KEYS - summary.keys()  # type: ignore[union-attr]
+    missing = REQUIRED_SUMMARY_KEYS - set(summary)
     if missing:
         raise TechnicalAnalysisError(
             f"indicator_summary is missing required keys: {sorted(missing)}."

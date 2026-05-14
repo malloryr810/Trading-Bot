@@ -26,7 +26,7 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 # Run the entry point
-python -m app.main
+python -m app.main <TICKER>
 
 # Run all tests
 pytest
@@ -43,7 +43,11 @@ python -m py_compile app/analysis/technicals.py
 | Module | Purpose |
 |--------|---------|
 | `app/data/market_data.py` | Fetches, validates, and normalizes OHLCV data from yfinance |
-| `app/analysis/technicals.py` | Computes SMA, RSI, MACD, volume SMA, daily return; summarizes signals |
+| `app/analysis/technicals.py` | Computes SMA, RSI, MACD, volume SMA, daily return; builds 7 typed Signals |
+| `app/models/signal.py` | Typed `Signal` Pydantic model; shared contract across the analysis layer |
+| `app/models/rating.py` | Typed `Rating` Pydantic model; output of the scoring engine |
+| `app/analysis/scoring.py` | Technical-only scoring from Signal objects into a Rating |
+| `app/main.py` | CLI entry point — orchestrates the pipeline and prints a terminal summary |
 
 ## Architecture
 

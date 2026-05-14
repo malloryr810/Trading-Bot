@@ -1,5 +1,17 @@
 # Development Log
 
+## 2026-05-14 — v0.1 milestone quality review
+
+- Reviewed all 7 source modules, 7 test files, README, CLAUDE.md, and 4 docs files
+- No architectural violations, no import boundary issues, no stale or live-API tests found
+- Removed `# type: ignore[union-attr]` in `_validate_summary_input` — converted to `set(summary)` for clean narrowing
+- Fixed `rating.py` module docstring: "future scoring engine" → "scoring engine"
+- Updated README: corrected stale test count (41→194), placeholder labels on `main.py` and `models/`
+- Updated CLAUDE.md: added all 6 currently-implemented modules to the table; added `<TICKER>` to CLI example
+- Updated `docs/architecture.md`: marked each file as ✓ implemented or ○ planned
+- Updated `docs/scoring_rules.md`: replaced placeholder thresholds with the actual implemented values; moved risk_block note to "planned" section
+- 194/194 tests passing; `python -m app.main AAPL` produces correct technical-only output
+
 ## 2026-05-14 — CLI pipeline wired in app/main.py
 
 - Implemented `analyze_ticker(ticker)` — orchestrates the full technical analysis pipeline

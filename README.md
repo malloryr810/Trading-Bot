@@ -88,14 +88,14 @@ print(summary["macd_condition"]) # "bullish" | "bearish" | "neutral"
 
 ```
 app/
-  main.py          # Entry point (placeholder)
+  main.py          # CLI entry point
   config.py        # Env-var settings via python-dotenv
   data/            # Data fetchers — market_data.py implemented
-  analysis/        # Analysis modules — technicals.py implemented
+  analysis/        # Analysis modules — technicals.py, scoring.py implemented
   reports/         # Report rendering (not yet implemented)
-  models/          # Shared Pydantic models (not yet implemented)
+  models/          # Shared Pydantic models — signal.py, rating.py implemented
   utils/           # Logging and helpers
-tests/             # pytest suite no live API calls
+tests/             # pytest suite (41 tests, no live API calls)
 data/
   raw/             # Cached API responses (git-ignored)
   processed/       # Cleaned data (git-ignored)

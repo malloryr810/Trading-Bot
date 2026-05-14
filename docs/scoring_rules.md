@@ -13,21 +13,25 @@ The final score is a weighted sum of four sub-scores, each normalized to 0–100
 
 **Composite = (Tech × 0.35) + (Fund × 0.25) + (News × 0.25) + (Risk × 0.15)**
 
-## Rating Thresholds (placeholder)
+## Rating Thresholds (implemented)
 
-| Composite score | Rating      |
-|-----------------|-------------|
-| 80–100          | Strong Buy  |
-| 65–79           | Buy         |
-| 45–64           | Hold        |
-| 30–44           | Sell        |
-| 0–29            | Strong Sell |
+These are the thresholds used by `app/analysis/scoring.py`:
 
-## Risk Override
+| Score range | Category              |
+|-------------|-----------------------|
+| ≥ 85        | Strong Buy Candidate  |
+| ≥ 70        | Buy Candidate         |
+| ≥ 55        | Watchlist             |
+| ≥ 45        | Hold                  |
+| ≥ 30        | Avoid                 |
+| < 30        | Sell / Exit Warning   |
 
-Risk conditions can act as hard blockers regardless of composite score.
-A `risk_block` flag on a `Signal` overrides a Buy rating to Hold,
-and a Hold to Sell, until the condition clears.
+Thresholds are initial estimates and may be tuned after backtesting.
+
+## Risk Override (planned, not yet implemented)
+
+Future versions may allow risk conditions to act as hard blockers regardless
+of composite score (e.g., overriding a Buy to Hold until a condition clears).
 
 ## Notes
 

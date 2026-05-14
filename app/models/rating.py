@@ -1,7 +1,7 @@
 """
 Rating model.
 
-Defines the typed output produced by the future scoring engine. A Rating
+Defines the typed output produced by the scoring engine. A Rating
 aggregates numeric sub-scores, a final category, confidence, explanations,
 and the Signal objects that informed it — giving consumers a complete,
 inspectable record of how a recommendation was reached.

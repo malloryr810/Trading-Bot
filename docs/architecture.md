@@ -9,30 +9,32 @@
 
 ## Layer Map
 
+Files marked ✓ are implemented. Files marked ○ are planned.
+
 ```
-main.py
+main.py ✓
   │
   ├── data/           ← fetch & persist raw data
-  │   ├── market_data.py
-  │   ├── fundamentals.py
-  │   ├── news_data.py
-  │   └── storage.py
+  │   ├── market_data.py ✓
+  │   ├── fundamentals.py ○
+  │   ├── news_data.py ○
+  │   └── storage.py ○
   │
   ├── analysis/       ← transform data into signals & scores
-  │   ├── technicals.py
-  │   ├── fundamentals_analysis.py
-  │   ├── news_analysis.py
-  │   ├── risk_analysis.py
-  │   └── scoring.py
+  │   ├── technicals.py ✓
+  │   ├── scoring.py ✓
+  │   ├── fundamentals_analysis.py ○
+  │   ├── news_analysis.py ○
+  │   └── risk_analysis.py ○
   │
   ├── models/         ← shared typed data structures
-  │   ├── signal.py
-  │   ├── rating.py
-  │   └── stock_report.py
+  │   ├── signal.py ✓
+  │   ├── rating.py ✓
+  │   └── stock_report.py ○
   │
   └── reports/        ← render final output
-      ├── report_generator.py
-      └── templates.py
+      ├── report_generator.py ○
+      └── templates.py ○
 ```
 
 ## Data Layer
