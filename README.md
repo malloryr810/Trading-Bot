@@ -23,6 +23,7 @@ support personal investment decisions.
 | `app/models/signal.py` | Typed `Signal` Pydantic model with enums for category, direction, and strength |
 | `app/analysis/technicals.py` — `build_technical_signals` | Converts a technical summary dict into 7 typed `Signal` objects |
 | `app/models/rating.py` | Typed `Rating` model that the future scoring engine will return |
+| `app/analysis/scoring.py` | Technical-only scoring from `Signal` objects into a `Rating` |
 
 All implemented modules have unit test coverage with no live API calls.
 

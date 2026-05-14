@@ -1,5 +1,14 @@
 # Development Log
 
+## 2026-05-14 — Technical-only scoring module
+
+- Added `app/analysis/scoring.py` with `ScoringError` and `score_technical_signals()`
+- Scoring: sums `score_impact` across signals, clamps to [-1, 1], scales to 0–100 via `50 + impact * 50`
+- Maps composite score to `RatingCategory`; maps average signal confidence to `ConfidenceLevel`
+- Populates `key_positive_factors` from bullish signals and `key_risks` from bearish signals
+- Non-implemented sub-scores (`fundamental_score`, `news_score`, `risk_score`) explicitly set to 0.0
+- Added 36 unit tests in `tests/test_scoring.py`; full suite 170/170 passing
+
 ## 2026-05-14 — Typed Rating model foundation
 
 - Added `app/models/rating.py` with `RatingCategory` and `ConfidenceLevel` enums and `Rating` Pydantic model
