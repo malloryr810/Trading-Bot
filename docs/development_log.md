@@ -1,5 +1,12 @@
 # Development Log
 
+## 2026-05-14 — Technical signal builder
+
+- Added `build_technical_signals(indicator_summary)` to `app/analysis/technicals.py`
+- Converts the dict from `summarize_technical_signals()` into 7 typed `Signal` objects (trend, RSI, MACD, price vs SMA 20/50/200, volume)
+- Added `REQUIRED_SUMMARY_KEYS` constant and `_validate_summary_input` helper
+- Added 34 unit tests in `tests/test_build_technical_signals.py`; full suite 97/97 passing
+
 ## 2026-05-14 — Typed signal model foundation
 
 - Added `app/models/signal.py` with `Signal` Pydantic model and `SignalCategory`, `SignalDirection`, `SignalStrength` enums

@@ -21,6 +21,7 @@ support personal investment decisions.
 | `app/data/market_data.py` | Fetches and validates historical OHLCV price data via yfinance |
 | `app/analysis/technicals.py` | Computes SMA, RSI, MACD, volume SMA, daily return; produces a signal summary |
 | `app/models/signal.py` | Typed `Signal` Pydantic model with enums for category, direction, and strength |
+| `app/analysis/technicals.py` — `build_technical_signals` | Converts a technical summary dict into 7 typed `Signal` objects |
 
 All implemented modules have unit test coverage with no live API calls.
 
