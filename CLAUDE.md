@@ -5,16 +5,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What This Project Is
 
 A modular Python investment analysis tool. It produces structured, scored research
-reports for individual stocks. **It is not an automated trading system.** Do not
-implement order execution, broker API calls, or live position management until
-explicitly instructed after backtesting is complete.
+reports for individual stocks. **It is not an automated trading system.**
+
+Do not implement any of the following unless explicitly instructed after backtesting is proven:
+- Broker API calls or integrations
+- Order execution of any kind
+- Live or paper trading
+- Automatic position management
+- Margin or options trading
+- Portfolio automation
 
 ## Commands
 
 ```bash
-# Create virtual environment
+# Create and activate virtual environment
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
@@ -22,13 +28,22 @@ pip install -r requirements.txt
 # Run the entry point
 python -m app.main
 
-# Run tests
+# Run all tests
 pytest
 
-Also, prefer:
+# Run a single test file
+pytest tests/test_market_data.py
 
-```bash
-python -m app.main
+# Compile-check a module without running it
+python -m py_compile app/analysis/technicals.py
+```
+
+## Currently Implemented
+
+| Module | Purpose |
+|--------|---------|
+| `app/data/market_data.py` | Fetches, validates, and normalizes OHLCV data from yfinance |
+| `app/analysis/technicals.py` | Computes SMA, RSI, MACD, volume SMA, daily return; summarizes signals |
 
 ## Architecture
 
@@ -38,25 +53,30 @@ Data flows in one direction through four layers:
 data/ → analysis/ → scoring.py → reports/
 ```
 
-All inter-layer contracts are typed Pydantic models in `app/models/`.
-
 | Layer | Package | Responsibility |
 |-------|---------|---------------|
-| Data | `app/data/` | Fetch and cache raw data; return DataFrames or Pydantic models |
-| Analysis | `app/analysis/` | Produce `Signal` lists from raw data; modules are independent of each other |
+| Data | `app/data/` | Fetch and validate raw data; return DataFrames |
+| Analysis | `app/analysis/` | Compute signals from data; modules stay independent of each other |
 | Scoring | `app/analysis/scoring.py` | Aggregate signals using weighted formula (see `docs/scoring_rules.md`) |
-| Reports | `app/reports/` | Render a complete `StockReport` to disk |
+| Reports | `app/reports/` | Render `StockReport` to disk |
 
-**Scoring weights:** Technical 35% · Fundamental 25% · News/Sentiment 25% · Risk 15%
+## Layer Rules
 
-## Key Conventions
+- **Data modules** fetch and clean data only. No analysis or scoring logic.
+- **Analysis modules** accept a DataFrame as input. Never call yfinance or other external APIs directly.
+- **Analysis modules** are independent — `technicals.py` does not call `fundamentals_analysis.py`.
+- **Scoring** stays in `scoring.py`. Analysis modules produce signals; they do not score them.
+- **Reports** consume scoring outputs. Report modules do not run analysis.
 
+## Development Standards
+
+- Add or update tests for every meaningful code change.
+- Keep tests deterministic — build DataFrames locally, never call live APIs in unit tests.
+- Update `docs/development_log.md` after meaningful changes.
+- Do not add dependencies without a clear need.
 - All API keys and secrets live in `.env` (never committed). Access them only through `app/config.py`.
-- Analysis modules (`technicals.py`, `fundamentals_analysis.py`, etc.) must not call each other — only `scoring.py` reads from multiple modules.
-- New data providers should be swappable without touching analysis logic.
-- `data/raw/`, `data/processed/`, and `data/reports/` are git-ignored; `.gitkeep` files preserve the folder structure.
 
-## Docs
+## Key Docs
 
 - `docs/project_plan.md` — version roadmap
 - `docs/architecture.md` — full layer diagram

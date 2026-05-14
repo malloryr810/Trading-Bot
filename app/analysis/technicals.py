@@ -135,9 +135,9 @@ def _validate_ohlcv_input(df: object) -> None:
         raise TechnicalAnalysisError(
             f"Expected a DataFrame, got {type(df).__name__}."
         )
-    if isinstance(df, pd.DataFrame) and df.empty:
+    if df.empty:
         raise TechnicalAnalysisError("price_data is empty.")
-    missing = REQUIRED_OHLCV - set(df.columns)  # type: ignore[union-attr]
+    missing = REQUIRED_OHLCV - set(df.columns)
     if missing:
         raise TechnicalAnalysisError(
             f"price_data is missing required OHLCV columns: {sorted(missing)}."
@@ -152,11 +152,11 @@ def _calculate_rsi(close: pd.Series, period: int = 14) -> pd.Series:
     avg_gain = gain.rolling(window=period).mean()
     avg_loss = loss.rolling(window=period).mean()
 
-    # Avoid division by zero: where avg_loss is 0, RS is effectively infinite → RSI = 100
     rs = avg_gain / avg_loss.replace(0, float("nan"))
     rsi = 100 - (100 / (1 + rs))
-    # When avg_loss is 0 and avg_gain > 0, RSI is 100
-    rsi = rsi.fillna(100)
+    # Where avg_loss is exactly 0 (all gains, no losses), RSI is definitionally 100.
+    # Use .where() rather than .fillna() so pre-window NaN rows stay NaN.
+    rsi = rsi.where(avg_loss != 0, other=100.0)
     return rsi
 
 

@@ -11,72 +11,94 @@ A modular, personal stock analysis and decision-support tool built in Python.
 ## Purpose
 
 Analyze individual stocks using market data, technical indicators, fundamentals,
-news sentiment, and risk signals — then produce a structured report with a
-scored recommendation.
+news sentiment, and risk signals — then produce a structured, scored report to
+support personal investment decisions.
 
-## Current Scope (v1)
+## What Is Implemented
 
-- Single-ticker analysis run from the command line
-- Data fetched via yfinance (no paid API required to start)
-- Composite score across four weighted categories (technical, fundamental, news, risk)
-- Plain-text / Markdown report written to `data/reports/`
+| Module | Description |
+|--------|-------------|
+| `app/data/market_data.py` | Fetches and validates historical OHLCV price data via yfinance |
+| `app/analysis/technicals.py` | Computes SMA, RSI, MACD, volume SMA, daily return; produces a signal summary |
 
-## What Future Versions May Add
+All implemented modules have full unit test coverage (41 tests, no live API calls).
 
-- Watchlist scanning across multiple tickers
-- Scheduled daily digest reports
-- Backtesting signals against historical price data
-- Paper trading simulation with performance tracking
-- Live trading with strict guardrails (position size limits, drawdown stops)
+## What Is Not Yet Implemented
+
+- Fundamental analysis
+- News / sentiment analysis
+- Risk analysis
+- Composite scoring engine
+- Report generation
+- CLI interface
+- Trading of any kind
+
+## Data Flow
+
+```
+app/data/ → app/analysis/ → app/analysis/scoring.py → app/reports/
+```
 
 ## Setup
 
 ```bash
-# 1. Clone and enter the repo
-git clone <repo-url>
-cd Trading-Bot
-
-# 2. Create and activate a virtual environment
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-
-# 3. Install dependencies
+python3 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-
-# 4. Configure environment variables
-cp .env.example .env
-# Edit .env and fill in any API keys you want to use
 ```
 
-## Usage
+## Running Tests
 
 ```bash
-python -m app.main
+pytest
 ```
 
-**Implemented so far:** `app/data/market_data.py` — fetches historical OHLCV
-price data for any ticker via yfinance. Full CLI usage will be documented as
-each analysis module is completed.
+## Usage Examples
+
+```python
+from app.data.market_data import get_price_history
+from app.analysis.technicals import calculate_technical_indicators, summarize_technical_signals
+
+# Fetch one year of daily OHLCV data
+price_data = get_price_history("AAPL")
+
+# Add technical indicator columns to the DataFrame
+indicators = calculate_technical_indicators(price_data)
+
+# Get a summary dict of the latest signals
+summary = summarize_technical_signals(indicators)
+print(summary["trend"])          # "bullish" | "bearish" | "mixed"
+print(summary["rsi_condition"])  # "overbought" | "oversold" | "neutral"
+print(summary["macd_condition"]) # "bullish" | "bearish" | "neutral"
+```
 
 ## Project Structure
 
 ```
 app/
-  main.py                  # Entry point
-  config.py                # Env-var-based settings
-  data/                    # Data fetchers (market, fundamentals, news)
-  analysis/                # Signal generators (technicals, fundamentals, news, risk, scoring)
-  reports/                 # Report renderer and templates
-  models/                  # Shared Pydantic models (Signal, Rating, StockReport)
-  utils/                   # Logging and general helpers
-tests/                     # pytest test suite
+  main.py          # Entry point (placeholder)
+  config.py        # Env-var settings via python-dotenv
+  data/            # Data fetchers — market_data.py implemented
+  analysis/        # Analysis modules — technicals.py implemented
+  reports/         # Report rendering (not yet implemented)
+  models/          # Shared Pydantic models (not yet implemented)
+  utils/           # Logging and helpers
+tests/             # pytest suite (41 tests, no live API calls)
 data/
-  raw/                     # Cached API responses (git-ignored)
-  processed/               # Cleaned data (git-ignored)
-  reports/                 # Generated reports (git-ignored)
-notebooks/                 # Exploratory analysis
-docs/                      # Project plan, architecture, scoring rules, data sources
-prompts/                   # Claude prompts used during development
+  raw/             # Cached API responses (git-ignored)
+  processed/       # Cleaned data (git-ignored)
+  reports/         # Generated reports (git-ignored)
+docs/              # Architecture, scoring rules, data sources, development log
+prompts/           # Claude prompts used during development
 ```
 
-See `docs/architecture.md` for a full description of the layer design.
+See `docs/architecture.md` for the full layer design and `docs/scoring_rules.md`
+for the planned composite score formula.
+
+## What Future Versions May Add
+
+- Fundamental and news/sentiment analysis
+- Composite scoring (Technical 35% · Fundamental 25% · News 25% · Risk 15%)
+- Watchlist scanning across multiple tickers
+- Backtesting signals against historical price data
+- Paper trading simulation

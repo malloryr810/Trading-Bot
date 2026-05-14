@@ -1,5 +1,13 @@
 # Development Log
 
+## 2026-05-14 — Documentation update and foundation review
+
+- README rewritten to accurately reflect implemented state; removed references to unbuilt features
+- CLAUDE.md updated with explicit guardrails, implemented module list, layer rules, and development standards
+- `app/analysis/technicals.py`: removed redundant `isinstance` check in `_validate_ohlcv_input` and dropped unnecessary `# type: ignore` comment
+- `app/analysis/technicals.py`: fixed `_calculate_rsi` to use `.where()` instead of `.fillna(100)` so pre-window rows correctly stay NaN rather than being incorrectly filled with 100
+- All 41 tests pass; no behavior changes
+
 ## 2026-05-14 — Technical analysis module implemented
 
 - Added `app/analysis/technicals.py` with `TechnicalAnalysisError`, `calculate_technical_indicators()`, and `summarize_technical_signals()`
