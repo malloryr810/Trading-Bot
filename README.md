@@ -51,12 +51,12 @@ cp .env.example .env
 ## Usage
 
 ```bash
-# Run the placeholder entry point
-python app/main.py
+python -m app.main
 ```
 
-Full CLI usage (e.g. `--ticker AAPL`) will be documented once the first
-analysis module is implemented.
+**Implemented so far:** `app/data/market_data.py` — fetches historical OHLCV
+price data for any ticker via yfinance. Full CLI usage will be documented as
+each analysis module is completed.
 
 ## Project Structure
 

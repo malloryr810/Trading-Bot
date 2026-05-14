@@ -1,5 +1,11 @@
 # Development Log
 
+## 2026-05-12 — Market data module implemented
+
+- Added `app/data/market_data.py` with `get_price_history()` and `DataFetchError`
+- Fetches historical OHLCV data via yfinance; normalizes column names; validates inputs and output shape
+- Added 15 unit tests in `tests/test_market_data.py` (all passing, no live API calls)
+
 ## 2026-05-12 — Project skeleton created
 
 - Initialized repository with full modular project structure
