@@ -1,5 +1,15 @@
 # Development Log
 
+## 2026-05-14 — Typed Rating model foundation
+
+- Added `app/models/rating.py` with `RatingCategory` and `ConfidenceLevel` enums and `Rating` Pydantic model
+- `RatingCategory` uses project-specific labels: Strong Buy Candidate, Buy Candidate, Watchlist, Hold, Avoid, Sell / Exit Warning
+- Score fields (composite + 4 sub-scores) constrained to 0–100 via `Field(ge=0.0, le=100.0)`
+- Ticker stripped and uppercased via `@field_validator`; explanation validated non-blank
+- `signals_used: list[Signal]` embeds provenance directly in the output model
+- Added `is_positive_rating`, `is_negative_rating`, `is_neutral_rating` convenience properties
+- Added 37 unit tests in `tests/test_rating.py` including JSON round-trip; full suite 134/134 passing
+
 ## 2026-05-14 — Technical signal builder
 
 - Added `build_technical_signals(indicator_summary)` to `app/analysis/technicals.py`
