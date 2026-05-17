@@ -1,5 +1,15 @@
 # Development Log
 
+## 2026-05-17 — Fundamental data layer
+
+- Added `app/models/fundamentals.py` with `CompanyFundamentals` Pydantic model
+- Added `app/data/fundamentals.py` with `get_company_fundamentals()` and `FundamentalDataFetchError`
+- Fetches 15 fields from `yfinance.Ticker.info`: identity (name, sector, industry) and key metrics (market cap, P/E ratios, P/B, margins, growth rates, D/E, FCF, dividend yield, beta)
+- `_safe_float` converts yfinance values safely: rejects None, NaN, Inf, and non-numeric strings → None
+- `_extract_company_name` prefers `longName` over `shortName`; raises if neither is present
+- Added 43 unit tests in `tests/test_fundamentals_data.py`; full suite 237/237 passing
+- Scoring and technical analysis untouched; scoring weights unchanged
+
 ## 2026-05-14 — v0.1 milestone quality review
 
 - Reviewed all 7 source modules, 7 test files, README, CLAUDE.md, and 4 docs files
