@@ -1,5 +1,19 @@
 # Development Log
 
+## 2026-05-17 — Fundamentals analysis layer
+
+- Implemented `app/analysis/fundamentals_analysis.py` with `build_fundamental_signals()` and `FundamentalAnalysisError`
+- Produces 5 typed FUNDAMENTAL Signals: Valuation, Profitability, Growth, Debt Levels, Free Cash Flow
+- Valuation: uses forward P/E (preferred) or trailing P/E; thresholds at 0/5/25/40; BEARISH for negative or >40 PE
+- Profitability: profit_margin thresholds at 0/5%/15%; BULLISH STRONG at >=15%, BEARISH below 0
+- Growth: both revenue_growth and earnings_growth assessed together; 4 outcomes (strong/positive/mixed/declining) plus partial and missing
+- Debt: debt_to_equity thresholds at 50/150; negative D/E treated as unusual with lower confidence
+- Cash flow: positive FCF is BULLISH, negative is BEARISH, zero is NEUTRAL
+- Missing fields always produce a neutral Signal with confidence=0.30 rather than raising exceptions
+- Also removed unused `Field` import from `app/models/fundamentals.py` (Pylance diagnostic)
+- Added 65 unit tests in `tests/test_fundamentals_analysis.py`; full suite 302/302 passing
+- Scoring and CLI untouched; fundamental signals not yet wired into scoring
+
 ## 2026-05-17 — Fundamental data layer
 
 - Added `app/models/fundamentals.py` with `CompanyFundamentals` Pydantic model
