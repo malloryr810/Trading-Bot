@@ -1,5 +1,15 @@
 # Development Log
 
+## 2026-05-19 — Composite scoring
+
+- Added `score_signals()` to `app/analysis/scoring.py` alongside existing `score_technical_signals()`
+- Weights: Technical 60%, Fundamental 40%; re-normalised to 100% when a category is absent
+- Unsupported categories (NEWS, RISK) are silently ignored; raises `ScoringError` only if no supported categories are present at all
+- Added `_WEIGHTS` constant, `_signals_to_score()` shared formula helper, and `_validate_composite_inputs()`
+- `score_technical_signals()` unchanged; its internal validator refactored to be standalone
+- `fundamental_summary` populated when fundamental signals are present; `technical_summary` likewise
+- Added 58 unit tests in `tests/test_composite_scoring.py`; full suite 360/360 passing
+
 ## 2026-05-17 — Fundamentals analysis layer
 
 - Implemented `app/analysis/fundamentals_analysis.py` with `build_fundamental_signals()` and `FundamentalAnalysisError`
