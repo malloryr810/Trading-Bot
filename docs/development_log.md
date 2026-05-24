@@ -1,5 +1,18 @@
 # Development Log
 
+## 2026-05-23 — Plain-text stock report generator
+
+- Added `app/reports/stock_report.py` with `generate_stock_report()` and `StockReportError`
+- Report is a single formatted string with eight sections: header, recommendation, score
+  breakdown, analysis summaries (technical/fundamental/news/risk when present), signals
+  table, key strengths, key risks, triggers, and disclaimer
+- Each signal rendered with a direction indicator (`[+]`/`[-]`/`[ ]`), direction, strength, name, and description
+- Optional params: `company_name`, `current_price`, `data_sources` (falls back to `rating.data_sources_used`)
+- Input validated with `StockReportError` for bad ticker, non-Rating, or non-Signal items
+- `app/main.py` updated to call `generate_stock_report` instead of the old `format_rating_output`
+- `format_rating_output` retained in `main.py` (tested independently in `test_main.py`)
+- Added 67 unit tests in `tests/test_stock_report.py`; full suite 427/427 passing
+
 ## 2026-05-19 — Composite scoring
 
 - Added `score_signals()` to `app/analysis/scoring.py` alongside existing `score_technical_signals()`

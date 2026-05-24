@@ -6,8 +6,8 @@ Runs a technical-only single-ticker analysis pipeline from the terminal:
     python -m app.main <TICKER>
 
 Fetches historical OHLCV data, calculates technical indicators, builds
-typed Signal objects, scores them, and prints a readable summary.
-Fundamentals, news, risk, and report file generation are not yet implemented.
+typed Signal objects, scores them, and prints a plain-text research report.
+Fundamentals, news, and risk analysis are not yet wired into the CLI.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from app.analysis.technicals import (
 )
 from app.data.market_data import DataFetchError, get_price_history
 from app.models.rating import Rating
+from app.reports.stock_report import generate_stock_report
 
 
 # ---------------------------------------------------------------------------
@@ -133,7 +134,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error scoring signals: {exc}", file=sys.stderr)
         return 1
 
-    print(format_rating_output(rating))
+    report = generate_stock_report(
+        ticker=rating.ticker,
+        rating=rating,
+        signals=rating.signals_used,
+    )
+    print(report)
     return 0
 
 

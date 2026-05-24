@@ -113,7 +113,7 @@ class TestMainSuccess:
         with _mock_pipeline():
             main(["AAPL"])
         out = capsys.readouterr().out
-        assert "Investment Bot Technical Analysis" in out
+        assert "STOCK RESEARCH REPORT" in out
 
 
 # ---------------------------------------------------------------------------
