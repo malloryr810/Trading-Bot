@@ -1,5 +1,21 @@
 # Development Log
 
+## 2026-05-23 — Risk analysis module
+
+- Implemented `app/analysis/risk_analysis.py` with `analyze_risk_conditions()` and `RiskAnalysisError`
+- Produces 4 signals (or 5 when `beta` is provided), all using `SignalCategory.RISK`
+- **Volatility Risk**: annualized std of daily returns; bearish >= 45%, bullish < 25%
+- **Maximum Drawdown Risk**: peak-to-trough decline; bearish <= -35%, neutral -35% to -15%, bullish > -15%
+- **Recent Trend Risk**: 30-trading-day price return; bearish <= -10%, bullish >= 5%; neutral signal with low confidence when fewer than 31 rows are available
+- **Liquidity Risk**: average daily volume; bearish < 500k, neutral 500k–1M, bullish >= 1M; graceful neutral when volume is all NaN
+- **Beta Risk** (optional): bearish >= 1.5, neutral 0.8–1.5, bullish < 0.8; raises `RiskAnalysisError` for NaN/Inf beta
+- Input validation follows the same pattern as `technicals.py` and `fundamentals_analysis.py`
+- `_insufficient_data_signal()` helper consolidates the neutral/low-confidence pattern for missing data
+- `_safe_float()` converts NaN/Inf safely to None for all calculations
+- Input DataFrame is never mutated (`.dropna()` returns a new Series)
+- Added 72 unit tests in `tests/test_risk_analysis.py`; full suite 496/496 passing
+- Not yet wired into `scoring.py`, `main.py`, or `stock_report.py`
+
 ## 2026-05-23 — Plain-text stock report generator
 
 - Added `app/reports/stock_report.py` with `generate_stock_report()` and `StockReportError`
