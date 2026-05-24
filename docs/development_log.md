@@ -1,5 +1,29 @@
 # Development Log
 
+## 2026-05-23 — Architecture review and cleanup
+
+Code-quality review after integrating three analysis branches. No behavior changes.
+
+- **`app/analysis/technicals.py`**: renamed private `_maybe_float` → `_safe_float` for
+  consistency with `risk_analysis.py` and `fundamentals.py`; replaced `f != f` NaN-only
+  check with `math.isfinite()` which also filters Inf; added `import math`
+- **`app/analysis/scoring.py`**: updated `score_signals` docstring (weight values were
+  still 60/40 from before risk was wired in); updated `score_technical_signals` docstring
+  and `explanation` string (both said "not implemented yet" when they are now implemented)
+- **`app/reports/stock_report.py`**: removed spurious double blank line left by linter
+- No structural changes, no new abstractions, no new dependencies
+
+Issues noted but intentionally left alone:
+- `_validate_ticker` is duplicated between `market_data.py` and `fundamentals.py` — they
+  raise different exceptions by design; extracting to shared utils would create
+  cross-layer coupling for trivial gain
+- `_safe_float` is duplicated between `risk_analysis.py` and `fundamentals.py` — same
+  reason; private helpers in independent modules
+- `_score_breakdown` shows "(not scored)" for any sub-score of 0.0 — borderline issue
+  only for the rare case where a scored category lands exactly at 0.0; acceptable now
+- `format_rating_output` in `main.py` is not on the live code path but is intentionally
+  retained and tested as an alternate/simpler formatter
+
 ## 2026-05-23 — Wire risk analysis into pipeline
 
 - Updated `_WEIGHTS` in `scoring.py`: Technical 35%, Fundamental 25%, Risk 15% (total 0.75, re-normalised when a category is absent)

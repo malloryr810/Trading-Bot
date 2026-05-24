@@ -40,9 +40,9 @@ def score_signals(
 ) -> Rating:
     """Score a mixed list of signals and return a composite Rating.
 
-    Supported categories are TECHNICAL (60%) and FUNDAMENTAL (40%).
-    Unsupported categories (NEWS, RISK) are silently ignored.
-    Weights are re-normalised to 100% when only one category is present.
+    Supported categories are TECHNICAL (35%), FUNDAMENTAL (25%), and RISK (15%).
+    Base weights sum to 0.75 and are re-normalised to 100% when categories are
+    absent. NEWS signals are silently ignored.
 
     Args:
         ticker: Stock ticker symbol (e.g. "AAPL").
@@ -160,8 +160,8 @@ def score_technical_signals(
     """Score a list of technical signals and return a typed Rating.
 
     Only technical signals (SignalCategory.TECHNICAL) are accepted.
-    Fundamental, news, and risk sub-scores are set to 0.0 because those
-    analysis modules have not been implemented yet.
+    Fundamental, news, and risk sub-scores are set to 0.0 because this is a
+    technical-only scoring path. Use score_signals() for composite scoring.
 
     Args:
         ticker: Stock ticker symbol (e.g. "AAPL").
@@ -189,7 +189,7 @@ def score_technical_signals(
     n = len(signals)
     explanation = (
         f"Technical-only rating for {ticker.strip().upper()} based on {n} technical "
-        "signals. Fundamentals, news, and risk analysis are not included yet."
+        "signals. Use score_signals() to include fundamental and risk analysis."
     )
     technical_summary = (
         f"Technical score: {technical_score:.1f}/100 based on trend, RSI, MACD, "

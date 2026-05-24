@@ -6,6 +6,8 @@ the data layer. Returns a new DataFrame with indicator columns appended.
 Does not fetch data directly — accepts input from app/data/market_data.py.
 """
 
+import math
+
 import pandas as pd
 
 from app.models.signal import Signal, SignalCategory, SignalDirection, SignalStrength
@@ -117,12 +119,12 @@ def summarize_technical_signals(indicator_data: pd.DataFrame) -> dict:
     row = indicator_data.iloc[-1]
 
     close = float(row["close"])
-    sma_20 = _maybe_float(row.get("sma_20"))
-    sma_50 = _maybe_float(row.get("sma_50"))
-    sma_200 = _maybe_float(row.get("sma_200"))
-    rsi = _maybe_float(row.get("rsi_14"))
-    macd = _maybe_float(row.get("macd"))
-    macd_signal = _maybe_float(row.get("macd_signal"))
+    sma_20 = _safe_float(row.get("sma_20"))
+    sma_50 = _safe_float(row.get("sma_50"))
+    sma_200 = _safe_float(row.get("sma_200"))
+    rsi = _safe_float(row.get("rsi_14"))
+    macd = _safe_float(row.get("macd"))
+    macd_signal = _safe_float(row.get("macd_signal"))
 
     return {
         "latest_close": close,
@@ -133,7 +135,7 @@ def summarize_technical_signals(indicator_data: pd.DataFrame) -> dict:
         "macd": macd,
         "macd_signal": macd_signal,
         "volume": float(row["volume"]),
-        "volume_sma_20": _maybe_float(row.get("volume_sma_20")),
+        "volume_sma_20": _safe_float(row.get("volume_sma_20")),
         "trend": _classify_trend(close, sma_20, sma_50),
         "price_above_sma_20": _above(close, sma_20),
         "price_above_sma_50": _above(close, sma_50),
@@ -220,11 +222,11 @@ def _calculate_rsi(close: pd.Series, period: int = 14) -> pd.Series:
     return rsi
 
 
-def _maybe_float(value: object) -> float | None:
+def _safe_float(value: object) -> float | None:
     """Return float if value is a finite number, else None."""
     try:
         f = float(value)  # type: ignore[arg-type]
-        return None if f != f else f  # NaN check: NaN != NaN
+        return None if not math.isfinite(f) else f
     except (TypeError, ValueError):
         return None
 
