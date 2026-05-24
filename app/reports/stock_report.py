@@ -21,10 +21,6 @@ _WIDTH = 80
 _SEP = "=" * _WIDTH
 
 
-class StockReportError(Exception):
-    """Raised when a report cannot be generated from the supplied inputs."""
-
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -52,9 +48,10 @@ def generate_stock_report(
         A single formatted plain-text string.
 
     Raises:
-        StockReportError: If any required argument is invalid.
+        ValueError: If ticker is empty or whitespace.
     """
-    _validate_inputs(ticker, rating, signals)
+    if not isinstance(ticker, str) or not ticker.strip():
+        raise ValueError(f"ticker must be a non-empty string, got {ticker!r}.")
 
     t = ticker.strip().upper()
     sources = list(data_sources) if data_sources is not None else list(rating.data_sources_used)
@@ -71,30 +68,6 @@ def generate_stock_report(
         _disclaimer(),
     ]
     return "\n".join(p for p in parts if p)
-
-
-# ---------------------------------------------------------------------------
-# Validation
-# ---------------------------------------------------------------------------
-
-def _validate_inputs(ticker: object, rating: object, signals: object) -> None:
-    if not isinstance(ticker, str) or not ticker.strip():
-        raise StockReportError(
-            f"ticker must be a non-empty string, got {ticker!r}."
-        )
-    if not isinstance(rating, Rating):
-        raise StockReportError(
-            f"rating must be a Rating instance, got {type(rating).__name__}."
-        )
-    if not isinstance(signals, list):
-        raise StockReportError(
-            f"signals must be a list, got {type(signals).__name__}."
-        )
-    for i, item in enumerate(signals):
-        if not isinstance(item, Signal):
-            raise StockReportError(
-                f"signals[{i}] is not a Signal instance (got {type(item).__name__})."
-            )
 
 
 # ---------------------------------------------------------------------------

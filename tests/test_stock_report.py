@@ -12,7 +12,7 @@ import pytest
 
 from app.models.rating import ConfidenceLevel, Rating, RatingCategory
 from app.models.signal import Signal, SignalCategory, SignalDirection, SignalStrength
-from app.reports.stock_report import StockReportError, generate_stock_report
+from app.reports.stock_report import generate_stock_report
 
 
 # ---------------------------------------------------------------------------
@@ -114,28 +114,16 @@ def _report(**kwargs) -> str:
 
 class TestValidation:
     def test_empty_ticker_raises(self):
-        with pytest.raises(StockReportError, match="ticker"):
+        with pytest.raises(ValueError, match="ticker"):
             generate_stock_report("", _make_rating(), [])
 
     def test_whitespace_ticker_raises(self):
-        with pytest.raises(StockReportError, match="ticker"):
+        with pytest.raises(ValueError, match="ticker"):
             generate_stock_report("   ", _make_rating(), [])
 
     def test_non_string_ticker_raises(self):
-        with pytest.raises(StockReportError, match="ticker"):
+        with pytest.raises(ValueError, match="ticker"):
             generate_stock_report(None, _make_rating(), [])  # type: ignore[arg-type]
-
-    def test_non_rating_raises(self):
-        with pytest.raises(StockReportError, match="rating"):
-            generate_stock_report("AAPL", "not a rating", [])  # type: ignore[arg-type]
-
-    def test_non_list_signals_raises(self):
-        with pytest.raises(StockReportError, match="signals"):
-            generate_stock_report("AAPL", _make_rating(), "oops")  # type: ignore[arg-type]
-
-    def test_non_signal_item_in_list_raises(self):
-        with pytest.raises(StockReportError, match="signals"):
-            generate_stock_report("AAPL", _make_rating(), [_neutral(), "bad"])  # type: ignore[list-item]
 
 
 # ---------------------------------------------------------------------------
