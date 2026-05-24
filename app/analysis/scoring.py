@@ -2,9 +2,9 @@
 Scoring engine.
 
 Implements technical-only scoring (score_technical_signals) and composite
-scoring across technical and fundamental signals (score_signals).
-Temporary weights: Technical 60%, Fundamental 40%; re-normalised when a
-category is absent.
+scoring across technical, fundamental, and risk signals (score_signals).
+Base weights: Technical 35%, Fundamental 25%, Risk 15%; re-normalised to
+active categories only. NEWS is reserved but not yet active.
 """
 
 from __future__ import annotations
@@ -19,10 +19,12 @@ class ScoringError(Exception):
     """Raised when stock signals cannot be scored."""
 
 
-# Supported categories and their weights (must sum to 1.0 when all present).
+# Supported categories and their base weights (sum to 0.75; re-normalised when
+# a category is absent). NEWS is reserved but not active yet.
 _WEIGHTS: dict[SignalCategory, float] = {
-    SignalCategory.TECHNICAL:   0.60,
-    SignalCategory.FUNDAMENTAL: 0.40,
+    SignalCategory.TECHNICAL:   0.35,
+    SignalCategory.FUNDAMENTAL: 0.25,
+    SignalCategory.RISK:        0.15,
 }
 
 
@@ -66,16 +68,18 @@ def score_signals(
     if not by_category:
         raise ScoringError(
             "No supported signal categories found in the provided signals. "
-            "Expected at least one TECHNICAL or FUNDAMENTAL signal."
+            "Expected at least one TECHNICAL, FUNDAMENTAL, or RISK signal."
         )
 
     total_weight = sum(_WEIGHTS[cat] for cat in by_category)
 
     tech_signals = by_category.get(SignalCategory.TECHNICAL, [])
     fund_signals = by_category.get(SignalCategory.FUNDAMENTAL, [])
+    risk_signals = by_category.get(SignalCategory.RISK, [])
 
-    technical_score = _signals_to_score(tech_signals) if tech_signals else 0.0
+    technical_score   = _signals_to_score(tech_signals) if tech_signals else 0.0
     fundamental_score = _signals_to_score(fund_signals) if fund_signals else 0.0
+    risk_score        = _signals_to_score(risk_signals) if risk_signals else 0.0
 
     composite = sum(
         _signals_to_score(cat_signals) * (_WEIGHTS[cat] / total_weight)
@@ -93,6 +97,8 @@ def score_signals(
         parts.append(f"{len(tech_signals)} technical")
     if fund_signals:
         parts.append(f"{len(fund_signals)} fundamental")
+    if risk_signals:
+        parts.append(f"{len(risk_signals)} risk")
     explanation = (
         f"Composite rating for {ticker.strip().upper()} based on "
         f"{' and '.join(parts)} signals."
@@ -112,6 +118,13 @@ def score_signals(
             "profitability, growth, debt, and cash flow signals."
         )
 
+    risk_summary: str | None = None
+    if risk_signals:
+        risk_summary = (
+            f"Risk score: {risk_score:.1f}/100 based on volatility, drawdown, "
+            "recent trend, liquidity, and beta signals."
+        )
+
     buy_trigger = _build_buy_trigger(category)
     sell_or_avoid_trigger = _build_sell_avoid_trigger(category)
 
@@ -124,9 +137,10 @@ def score_signals(
         technical_score=technical_score,
         fundamental_score=fundamental_score,
         news_score=0.0,
-        risk_score=0.0,
+        risk_score=risk_score,
         technical_summary=technical_summary,
         fundamental_summary=fundamental_summary,
+        risk_summary=risk_summary,
         key_positive_factors=positive_factors,
         key_risks=risk_factors,
         buy_trigger=buy_trigger,

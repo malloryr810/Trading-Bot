@@ -8,13 +8,15 @@ from __future__ import annotations
 
 import sys
 from datetime import datetime, timezone
-from io import StringIO
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from app.analysis.fundamentals_analysis import FundamentalAnalysisError
+from app.analysis.risk_analysis import RiskAnalysisError
 from app.analysis.scoring import ScoringError
 from app.analysis.technicals import TechnicalAnalysisError
+from app.data.fundamentals import FundamentalDataFetchError
 from app.data.market_data import DataFetchError
 from app.main import analyze_ticker, format_rating_output, main
 from app.models.rating import ConfidenceLevel, Rating, RatingCategory
@@ -25,10 +27,14 @@ from app.models.signal import Signal, SignalCategory, SignalDirection, SignalStr
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_signal(score_impact: float = 0.10, direction: SignalDirection = SignalDirection.BULLISH) -> Signal:
+def _make_signal(
+    score_impact: float = 0.10,
+    direction: SignalDirection = SignalDirection.BULLISH,
+    category: SignalCategory = SignalCategory.TECHNICAL,
+) -> Signal:
     return Signal(
         name="Test Signal",
-        category=SignalCategory.TECHNICAL,
+        category=category,
         direction=direction,
         strength=SignalStrength.MODERATE,
         description="A test signal.",
@@ -48,7 +54,7 @@ def _make_rating(
         final_category=category,
         score=score,
         confidence=ConfidenceLevel.MEDIUM,
-        explanation="Technical-only rating for AAPL based on 7 technical signals.",
+        explanation="Composite rating for AAPL based on 7 technical and 5 fundamental and 4 risk signals.",
         technical_score=score,
         technical_summary="Technical score: 60.0/100 based on indicators.",
         key_positive_factors=positives or [],
@@ -61,12 +67,21 @@ def _make_rating(
     )
 
 
+def _make_mock_fundamentals(beta: float | None = 1.1) -> MagicMock:
+    m = MagicMock()
+    m.beta = beta
+    return m
+
+
 # Patch targets
-_FETCH   = "app.main.get_price_history"
-_CALC    = "app.main.calculate_technical_indicators"
-_SUMM    = "app.main.summarize_technical_signals"
-_BUILD   = "app.main.build_technical_signals"
-_SCORE   = "app.main.score_technical_signals"
+_FETCH      = "app.main.get_price_history"
+_FETCH_FUND = "app.main.get_company_fundamentals"
+_CALC       = "app.main.calculate_technical_indicators"
+_SUMM       = "app.main.summarize_technical_signals"
+_BUILD_TECH = "app.main.build_technical_signals"
+_BUILD_FUND = "app.main.build_fundamental_signals"
+_RISK       = "app.main.analyze_risk_conditions"
+_SCORE      = "app.main.score_signals"
 
 
 def _mock_pipeline(rating: Rating | None = None):
@@ -76,13 +91,21 @@ def _mock_pipeline(rating: Rating | None = None):
     @contextlib.contextmanager
     def _ctx():
         with (
-            patch(_FETCH, return_value=MagicMock()) as mock_fetch,
-            patch(_CALC,  return_value=MagicMock()) as mock_calc,
-            patch(_SUMM,  return_value=MagicMock()) as mock_summ,
-            patch(_BUILD, return_value=[_make_signal()]) as mock_build,
-            patch(_SCORE, return_value=rating or _make_rating()) as mock_score,
+            patch(_FETCH,      return_value=MagicMock()) as mock_fetch,
+            patch(_FETCH_FUND, return_value=_make_mock_fundamentals()) as mock_fetch_fund,
+            patch(_CALC,       return_value=MagicMock()) as mock_calc,
+            patch(_SUMM,       return_value=MagicMock()) as mock_summ,
+            patch(_BUILD_TECH, return_value=[_make_signal()]) as mock_build_tech,
+            patch(_BUILD_FUND, return_value=[_make_signal(category=SignalCategory.FUNDAMENTAL)]) as mock_build_fund,
+            patch(_RISK,       return_value=[_make_signal(category=SignalCategory.RISK)]) as mock_risk,
+            patch(_SCORE,      return_value=rating or _make_rating()) as mock_score,
         ):
-            yield mock_fetch, mock_calc, mock_summ, mock_build, mock_score
+            yield (
+                mock_fetch, mock_fetch_fund,
+                mock_calc, mock_summ,
+                mock_build_tech, mock_build_fund, mock_risk,
+                mock_score,
+            )
 
     return _ctx()
 
@@ -127,22 +150,62 @@ class TestMainErrors:
         assert result == 1
         assert "Error fetching" in capsys.readouterr().err
 
-    def test_technical_analysis_error_returns_1(self, capsys):
+    def test_fundamental_fetch_error_returns_1(self, capsys):
         with (
             patch(_FETCH, return_value=MagicMock()),
+            patch(_FETCH_FUND, side_effect=FundamentalDataFetchError("no data")),
+        ):
+            result = main(["AAPL"])
+        assert result == 1
+        assert "fundamental" in capsys.readouterr().err.lower()
+
+    def test_technical_analysis_error_returns_1(self, capsys):
+        with (
+            patch(_FETCH,      return_value=MagicMock()),
+            patch(_FETCH_FUND, return_value=_make_mock_fundamentals()),
             patch(_CALC, side_effect=TechnicalAnalysisError("bad data")),
         ):
             result = main(["AAPL"])
         assert result == 1
         assert "technical analysis" in capsys.readouterr().err.lower()
 
+    def test_fundamental_analysis_error_returns_1(self, capsys):
+        with (
+            patch(_FETCH,      return_value=MagicMock()),
+            patch(_FETCH_FUND, return_value=_make_mock_fundamentals()),
+            patch(_CALC,       return_value=MagicMock()),
+            patch(_SUMM,       return_value=MagicMock()),
+            patch(_BUILD_TECH, return_value=[_make_signal()]),
+            patch(_BUILD_FUND, side_effect=FundamentalAnalysisError("bad fundamentals")),
+        ):
+            result = main(["AAPL"])
+        assert result == 1
+        assert "fundamental analysis" in capsys.readouterr().err.lower()
+
+    def test_risk_analysis_error_returns_1(self, capsys):
+        with (
+            patch(_FETCH,      return_value=MagicMock()),
+            patch(_FETCH_FUND, return_value=_make_mock_fundamentals()),
+            patch(_CALC,       return_value=MagicMock()),
+            patch(_SUMM,       return_value=MagicMock()),
+            patch(_BUILD_TECH, return_value=[_make_signal()]),
+            patch(_BUILD_FUND, return_value=[_make_signal(category=SignalCategory.FUNDAMENTAL)]),
+            patch(_RISK,       side_effect=RiskAnalysisError("bad risk")),
+        ):
+            result = main(["AAPL"])
+        assert result == 1
+        assert "risk analysis" in capsys.readouterr().err.lower()
+
     def test_scoring_error_returns_1(self, capsys):
         with (
-            patch(_FETCH, return_value=MagicMock()),
-            patch(_CALC,  return_value=MagicMock()),
-            patch(_SUMM,  return_value=MagicMock()),
-            patch(_BUILD, return_value=[_make_signal()]),
-            patch(_SCORE, side_effect=ScoringError("bad signals")),
+            patch(_FETCH,      return_value=MagicMock()),
+            patch(_FETCH_FUND, return_value=_make_mock_fundamentals()),
+            patch(_CALC,       return_value=MagicMock()),
+            patch(_SUMM,       return_value=MagicMock()),
+            patch(_BUILD_TECH, return_value=[_make_signal()]),
+            patch(_BUILD_FUND, return_value=[_make_signal(category=SignalCategory.FUNDAMENTAL)]),
+            patch(_RISK,       return_value=[_make_signal(category=SignalCategory.RISK)]),
+            patch(_SCORE,      side_effect=ScoringError("bad signals")),
         ):
             result = main(["AAPL"])
         assert result == 1
@@ -155,29 +218,72 @@ class TestMainErrors:
 
 class TestAnalyzeTicker:
     def test_returns_rating(self):
-        with _mock_pipeline() as (_, __, ___, ____, mock_score):
+        with _mock_pipeline() as mocks:
             result = analyze_ticker("AAPL")
         assert isinstance(result, Rating)
 
     def test_calls_pipeline_in_order(self):
         call_order: list[str] = []
 
+        fund_mock = _make_mock_fundamentals()
+
         with (
-            patch(_FETCH, side_effect=lambda *a, **kw: call_order.append("fetch") or MagicMock()),
-            patch(_CALC,  side_effect=lambda *a, **kw: call_order.append("calc") or MagicMock()),
-            patch(_SUMM,  side_effect=lambda *a, **kw: call_order.append("summ") or MagicMock()),
-            patch(_BUILD, side_effect=lambda *a, **kw: call_order.append("build") or [_make_signal()]),
-            patch(_SCORE, side_effect=lambda **kw: call_order.append("score") or _make_rating()),
+            patch(_FETCH,      side_effect=lambda *a, **kw: call_order.append("fetch") or MagicMock()),
+            patch(_FETCH_FUND, side_effect=lambda *a, **kw: call_order.append("fetch_fund") or fund_mock),
+            patch(_CALC,       side_effect=lambda *a, **kw: call_order.append("calc") or MagicMock()),
+            patch(_SUMM,       side_effect=lambda *a, **kw: call_order.append("summ") or MagicMock()),
+            patch(_BUILD_TECH, side_effect=lambda *a, **kw: call_order.append("build_tech") or [_make_signal()]),
+            patch(_BUILD_FUND, side_effect=lambda *a, **kw: call_order.append("build_fund") or []),
+            patch(_RISK,       side_effect=lambda *a, **kw: call_order.append("risk") or []),
+            patch(_SCORE,      side_effect=lambda **kw: call_order.append("score") or _make_rating()),
         ):
             analyze_ticker("AAPL")
 
-        assert call_order == ["fetch", "calc", "summ", "build", "score"]
+        assert call_order == [
+            "fetch", "fetch_fund",
+            "calc", "summ",
+            "build_tech", "build_fund", "risk",
+            "score",
+        ]
 
     def test_passes_yfinance_as_data_source(self):
-        with _mock_pipeline() as (_, __, ___, ____, mock_score):
+        with _mock_pipeline() as mocks:
             analyze_ticker("AAPL")
+        mock_score = mocks[-1]
         call_kwargs = mock_score.call_args.kwargs
         assert "yfinance" in call_kwargs["data_sources_used"]
+
+    def test_passes_beta_from_fundamentals_to_risk(self):
+        fund_mock = _make_mock_fundamentals(beta=1.3)
+        with (
+            patch(_FETCH,      return_value=MagicMock()),
+            patch(_FETCH_FUND, return_value=fund_mock),
+            patch(_CALC,       return_value=MagicMock()),
+            patch(_SUMM,       return_value=MagicMock()),
+            patch(_BUILD_TECH, return_value=[_make_signal()]),
+            patch(_BUILD_FUND, return_value=[]),
+            patch(_RISK,       return_value=[]) as mock_risk,
+            patch(_SCORE,      return_value=_make_rating()),
+        ):
+            analyze_ticker("AAPL")
+        call_kwargs = mock_risk.call_args.kwargs
+        assert call_kwargs.get("beta") == pytest.approx(1.3)
+
+    def test_passes_none_beta_when_fundamentals_has_no_beta(self):
+        fund_mock = _make_mock_fundamentals(beta=None)
+        with (
+            patch(_FETCH,      return_value=MagicMock()),
+            patch(_FETCH_FUND, return_value=fund_mock),
+            patch(_CALC,       return_value=MagicMock()),
+            patch(_SUMM,       return_value=MagicMock()),
+            patch(_BUILD_TECH, return_value=[_make_signal()]),
+            patch(_BUILD_FUND, return_value=[]),
+            patch(_RISK,       return_value=[]) as mock_risk,
+            patch(_SCORE,      return_value=_make_rating()),
+        ):
+            analyze_ticker("AAPL")
+        call_kwargs = mock_risk.call_args.kwargs
+        assert call_kwargs.get("beta") is None
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +311,7 @@ class TestFormatRatingOutput:
         assert "60.0/100" in out
 
     def test_includes_explanation(self):
-        assert "Technical-only rating" in self._output()
+        assert "Composite rating" in self._output()
 
     def test_includes_technical_summary(self):
         assert "Technical score" in self._output()

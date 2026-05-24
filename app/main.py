@@ -1,13 +1,13 @@
 """
 Entry point for the Investment Bot.
 
-Runs a technical-only single-ticker analysis pipeline from the terminal:
+Runs a full single-ticker analysis pipeline from the terminal:
 
     python -m app.main <TICKER>
 
-Fetches historical OHLCV data, calculates technical indicators, builds
-typed Signal objects, scores them, and prints a plain-text research report.
-Fundamentals, news, and risk analysis are not yet wired into the CLI.
+Fetches historical OHLCV data and company fundamentals, computes technical,
+fundamental, and risk signals, scores them with composite weights, and prints
+a plain-text research report.
 """
 
 from __future__ import annotations
@@ -15,13 +15,19 @@ from __future__ import annotations
 import sys
 from datetime import datetime, timezone
 
-from app.analysis.scoring import ScoringError, score_technical_signals
+from app.analysis.fundamentals_analysis import (
+    FundamentalAnalysisError,
+    build_fundamental_signals,
+)
+from app.analysis.risk_analysis import RiskAnalysisError, analyze_risk_conditions
+from app.analysis.scoring import ScoringError, score_signals
 from app.analysis.technicals import (
     TechnicalAnalysisError,
     build_technical_signals,
     calculate_technical_indicators,
     summarize_technical_signals,
 )
+from app.data.fundamentals import FundamentalDataFetchError, get_company_fundamentals
 from app.data.market_data import DataFetchError, get_price_history
 from app.models.rating import Rating
 from app.reports.stock_report import generate_stock_report
@@ -32,26 +38,37 @@ from app.reports.stock_report import generate_stock_report
 # ---------------------------------------------------------------------------
 
 def analyze_ticker(ticker: str) -> Rating:
-    """Run the full technical analysis pipeline for a single ticker.
+    """Run the full analysis pipeline for a single ticker.
+
+    Fetches market data and company fundamentals, computes technical,
+    fundamental, and risk signals, then scores them with composite weights.
 
     Args:
         ticker: Stock ticker symbol (e.g. "AAPL").
 
     Returns:
-        A Rating produced by the technical scoring engine.
+        A composite Rating covering technical, fundamental, and risk signals.
 
     Raises:
         DataFetchError: If market data cannot be fetched or validated.
-        TechnicalAnalysisError: If indicators or signals cannot be computed.
+        FundamentalDataFetchError: If fundamental data cannot be fetched.
+        TechnicalAnalysisError: If technical indicators or signals cannot be computed.
+        FundamentalAnalysisError: If fundamental signals cannot be computed.
+        RiskAnalysisError: If risk signals cannot be computed.
         ScoringError: If the signals cannot be scored.
     """
-    price_data = get_price_history(ticker)
-    indicator_data = calculate_technical_indicators(price_data)
+    price_data   = get_price_history(ticker)
+    fundamentals = get_company_fundamentals(ticker)
+
+    indicator_data    = calculate_technical_indicators(price_data)
     indicator_summary = summarize_technical_signals(indicator_data)
-    signals = build_technical_signals(indicator_summary)
-    return score_technical_signals(
+    tech_signals      = build_technical_signals(indicator_summary)
+    fund_signals      = build_fundamental_signals(fundamentals)
+    risk_signals      = analyze_risk_conditions(price_data, beta=fundamentals.beta)
+
+    return score_signals(
         ticker=ticker,
-        signals=signals,
+        signals=tech_signals + fund_signals + risk_signals,
         data_timestamp=datetime.now(tz=timezone.utc),
         data_sources_used=["yfinance"],
     )
@@ -95,7 +112,7 @@ def format_rating_output(rating: Rating) -> str:
         f"  {rating.sell_or_avoid_trigger or 'N/A'}",
         "",
         "Note:",
-        "  This is a technical-only decision-support output.",
+        "  This is a decision-support output.",
         "  It is not financial advice and does not place trades.",
     ]
     return "\n".join(lines)
@@ -127,8 +144,17 @@ def main(argv: list[str] | None = None) -> int:
     except DataFetchError as exc:
         print(f"Error fetching market data: {exc}", file=sys.stderr)
         return 1
+    except FundamentalDataFetchError as exc:
+        print(f"Error fetching fundamental data: {exc}", file=sys.stderr)
+        return 1
     except TechnicalAnalysisError as exc:
         print(f"Error running technical analysis: {exc}", file=sys.stderr)
+        return 1
+    except FundamentalAnalysisError as exc:
+        print(f"Error running fundamental analysis: {exc}", file=sys.stderr)
+        return 1
+    except RiskAnalysisError as exc:
+        print(f"Error running risk analysis: {exc}", file=sys.stderr)
         return 1
     except ScoringError as exc:
         print(f"Error scoring signals: {exc}", file=sys.stderr)

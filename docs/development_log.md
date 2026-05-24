@@ -1,5 +1,17 @@
 # Development Log
 
+## 2026-05-23 — Wire risk analysis into pipeline
+
+- Updated `_WEIGHTS` in `scoring.py`: Technical 35%, Fundamental 25%, Risk 15% (total 0.75, re-normalised when a category is absent)
+- `score_signals()` now handles `SignalCategory.RISK`: computes `risk_score`, populates `risk_summary`, includes risk signal count in `explanation`, passes `risk_score` and `risk_summary` to `Rating`
+- Error message updated: "Expected at least one TECHNICAL, FUNDAMENTAL, or RISK signal."
+- `stock_report.py`: RISK CONDITIONS section always rendered; fallback text "Risk conditions were not assessed for this report." shown when `risk_summary` is None
+- `main.py`: full pipeline wired — fetches fundamentals, builds all three signal sets, scores with `score_signals()`; handles `FundamentalDataFetchError`, `FundamentalAnalysisError`, and `RiskAnalysisError` in `main()`
+- Updated `tests/test_composite_scoring.py`: fixed 7 tests that assumed old 60/40 weights; added `TestRiskSignals` (7 tests) and `TestThreeWayWeighting` (4 tests); renamed two `TestNoSupportedCategories` tests that no longer raise
+- Updated `tests/test_main.py`: rewrote mock targets for new pipeline; added tests for `FundamentalDataFetchError`, `FundamentalAnalysisError`, `RiskAnalysisError`; added `test_passes_beta_from_fundamentals_to_risk` and `test_passes_none_beta_when_fundamentals_has_no_beta`
+- Added 3 tests to `tests/test_stock_report.py` for the RISK CONDITIONS section
+- Full suite 515/515 passing
+
 ## 2026-05-23 — Risk analysis module
 
 - Implemented `app/analysis/risk_analysis.py` with `analyze_risk_conditions()` and `RiskAnalysisError`

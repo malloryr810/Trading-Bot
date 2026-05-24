@@ -129,11 +129,12 @@ def _score_breakdown(rating: Rating) -> str:
 
 
 def _analysis_summaries(rating: Rating) -> str:
+    risk_text = rating.risk_summary or "Risk conditions were not assessed for this report."
     present = [
-        ("TECHNICAL ANALYSIS",  rating.technical_summary),
+        ("TECHNICAL ANALYSIS",   rating.technical_summary),
         ("FUNDAMENTAL ANALYSIS", rating.fundamental_summary),
-        ("NEWS / SENTIMENT",    rating.news_summary),
-        ("RISK CONDITIONS",     rating.risk_summary),
+        ("NEWS / SENTIMENT",     rating.news_summary),
+        ("RISK CONDITIONS",      risk_text),
     ]
     active = [(title, summary) for title, summary in present if summary]
     if not active:

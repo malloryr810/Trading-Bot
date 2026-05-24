@@ -446,3 +446,37 @@ class TestImmutability:
         sources = ["yfinance"]
         _report(data_sources=sources)
         assert sources == ["yfinance"]
+
+
+# ---------------------------------------------------------------------------
+# Risk conditions section
+# ---------------------------------------------------------------------------
+
+class TestRiskConditionsSection:
+    def test_risk_conditions_header_always_present(self):
+        # RISK CONDITIONS should appear even when risk_summary is None
+        out = _report(rating=_make_rating())
+        assert "RISK CONDITIONS" in out
+
+    def test_fallback_text_when_no_risk_summary(self):
+        rating = _make_rating()  # risk_summary defaults to None
+        out = generate_stock_report("AAPL", rating, [])
+        assert "not assessed" in out.lower()
+
+    def test_risk_summary_shown_when_present(self):
+        rating = Rating(
+            ticker="AAPL",
+            final_category=RatingCategory.WATCHLIST,
+            score=62.0,
+            confidence=ConfidenceLevel.MEDIUM,
+            explanation="Test.",
+            technical_score=62.0,
+            risk_score=55.0,
+            risk_summary="Risk score: 55.0/100 based on volatility and drawdown signals.",
+            key_positive_factors=[],
+            key_risks=[],
+            data_sources_used=["yfinance"],
+            signals_used=[_neutral()],
+        )
+        out = generate_stock_report("AAPL", rating, [])
+        assert "Risk score: 55.0/100" in out
