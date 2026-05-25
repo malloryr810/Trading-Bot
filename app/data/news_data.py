@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 import yfinance as yf
 
 from app.models.news import NewsItem
+from app.utils.helpers import normalize_ticker
 
 
 class NewsFetchError(Exception):
@@ -34,9 +35,11 @@ def get_recent_news(ticker: str, limit: int = 10) -> list[NewsItem]:
         NewsFetchError: If the ticker is invalid, limit is invalid, or yfinance
             raises an error during the fetch.
     """
-    _validate_ticker(ticker)
+    try:
+        symbol = normalize_ticker(ticker)
+    except ValueError as exc:
+        raise NewsFetchError(str(exc)) from exc
     _validate_limit(limit)
-    symbol = ticker.strip().upper()
 
     try:
         raw_news = yf.Ticker(symbol).news
@@ -62,15 +65,6 @@ def get_recent_news(ticker: str, limit: int = 10) -> list[NewsItem]:
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
-
-def _validate_ticker(ticker: object) -> None:
-    if not isinstance(ticker, str):
-        raise NewsFetchError(
-            f"Ticker must be a string, got {type(ticker).__name__}."
-        )
-    if not ticker.strip():
-        raise NewsFetchError("Ticker must not be empty or whitespace.")
-
 
 def _validate_limit(limit: object) -> None:
     if isinstance(limit, bool) or not isinstance(limit, int):

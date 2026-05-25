@@ -1,5 +1,15 @@
 # Development Log
 
+## 2026-05-24 — Consolidate shared helpers into app/utils/helpers.py
+
+- Implemented `safe_float(value) -> float | None` and `normalize_ticker(ticker) -> str` in `app/utils/helpers.py`
+- Removed `_safe_float` from `app/analysis/technicals.py`, `app/analysis/risk_analysis.py`, and `app/data/fundamentals.py`; all three copies were identical in behavior
+- Removed `_validate_ticker` from `app/data/market_data.py`, `app/data/fundamentals.py`, `app/data/news_data.py`, and `app/data/storage.py`; all four copies were identical in behavior (storage.py used lowercase "ticker" in messages but module-boundary error types are unchanged)
+- Each module now imports from `app.utils.helpers`; module-specific exception types (`DataFetchError`, `FundamentalDataFetchError`, `NewsFetchError`, `StorageError`) are preserved at public module boundaries via `try: normalize_ticker(ticker); except ValueError: raise ModuleError(...) from exc`
+- Removed `import math` from `app/analysis/technicals.py` and `app/data/fundamentals.py` (only used by the removed helpers); kept in `app/analysis/risk_analysis.py` (`_validate_beta` uses `math.isfinite`)
+- Added 29 tests in `tests/test_helpers.py` covering both helpers
+- Full suite 842/842 passing
+
 ## 2026-05-24 — Codebase audit and cleanup
 
 **`app/main.py`**

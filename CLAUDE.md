@@ -65,6 +65,7 @@ python -m py_compile app/analysis/scoring.py
 | `app/analysis/news_analysis.py` | Builds exactly 3 NEWS Signals (Sentiment, Risk Headlines, Coverage) via keyword matching |
 | `app/analysis/scoring.py` | Composite scoring engine with `score_signals()` and `score_technical_signals()` |
 | `app/reports/stock_report.py` | Generates a formatted plain-text research report from a Rating and its Signals |
+| `app/utils/helpers.py` | Shared low-level helpers: `safe_float` (safe numeric conversion) and `normalize_ticker` (validation + uppercase normalization) |
 | `app/main.py` | CLI entry point — orchestrates the full pipeline and prints the report |
 
 ## Architecture

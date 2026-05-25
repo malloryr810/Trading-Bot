@@ -20,6 +20,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from app.utils.helpers import normalize_ticker
+
 
 _SUPPORTED_EXTENSIONS: frozenset[str] = frozenset({"txt", "json"})
 
@@ -50,9 +52,11 @@ def build_report_filename(
     Raises:
         StorageError: If ticker is invalid or extension is not supported.
     """
-    _validate_ticker(ticker)
+    try:
+        symbol = normalize_ticker(ticker)
+    except ValueError as exc:
+        raise StorageError(str(exc)) from exc
     ext = _normalise_extension(extension)
-    symbol = ticker.strip().upper()
     ts = timestamp if timestamp is not None else datetime.now(tz=timezone.utc)
     stamp = ts.strftime("%Y%m%d_%H%M%S")
     return f"{symbol}_{stamp}.{ext}"
@@ -103,7 +107,10 @@ def save_text_report(
     """
     if not isinstance(report_text, str) or not report_text.strip():
         raise StorageError("report_text must be a non-empty string.")
-    _validate_ticker(ticker)
+    try:
+        normalize_ticker(ticker)
+    except ValueError as exc:
+        raise StorageError(str(exc)) from exc
     directory = ensure_output_dir(output_dir)
     filename = build_report_filename(ticker, timestamp=timestamp, extension="txt")
     filepath = directory / filename
@@ -141,7 +148,10 @@ def save_json_result(
         StorageError: If ticker is invalid, result cannot be serialised, or a
             filesystem error occurs while writing.
     """
-    _validate_ticker(ticker)
+    try:
+        normalize_ticker(ticker)
+    except ValueError as exc:
+        raise StorageError(str(exc)) from exc
     data = _to_json_dict(result)
     directory = ensure_output_dir(output_dir)
     filename = build_report_filename(ticker, timestamp=timestamp, extension="json")
@@ -159,15 +169,6 @@ def save_json_result(
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
-
-def _validate_ticker(ticker: object) -> None:
-    if not isinstance(ticker, str):
-        raise StorageError(
-            f"ticker must be a string, got {type(ticker).__name__}."
-        )
-    if not ticker.strip():
-        raise StorageError("ticker must not be empty or whitespace.")
-
 
 def _normalise_extension(extension: object) -> str:
     if not isinstance(extension, str):

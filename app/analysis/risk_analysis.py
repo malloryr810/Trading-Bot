@@ -14,6 +14,7 @@ from math import sqrt
 import pandas as pd
 
 from app.models.signal import Signal, SignalCategory, SignalDirection, SignalStrength
+from app.utils.helpers import safe_float
 
 
 REQUIRED_COLUMNS = {"close", "volume"}
@@ -120,7 +121,7 @@ def _validate_beta(beta: object) -> None:
 
 def _volatility_signal(close: pd.Series) -> Signal:
     """Annualized volatility from daily returns."""
-    vol_daily = _safe_float(close.pct_change().dropna().std())
+    vol_daily = safe_float(close.pct_change().dropna().std())
 
     if vol_daily is None:
         return _insufficient_data_signal(
@@ -173,7 +174,7 @@ def _max_drawdown_signal(close: pd.Series) -> Signal:
         )
 
     drawdown = (close / close.cummax()) - 1
-    max_dd = _safe_float(drawdown.min())
+    max_dd = safe_float(drawdown.min())
 
     if max_dd is None:
         return _insufficient_data_signal(
@@ -226,7 +227,7 @@ def _recent_trend_signal(close: pd.Series) -> Signal:
             {"return_30d": None, "rows_available": len(close)},
         )
 
-    return_30d = _safe_float((close.iloc[-1] / close.iloc[-31]) - 1)
+    return_30d = safe_float((close.iloc[-1] / close.iloc[-31]) - 1)
 
     if return_30d is None:
         return _insufficient_data_signal(
@@ -269,7 +270,7 @@ def _recent_trend_signal(close: pd.Series) -> Signal:
 
 def _liquidity_signal(volume: pd.Series) -> Signal:
     """Average daily volume as a proxy for liquidity."""
-    avg_vol = _safe_float(volume.mean())
+    avg_vol = safe_float(volume.mean())
 
     if avg_vol is None:
         return _insufficient_data_signal(
@@ -343,15 +344,6 @@ def _beta_signal(beta: float) -> Signal:
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
-
-def _safe_float(value: object) -> float | None:
-    """Return float if value is a finite number, else None."""
-    try:
-        f = float(value)  # type: ignore[arg-type]
-        return None if not math.isfinite(f) else f
-    except (TypeError, ValueError):
-        return None
-
 
 def _insufficient_data_signal(
     name: str,

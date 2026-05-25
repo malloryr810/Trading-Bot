@@ -8,12 +8,12 @@ analysis layer. Does not perform scoring or signal generation.
 
 from __future__ import annotations
 
-import math
 from datetime import datetime, timezone
 
 import yfinance as yf
 
 from app.models.fundamentals import CompanyFundamentals
+from app.utils.helpers import normalize_ticker, safe_float
 
 
 class FundamentalDataFetchError(Exception):
@@ -34,8 +34,10 @@ def get_company_fundamentals(ticker: str) -> CompanyFundamentals:
         FundamentalDataFetchError: If the ticker is invalid, yfinance raises
             an error, or the returned data does not identify a valid company.
     """
-    _validate_ticker(ticker)
-    symbol = ticker.strip().upper()
+    try:
+        symbol = normalize_ticker(ticker)
+    except ValueError as exc:
+        raise FundamentalDataFetchError(str(exc)) from exc
 
     try:
         info = yf.Ticker(symbol).info
@@ -62,17 +64,17 @@ def get_company_fundamentals(ticker: str) -> CompanyFundamentals:
         company_name=company_name,
         sector=info.get("sector") or None,
         industry=info.get("industry") or None,
-        market_cap=_safe_float(info.get("marketCap")),
-        trailing_pe=_safe_float(info.get("trailingPE")),
-        forward_pe=_safe_float(info.get("forwardPE")),
-        price_to_book=_safe_float(info.get("priceToBook")),
-        profit_margin=_safe_float(info.get("profitMargins")),
-        revenue_growth=_safe_float(info.get("revenueGrowth")),
-        earnings_growth=_safe_float(info.get("earningsGrowth")),
-        debt_to_equity=_safe_float(info.get("debtToEquity")),
-        free_cash_flow=_safe_float(info.get("freeCashflow")),
-        dividend_yield=_safe_float(info.get("dividendYield")),
-        beta=_safe_float(info.get("beta")),
+        market_cap=safe_float(info.get("marketCap")),
+        trailing_pe=safe_float(info.get("trailingPE")),
+        forward_pe=safe_float(info.get("forwardPE")),
+        price_to_book=safe_float(info.get("priceToBook")),
+        profit_margin=safe_float(info.get("profitMargins")),
+        revenue_growth=safe_float(info.get("revenueGrowth")),
+        earnings_growth=safe_float(info.get("earningsGrowth")),
+        debt_to_equity=safe_float(info.get("debtToEquity")),
+        free_cash_flow=safe_float(info.get("freeCashflow")),
+        dividend_yield=safe_float(info.get("dividendYield")),
+        beta=safe_float(info.get("beta")),
         data_timestamp=datetime.now(tz=timezone.utc),
     )
 
@@ -80,28 +82,6 @@ def get_company_fundamentals(ticker: str) -> CompanyFundamentals:
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
-
-def _validate_ticker(ticker: object) -> None:
-    if not isinstance(ticker, str):
-        raise FundamentalDataFetchError(
-            f"Ticker must be a string, got {type(ticker).__name__}."
-        )
-    if not ticker.strip():
-        raise FundamentalDataFetchError("Ticker must not be empty or whitespace.")
-
-
-def _safe_float(value: object) -> float | None:
-    """Return float if value is a finite, usable number; else None."""
-    if value is None:
-        return None
-    try:
-        f = float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return None
-    if math.isnan(f) or math.isinf(f):
-        return None
-    return f
-
 
 def _extract_company_name(info: dict) -> str | None:
     """Return the best available company name from yfinance info, or None."""

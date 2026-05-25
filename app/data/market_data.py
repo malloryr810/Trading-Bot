@@ -8,6 +8,8 @@ Returns a normalized, validated pandas DataFrame consumed by the analysis layer.
 import yfinance as yf
 import pandas as pd
 
+from app.utils.helpers import normalize_ticker
+
 
 REQUIRED_COLUMNS = {"open", "high", "low", "close", "volume"}
 
@@ -36,8 +38,10 @@ def get_price_history(
         DataFetchError: If the ticker is invalid, data is unavailable,
             required columns are missing, or yfinance raises an error.
     """
-    _validate_ticker(ticker)
-    symbol = ticker.strip().upper()
+    try:
+        symbol = normalize_ticker(ticker)
+    except ValueError as exc:
+        raise DataFetchError(str(exc)) from exc
 
     try:
         raw = yf.download(symbol, period=period, interval=interval, progress=False)
@@ -68,15 +72,6 @@ def get_price_history(
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
-
-def _validate_ticker(ticker: object) -> None:
-    if not isinstance(ticker, str):
-        raise DataFetchError(
-            f"Ticker must be a string, got {type(ticker).__name__}."
-        )
-    if not ticker.strip():
-        raise DataFetchError("Ticker must not be empty or whitespace.")
-
 
 def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Lowercase column names and replace spaces with underscores."""
