@@ -1,5 +1,31 @@
 # Development Log
 
+## 2026-05-25 — Add basic watchlist scanning
+
+**`app/watchlist.py`** (new)
+
+- `WatchlistLoadError` — raised for missing or empty watchlist files
+- `WatchlistResult` dataclass — ticker, company_name, final_category, score, confidence_level, current_price, error_message; `succeeded` property distinguishes success from failure
+- `load_watchlist(path)` — reads a plain-text file; strips whitespace; ignores blank lines and lines starting with `#`; normalizes tickers to uppercase; removes duplicates preserving first-seen order; raises `WatchlistLoadError` for missing files or no valid tickers
+- `scan_watchlist(tickers, analyze_func)` — calls `analyze_func` for each ticker; captures failures as `WatchlistResult` entries with `error_message` set so one bad ticker never aborts the scan; returns successful results sorted by score descending followed by failures in encounter order; `analyze_func` is injectable so tests can avoid live API calls
+- `format_watchlist_summary(results)` — renders an aligned plain-text table with TICKER / CATEGORY / SCORE / CONFIDENCE columns, error rows for failed tickers, and a footer with scanned/success/failed counts
+
+**`watchlists/default.txt`** (new)
+
+- Sample watchlist: AAPL, MSFT, NVDA, GOOGL, AMZN
+
+**`app/main.py`** (updated)
+
+- Added `--watchlist <file>` CLI flag; dispatches to `_run_watchlist` helper which loads the file, runs `scan_watchlist` via the existing `analyze_ticker` → `build_stock_report` pipeline, and prints the summary
+- Single-ticker path and `--save-report`/`--save-json` flags unchanged
+- Providing both a ticker and `--watchlist` prints an error and returns 1
+
+**Tests added**
+
+- `tests/test_watchlist.py` — 62 tests covering: file loading (normal, blank lines, comments, lowercase, dedup, whitespace, missing file, empty file); scan success, partial failure, all-failure, and ordering; format output (headers, counts, columns, error rows, order preservation); CLI integration (watchlist flag dispatch, missing path, ticker+watchlist conflict, partial failure returns 0, existing single-ticker path unaffected)
+
+No trading functionality added. Full suite 1030/1030 passing (previously 968, +62 tests).
+
 ## 2026-05-25 — Implement structured report layer (StockReport model, templates, report generator)
 
 **`app/models/stock_report.py`**

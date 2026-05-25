@@ -1,12 +1,16 @@
 """
 Entry point for the Investment Bot.
 
-Runs a full single-ticker analysis pipeline from the terminal:
+Single-ticker mode:
 
     python -m app.main <TICKER>
     python -m app.main <TICKER> --save-report
     python -m app.main <TICKER> --save-json
     python -m app.main <TICKER> --save-report --save-json
+
+Watchlist mode:
+
+    python -m app.main --watchlist <file>
 
 Fetches historical OHLCV data and company fundamentals, computes technical,
 fundamental, risk, and news signals, scores them with composite weights, and
@@ -90,8 +94,41 @@ def analyze_ticker(ticker: str) -> Rating:
 
 
 # ---------------------------------------------------------------------------
+# Watchlist mode
+# ---------------------------------------------------------------------------
+
+def _run_watchlist(watchlist_path: str) -> int:
+    """Run watchlist scan mode and print a ranked summary table."""
+    from app.watchlist import (
+        WatchlistLoadError,
+        format_watchlist_summary,
+        load_watchlist,
+        scan_watchlist,
+    )
+
+    try:
+        tickers = load_watchlist(watchlist_path)
+    except WatchlistLoadError as exc:
+        print(f"Error loading watchlist: {exc}", file=sys.stderr)
+        return 1
+
+    results = scan_watchlist(
+        tickers,
+        lambda ticker: build_stock_report(analyze_ticker(ticker)),
+    )
+    print(format_watchlist_summary(results))
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
+_USAGE = (
+    "Usage: python -m app.main <TICKER> [--save-report] [--save-json]\n"
+    "       python -m app.main --watchlist <file>"
+)
+
 
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point.
@@ -104,13 +141,33 @@ def main(argv: list[str] | None = None) -> int:
     """
     args = argv if argv is not None else sys.argv[1:]
 
-    positional = [a for a in args if not a.startswith("--")]
+    # Extract --watchlist value, if present.
+    watchlist_path: str | None = None
+    if "--watchlist" in args:
+        idx = args.index("--watchlist")
+        if idx + 1 >= len(args):
+            print("Error: --watchlist requires a file path.", file=sys.stderr)
+            return 1
+        watchlist_path = args[idx + 1]
 
-    if not positional:
+    # Positionals are non-flag args, excluding the watchlist path value.
+    positional = [
+        a for a in args
+        if not a.startswith("--") and a != (watchlist_path or "")
+    ]
+
+    if watchlist_path and positional:
         print(
-            "Usage: python -m app.main <TICKER> [--save-report] [--save-json]",
+            "Error: provide either a ticker or --watchlist, not both.",
             file=sys.stderr,
         )
+        return 1
+
+    if watchlist_path:
+        return _run_watchlist(watchlist_path)
+
+    if not positional:
+        print(_USAGE, file=sys.stderr)
         return 1
 
     ticker = positional[0]
