@@ -23,7 +23,7 @@ from app.analysis.fundamentals_analysis import (
     FundamentalAnalysisError,
     build_fundamental_signals,
 )
-from app.analysis.news_analysis import analyze_news
+from app.analysis.news_analysis import NewsAnalysisError, analyze_news
 from app.analysis.risk_analysis import RiskAnalysisError, analyze_risk_conditions
 from app.analysis.scoring import ScoringError, score_signals
 from app.analysis.technicals import (
@@ -177,6 +177,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     except RiskAnalysisError as exc:
         print(f"Error running risk analysis: {exc}", file=sys.stderr)
+        return 1
+    except NewsAnalysisError as exc:
+        print(f"Error running news analysis: {exc}", file=sys.stderr)
         return 1
     except ScoringError as exc:
         print(f"Error scoring signals: {exc}", file=sys.stderr)

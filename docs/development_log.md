@@ -1,5 +1,29 @@
 # Development Log
 
+## 2026-05-24 — Codebase audit and cleanup
+
+**`app/main.py`**
+
+- Added `NewsAnalysisError` import and catch clause in `main()` — the error was reachable via `analyze_news()` but silently missing from the handler chain; now exits with `return 1` and a message to stderr like all other analysis errors
+
+**`README.md`**
+
+- Corrected test count (512 → 812), scoring table (News was listed as "reserved", now shown as 25% active), module table (added `news_data.py`, `news_analysis.py`, `models/news.py`, `storage.py`), CLI examples (`--save-report`, `--save-json`), project structure section; removed stale "Future Versions" mention of news analysis; added "What Is Not Included" section
+
+**`tests/test_main.py`**
+
+- Added `test_news_analysis_error_returns_1` to `TestMainErrors` — verifies `NewsAnalysisError` from `analyze_news` surfaces as exit code 1 with "news analysis" in stderr
+
+**Refactor candidates (not changed — beyond audit scope)**
+
+- `_safe_float` duplicated verbatim in `technicals.py`, `fundamentals_analysis.py`, `risk_analysis.py`, and `market_data.py` — move to `app/utils/helpers.py`
+- `_validate_ticker` duplicated in `market_data.py`, `fundamentals.py`, `news_data.py`, `storage.py` — move to `app/utils/helpers.py`
+- `format_rating_output()` in `main.py` — dead code; never called in the production pipeline (pipeline uses `generate_stock_report()`); 6 tests cover it, so it remains until those tests are removed
+- `app/config.py` — defines `MARKET_DATA_API_KEY`, `NEWS_API_KEY`, `OPENAI_API_KEY`, `DATABASE_URL`; no module imports it; fields are unused placeholders
+- `app/utils/helpers.py`, `app/utils/logging.py`, `app/models/stock_report.py`, `app/reports/report_generator.py`, `app/reports/templates.py` — docstring-only stubs; no production code depends on them
+
+**Full suite 813/813 passing**
+
 ## 2026-05-24 — Report quality polish
 
 **`app/analysis/scoring.py`**

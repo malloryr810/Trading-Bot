@@ -14,6 +14,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.analysis.fundamentals_analysis import FundamentalAnalysisError
+from app.analysis.news_analysis import NewsAnalysisError
 from app.analysis.risk_analysis import RiskAnalysisError
 from app.analysis.scoring import ScoringError
 from app.analysis.technicals import TechnicalAnalysisError
@@ -207,6 +208,22 @@ class TestMainErrors:
             result = main(["AAPL"])
         assert result == 1
         assert "risk analysis" in capsys.readouterr().err.lower()
+
+    def test_news_analysis_error_returns_1(self, capsys):
+        with (
+            patch(_FETCH,        return_value=MagicMock()),
+            patch(_FETCH_FUND,   return_value=_make_mock_fundamentals()),
+            patch(_FETCH_NEWS,   return_value=[]),
+            patch(_CALC,         return_value=MagicMock()),
+            patch(_SUMM,         return_value=MagicMock()),
+            patch(_BUILD_TECH,   return_value=[_make_signal()]),
+            patch(_BUILD_FUND,   return_value=[_make_signal(category=SignalCategory.FUNDAMENTAL)]),
+            patch(_RISK,         return_value=[_make_signal(category=SignalCategory.RISK)]),
+            patch(_ANALYZE_NEWS, side_effect=NewsAnalysisError("bad news input")),
+        ):
+            result = main(["AAPL"])
+        assert result == 1
+        assert "news analysis" in capsys.readouterr().err.lower()
 
     def test_scoring_error_returns_1(self, capsys):
         with (
