@@ -1,5 +1,23 @@
 # Development Log
 
+## 2026-05-24 — Wire news analysis into pipeline
+
+- Updated `_WEIGHTS` in `scoring.py`: Technical 35%, Fundamental 25%, **News 25%**, Risk 15% (sum 1.00; re-normalised when a category is absent)
+- `score_signals()` now handles `SignalCategory.NEWS`: computes `news_score`, populates `news_summary`, includes news signal count in `explanation`, passes `news_score` and `news_summary` to `Rating`
+- Error message updated: "Expected at least one TECHNICAL, FUNDAMENTAL, NEWS, or RISK signal."
+- `main.py`: added `get_recent_news` and `analyze_news` imports; `analyze_ticker()` now fetches news (non-fatal — falls back to `analyze_news([])` on any exception), calls `analyze_news(news_items)`, and includes `news_signals` in the `score_signals()` call
+- `tests/test_composite_scoring.py`: renamed `test_only_news_signals_raises` → `test_only_news_signals_does_not_raise`; replaced `TestUnsupportedCategoriesIgnored` with `TestNewsSignals` (10 tests); added `test_news_only_weight_is_100pct` to `TestRenormalisation`; added `TestFourWayWeighting` (4 tests)
+- `tests/test_main.py`: added `_FETCH_NEWS` and `_ANALYZE_NEWS` patch targets; updated `_mock_pipeline`; updated `test_calls_pipeline_in_order` with new step order; added news patches to two individual beta tests; added `TestNewsFetchInPipeline` (3 tests)
+- No changes to `app/models/rating.py` or `app/reports/stock_report.py` — both already handled `news_score` and `news_summary`
+- Full suite 687/687 passing
+
+## 2026-05-24 — News analysis and data layers
+
+- Implemented `app/models/news.py` with `NewsItem` Pydantic model; required `title` (validated non-blank), optional `publisher`, `link`, `published_at`, `summary`, `related_tickers: list[str]`
+- Implemented `app/data/news_data.py` with `get_recent_news(ticker, limit=10) -> list[NewsItem]` and `NewsFetchError`; handles both flat and nested-content yfinance response shapes; converts Unix timestamps to timezone-aware UTC datetimes; limit validated to reject bool, float, and zero/negative integers
+- Implemented `app/analysis/news_analysis.py` with `analyze_news(news_items) -> list[Signal]` and `NewsAnalysisError`; always returns exactly 3 `SignalCategory.NEWS` signals (Sentiment, Risk Headlines, Coverage); rule-based keyword matching using frozensets; empty input produces 3 neutral no-data signals (confidence=0.30); score impacts capped at ±0.20; coverage signal always score_impact=0.0
+- Added 63 tests in `tests/test_news_data.py` and 95 tests in `tests/test_news_analysis.py`; all mocked — no live API calls
+
 ## 2026-05-23 — Architecture review and cleanup
 
 Code-quality review after integrating three analysis branches. No behavior changes.

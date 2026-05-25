@@ -135,16 +135,15 @@ class TestInputValidation:
 # ---------------------------------------------------------------------------
 
 class TestNoSupportedCategories:
-    def test_only_news_signals_raises(self):
-        with pytest.raises(ScoringError, match="No supported signal categories"):
-            score_signals("AAPL", [_news("N1"), _news("N2")])
+    def test_only_news_signals_does_not_raise(self):
+        r = score_signals("AAPL", [_news("N1"), _news("N2")])
+        assert isinstance(r, Rating)
 
     def test_only_risk_signals_does_not_raise(self):
         r = score_signals("AAPL", [_risk("R1", 0.2)])
         assert isinstance(r, Rating)
 
     def test_news_and_risk_only_does_not_raise(self):
-        # NEWS is ignored but RISK is now supported; should not raise
         r = score_signals("AAPL", [_news("N1"), _risk("R1", 0.1)])
         assert isinstance(r, Rating)
 
@@ -290,33 +289,63 @@ class TestRenormalisation:
         expected = 50.0 + impact * 50.0
         assert r.score == pytest.approx(expected)
 
+    def test_news_only_weight_is_100pct(self):
+        # composite should equal news_score exactly (weight = 0.25/0.25 = 1.0)
+        impact = 0.5
+        news = [_news("N1", impact)]
+        r = score_signals("AAPL", news)
+        expected = 50.0 + impact * 50.0
+        assert r.score == pytest.approx(expected)
+
 
 # ---------------------------------------------------------------------------
-# Unsupported categories are ignored
+# News signals
 # ---------------------------------------------------------------------------
 
-class TestUnsupportedCategoriesIgnored:
-    def test_news_ignored_alongside_technical(self):
+class TestNewsSignals:
+    def _result(self, *impacts: float) -> Rating:
+        signals = [_news(f"N{i}", imp) for i, imp in enumerate(impacts)]
+        return score_signals("AAPL", signals)
+
+    def test_composite_equals_news_score_when_news_only(self):
+        r = self._result(0.2, 0.1)
+        assert r.score == pytest.approx(r.news_score)
+
+    def test_technical_score_zero_when_news_only(self):
+        r = self._result(0.2)
+        assert r.technical_score == pytest.approx(0.0)
+
+    def test_fundamental_score_zero_when_news_only(self):
+        r = self._result(0.2)
+        assert r.fundamental_score == pytest.approx(0.0)
+
+    def test_risk_score_zero_when_news_only(self):
+        r = self._result(0.2)
+        assert r.risk_score == pytest.approx(0.0)
+
+    def test_news_summary_populated_when_news_signals_present(self):
+        r = self._result(0.2)
+        assert r.news_summary is not None
+        assert "score" in r.news_summary.lower()
+
+    def test_news_summary_none_when_no_news_signals(self):
+        r = score_signals("AAPL", [_tech("T1", 0.2)])
+        assert r.news_summary is None
+
+    def test_neutral_news_score_is_50(self):
+        r = self._result(0.0)
+        assert r.score == pytest.approx(50.0)
+
+    def test_news_score_above_50_when_bullish_news(self):
+        r = score_signals("AAPL", [_tech("T1", 0.0), _news("N1", 0.3)])
+        assert r.news_score > 50.0
+
+    def test_adding_news_changes_composite_score(self):
         tech = [_tech("T1", 0.4)]
         news = [_news("N1", 0.9)]
         r_with_news = score_signals("AAPL", tech + news)
         r_tech_only = score_signals("AAPL", tech)
-        assert r_with_news.score == pytest.approx(r_tech_only.score)
-
-    def test_news_ignored_alongside_technical_and_risk(self):
-        tech = [_tech("T1", 0.4)]
-        risk = [_risk("R1", 0.0)]
-        news = [_news("N1", 0.9)]
-        r_with_news = score_signals("AAPL", tech + risk + news)
-        r_clean = score_signals("AAPL", tech + risk)
-        assert r_with_news.score == pytest.approx(r_clean.score)
-
-    def test_news_only_score_not_in_sub_scores(self):
-        # NEWS signals should not inflate the score
-        tech = [_tech("T1", 0.0)]
-        news = [_news("N1", 1.0)]
-        r = score_signals("AAPL", tech + news)
-        assert r.score == pytest.approx(50.0)
+        assert r_with_news.score != pytest.approx(r_tech_only.score)
 
 
 # ---------------------------------------------------------------------------
@@ -531,3 +560,56 @@ class TestThreeWayWeighting:
             _risk("R1", 0.0),
         ])
         assert "risk" in r.explanation.lower()
+
+
+# ---------------------------------------------------------------------------
+# Four-way composite weighting (Tech 0.35 / Fund 0.25 / News 0.25 / Risk 0.15)
+# ---------------------------------------------------------------------------
+
+class TestFourWayWeighting:
+    def test_four_way_equal_impacts_composite_equals_sub_scores(self):
+        impact = 0.2
+        r = score_signals("AAPL", [
+            _tech("T1", impact),
+            _fund("F1", impact),
+            _news("N1", impact),
+            _risk("R1", impact),
+        ])
+        assert r.score == pytest.approx(r.technical_score)
+        assert r.score == pytest.approx(r.fundamental_score)
+        assert r.score == pytest.approx(r.news_score)
+        assert r.score == pytest.approx(r.risk_score)
+
+    def test_four_way_weights_tech_dominant(self):
+        # tech_score=70 (impact 0.4), fund/news/risk=50 (impact 0)
+        # total_weight = 1.00
+        # composite = 70*0.35 + 50*0.25 + 50*0.25 + 50*0.15
+        #           = 24.5 + 12.5 + 12.5 + 7.5 = 57.0
+        r = score_signals("AAPL", [
+            _tech("T1", 0.4),
+            _fund("F1", 0.0),
+            _news("N1", 0.0),
+            _risk("R1", 0.0),
+        ])
+        assert r.score == pytest.approx(57.0)
+
+    def test_four_way_all_summaries_populated(self):
+        r = score_signals("AAPL", [
+            _tech("T1", 0.2),
+            _fund("F1", 0.1),
+            _news("N1", 0.05),
+            _risk("R1", -0.1),
+        ])
+        assert r.technical_summary is not None
+        assert r.fundamental_summary is not None
+        assert r.news_summary is not None
+        assert r.risk_summary is not None
+
+    def test_four_way_explanation_mentions_news(self):
+        r = score_signals("AAPL", [
+            _tech("T1", 0.2),
+            _fund("F1", 0.1),
+            _news("N1", 0.05),
+            _risk("R1", 0.0),
+        ])
+        assert "news" in r.explanation.lower()

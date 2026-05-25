@@ -44,12 +44,15 @@ python -m py_compile app/analysis/scoring.py
 |--------|---------|
 | `app/data/market_data.py` | Fetches, validates, and normalizes OHLCV price data from yfinance |
 | `app/data/fundamentals.py` | Fetches company fundamentals (P/E, margins, growth, D/E, FCF, beta) from yfinance |
+| `app/data/news_data.py` | Fetches recent news headlines from yfinance; returns typed `NewsItem` objects |
 | `app/models/signal.py` | Typed `Signal` Pydantic model; shared contract across the analysis layer |
 | `app/models/rating.py` | Typed `Rating` Pydantic model; output of the scoring engine |
 | `app/models/fundamentals.py` | Typed `CompanyFundamentals` Pydantic model; output of the fundamentals data layer |
+| `app/models/news.py` | Typed `NewsItem` Pydantic model; output of the news data layer |
 | `app/analysis/technicals.py` | Computes SMA 20/50/200, RSI 14, MACD, volume SMA; builds 7 typed Signals |
 | `app/analysis/fundamentals_analysis.py` | Builds 5 typed Signals from valuation, profitability, growth, debt, and cash flow |
 | `app/analysis/risk_analysis.py` | Builds 4–5 typed Signals from volatility, drawdown, recent trend, liquidity, and beta |
+| `app/analysis/news_analysis.py` | Builds exactly 3 NEWS Signals (Sentiment, Risk Headlines, Coverage) via keyword matching |
 | `app/analysis/scoring.py` | Composite scoring engine with `score_signals()` and `score_technical_signals()` |
 | `app/reports/stock_report.py` | Generates a formatted plain-text research report from a Rating and its Signals |
 | `app/main.py` | CLI entry point — orchestrates the full pipeline and prints the report |
@@ -85,23 +88,22 @@ Base weights (re-normalised to 100% when a category is absent):
 |----------|-------------|
 | Technical | 35% |
 | Fundamental | 25% |
+| News | 25% |
 | Risk | 15% |
-| News | Reserved — not yet active |
 
 ## Signal Pattern
 
 Each analysis module follows the same pattern:
-- Accepts a validated input (DataFrame or typed model)
-- Returns a `list[Signal]` using `SignalCategory.TECHNICAL`, `FUNDAMENTAL`, or `RISK`
+- Accepts a validated input (DataFrame, typed model, or list of NewsItem)
+- Returns a `list[Signal]` using `SignalCategory.TECHNICAL`, `FUNDAMENTAL`, `NEWS`, or `RISK`
 - Never raises on missing data fields — produces a neutral `Signal` with `confidence=0.30` instead
-- Has its own exception class (e.g. `TechnicalAnalysisError`, `FundamentalAnalysisError`, `RiskAnalysisError`) that `main.py` catches
+- Has its own exception class (e.g. `TechnicalAnalysisError`, `NewsAnalysisError`, `RiskAnalysisError`) that `main.py` catches
+- News fetch failures in `main.py` are non-fatal: the pipeline continues with `analyze_news([])`
 
 ## Not Yet Implemented
 
 These files exist as docstring-only stubs:
-- `app/data/news_data.py` — news/sentiment data fetcher
 - `app/data/storage.py` — data persistence layer
-- `app/analysis/news_analysis.py` — news/sentiment signal builder
 - `app/reports/report_generator.py` — full report orchestration
 - `app/reports/templates.py` — report templates
 - `app/models/stock_report.py` — top-level StockReport model

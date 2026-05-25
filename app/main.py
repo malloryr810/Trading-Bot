@@ -19,6 +19,7 @@ from app.analysis.fundamentals_analysis import (
     FundamentalAnalysisError,
     build_fundamental_signals,
 )
+from app.analysis.news_analysis import analyze_news
 from app.analysis.risk_analysis import RiskAnalysisError, analyze_risk_conditions
 from app.analysis.scoring import ScoringError, score_signals
 from app.analysis.technicals import (
@@ -29,6 +30,7 @@ from app.analysis.technicals import (
 )
 from app.data.fundamentals import FundamentalDataFetchError, get_company_fundamentals
 from app.data.market_data import DataFetchError, get_price_history
+from app.data.news_data import get_recent_news
 from app.models.rating import Rating
 from app.reports.stock_report import generate_stock_report
 
@@ -40,14 +42,16 @@ from app.reports.stock_report import generate_stock_report
 def analyze_ticker(ticker: str) -> Rating:
     """Run the full analysis pipeline for a single ticker.
 
-    Fetches market data and company fundamentals, computes technical,
-    fundamental, and risk signals, then scores them with composite weights.
+    Fetches market data, company fundamentals, and recent news, then computes
+    technical, fundamental, risk, and news signals and scores them with
+    composite weights. News fetch failures are non-fatal: the pipeline
+    continues with neutral no-data news signals.
 
     Args:
         ticker: Stock ticker symbol (e.g. "AAPL").
 
     Returns:
-        A composite Rating covering technical, fundamental, and risk signals.
+        A composite Rating covering technical, fundamental, risk, and news signals.
 
     Raises:
         DataFetchError: If market data cannot be fetched or validated.
@@ -60,15 +64,21 @@ def analyze_ticker(ticker: str) -> Rating:
     price_data   = get_price_history(ticker)
     fundamentals = get_company_fundamentals(ticker)
 
+    try:
+        news_items = get_recent_news(ticker)
+    except Exception:
+        news_items = []
+
     indicator_data    = calculate_technical_indicators(price_data)
     indicator_summary = summarize_technical_signals(indicator_data)
     tech_signals      = build_technical_signals(indicator_summary)
     fund_signals      = build_fundamental_signals(fundamentals)
     risk_signals      = analyze_risk_conditions(price_data, beta=fundamentals.beta)
+    news_signals      = analyze_news(news_items)
 
     return score_signals(
         ticker=ticker,
-        signals=tech_signals + fund_signals + risk_signals,
+        signals=tech_signals + fund_signals + risk_signals + news_signals,
         data_timestamp=datetime.now(tz=timezone.utc),
         data_sources_used=["yfinance"],
     )

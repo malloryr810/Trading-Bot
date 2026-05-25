@@ -2,9 +2,9 @@
 Scoring engine.
 
 Implements technical-only scoring (score_technical_signals) and composite
-scoring across technical, fundamental, and risk signals (score_signals).
-Base weights: Technical 35%, Fundamental 25%, Risk 15%; re-normalised to
-active categories only. NEWS is reserved but not yet active.
+scoring across technical, fundamental, news, and risk signals (score_signals).
+Base weights: Technical 35%, Fundamental 25%, News 25%, Risk 15%; sum to 1.00;
+re-normalised to active categories when any category is absent.
 """
 
 from __future__ import annotations
@@ -19,11 +19,12 @@ class ScoringError(Exception):
     """Raised when stock signals cannot be scored."""
 
 
-# Supported categories and their base weights (sum to 0.75; re-normalised when
-# a category is absent). NEWS is reserved but not active yet.
+# Supported categories and their base weights (sum to 1.00; re-normalised when
+# a category is absent).
 _WEIGHTS: dict[SignalCategory, float] = {
     SignalCategory.TECHNICAL:   0.35,
     SignalCategory.FUNDAMENTAL: 0.25,
+    SignalCategory.NEWS:        0.25,
     SignalCategory.RISK:        0.15,
 }
 
@@ -68,17 +69,19 @@ def score_signals(
     if not by_category:
         raise ScoringError(
             "No supported signal categories found in the provided signals. "
-            "Expected at least one TECHNICAL, FUNDAMENTAL, or RISK signal."
+            "Expected at least one TECHNICAL, FUNDAMENTAL, NEWS, or RISK signal."
         )
 
     total_weight = sum(_WEIGHTS[cat] for cat in by_category)
 
     tech_signals = by_category.get(SignalCategory.TECHNICAL, [])
     fund_signals = by_category.get(SignalCategory.FUNDAMENTAL, [])
+    news_signals = by_category.get(SignalCategory.NEWS, [])
     risk_signals = by_category.get(SignalCategory.RISK, [])
 
     technical_score   = _signals_to_score(tech_signals) if tech_signals else 0.0
     fundamental_score = _signals_to_score(fund_signals) if fund_signals else 0.0
+    news_score        = _signals_to_score(news_signals) if news_signals else 0.0
     risk_score        = _signals_to_score(risk_signals) if risk_signals else 0.0
 
     composite = sum(
@@ -97,6 +100,8 @@ def score_signals(
         parts.append(f"{len(tech_signals)} technical")
     if fund_signals:
         parts.append(f"{len(fund_signals)} fundamental")
+    if news_signals:
+        parts.append(f"{len(news_signals)} news")
     if risk_signals:
         parts.append(f"{len(risk_signals)} risk")
     explanation = (
@@ -118,6 +123,13 @@ def score_signals(
             "profitability, growth, debt, and cash flow signals."
         )
 
+    news_summary: str | None = None
+    if news_signals:
+        news_summary = (
+            f"News score: {news_score:.1f}/100 based on sentiment, risk headlines, "
+            "and coverage signals."
+        )
+
     risk_summary: str | None = None
     if risk_signals:
         risk_summary = (
@@ -136,10 +148,11 @@ def score_signals(
         explanation=explanation,
         technical_score=technical_score,
         fundamental_score=fundamental_score,
-        news_score=0.0,
+        news_score=news_score,
         risk_score=risk_score,
         technical_summary=technical_summary,
         fundamental_summary=fundamental_summary,
+        news_summary=news_summary,
         risk_summary=risk_summary,
         key_positive_factors=positive_factors,
         key_risks=risk_factors,
