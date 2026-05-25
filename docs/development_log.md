@@ -1,5 +1,36 @@
 # Development Log
 
+## 2026-05-25 — Implement structured report layer (StockReport model, templates, report generator)
+
+**`app/models/stock_report.py`**
+
+- Implemented `StockReport` Pydantic model: the top-level structured output of a full analysis run
+- Fields: ticker (normalized, non-empty), company_name, current_price, final_category, score (0–100), confidence_level, per-category summaries, key_positive_factors, key_risks, buy_trigger, sell_or_avoid_trigger, data_timestamp, data_sources_used, and four per-category signal lists (technical_signals, fundamental_signals, news_signals, risk_signals)
+- Reuses `RatingCategory`, `ConfidenceLevel`, and `Signal` from existing models; no concepts duplicated
+
+**`app/reports/templates.py`**
+
+- Implemented `format_plain_text_report(report: StockReport) -> str` — terminal-readable plain-text formatter
+- Section structure matches existing CLI output style: header, recommendation, analysis summaries, signals (sorted Technical → Fundamental → News → Risk), key strengths, key risks, triggers, disclaimer
+- Header now includes an "As of:" line from data_timestamp when present
+
+**`app/reports/report_generator.py`**
+
+- Implemented `build_stock_report(rating, company_name, current_price) -> StockReport` — assembles StockReport from a completed Rating; partitions `signals_used` into per-category lists; does not fetch data or perform analysis
+- Implemented `generate_plain_text_report(report: StockReport) -> str` — delegates to `format_plain_text_report`
+
+**`app/main.py`**
+
+- Replaced `generate_stock_report` import and call with `build_stock_report` + `generate_plain_text_report`; no other changes; CLI flags and error handling unchanged
+
+**Tests added**
+
+- `tests/test_stock_report_model.py` — 42 tests: creation, ticker normalization, score/field validation, defaults, optional fields, immutability
+- `tests/test_report_templates.py` — 52 tests: all report sections, signal ordering, count labels, trigger/risk/strength display, empty-state fallbacks
+- `tests/test_report_generator.py` — 31 tests: field mapping from Rating, signal partitioning, optional parameters, generate_plain_text_report delegation
+
+No trading functionality added. Full suite 968/968 passing (previously 842, +126 tests).
+
 ## 2026-05-24 — Remove dead format_rating_output() helper
 
 - Confirmed via full-repo search: `format_rating_output()` was defined in `app/main.py` and tested in `tests/test_main.py` but never called by the production pipeline (which uses `generate_stock_report()`)

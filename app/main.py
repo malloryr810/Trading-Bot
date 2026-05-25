@@ -37,7 +37,7 @@ from app.data.market_data import DataFetchError, get_price_history
 from app.data.news_data import get_recent_news
 from app.data.storage import StorageError, save_json_result, save_text_report
 from app.models.rating import Rating
-from app.reports.stock_report import generate_stock_report
+from app.reports.report_generator import build_stock_report, generate_plain_text_report
 
 
 # ---------------------------------------------------------------------------
@@ -141,11 +141,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error scoring signals: {exc}", file=sys.stderr)
         return 1
 
-    report = generate_stock_report(
-        ticker=rating.ticker,
-        rating=rating,
-        signals=rating.signals_used,
-    )
+    stock_report = build_stock_report(rating)
+    report = generate_plain_text_report(stock_report)
     print(report)
 
     if do_save_report:
