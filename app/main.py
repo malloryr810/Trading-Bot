@@ -90,50 +90,6 @@ def analyze_ticker(ticker: str) -> Rating:
 
 
 # ---------------------------------------------------------------------------
-# Formatting
-# ---------------------------------------------------------------------------
-
-def format_rating_output(rating: Rating) -> str:
-    """Render a Rating as a human-readable terminal string."""
-
-    def _list_items(items: list[str]) -> str:
-        return "\n".join(f"  - {item}" for item in items) if items else "  - None"
-
-    lines = [
-        "Investment Bot Technical Analysis",
-        "=================================",
-        f"Ticker:           {rating.ticker}",
-        f"Final Category:   {rating.final_category.value}",
-        f"Score:            {rating.score:.1f}/100",
-        f"Confidence:       {rating.confidence.value}",
-        f"Technical Score:  {rating.technical_score:.1f}/100",
-        "",
-        "Explanation:",
-        f"  {rating.explanation}",
-        "",
-        "Technical Summary:",
-        f"  {rating.technical_summary or 'N/A'}",
-        "",
-        "Key Positive Factors:",
-        _list_items(rating.key_positive_factors),
-        "",
-        "Key Risks:",
-        _list_items(rating.key_risks),
-        "",
-        "Buy Trigger:",
-        f"  {rating.buy_trigger or 'N/A'}",
-        "",
-        "Sell / Avoid Trigger:",
-        f"  {rating.sell_or_avoid_trigger or 'N/A'}",
-        "",
-        "Note:",
-        "  This is a decision-support output.",
-        "  It is not financial advice and does not place trades.",
-    ]
-    return "\n".join(lines)
-
-
-# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 

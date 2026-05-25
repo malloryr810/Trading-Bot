@@ -22,7 +22,7 @@ from app.data.fundamentals import FundamentalDataFetchError
 from app.data.market_data import DataFetchError
 from app.data.news_data import NewsFetchError
 from app.data.storage import StorageError
-from app.main import analyze_ticker, format_rating_output, main
+from app.main import analyze_ticker, main
 from app.models.rating import ConfidenceLevel, Rating, RatingCategory
 from app.models.signal import Signal, SignalCategory, SignalDirection, SignalStrength
 
@@ -319,66 +319,6 @@ class TestAnalyzeTicker:
             analyze_ticker("AAPL")
         call_kwargs = mock_risk.call_args.kwargs
         assert call_kwargs.get("beta") is None
-
-
-# ---------------------------------------------------------------------------
-# format_rating_output()
-# ---------------------------------------------------------------------------
-
-class TestFormatRatingOutput:
-    def _output(self, **overrides) -> str:
-        return format_rating_output(_make_rating(**overrides))
-
-    def test_includes_ticker(self):
-        assert "AAPL" in self._output()
-
-    def test_includes_final_category(self):
-        assert "Watchlist" in self._output()
-
-    def test_includes_score(self):
-        assert "60.0/100" in self._output()
-
-    def test_includes_confidence(self):
-        assert "medium" in self._output()
-
-    def test_includes_technical_score(self):
-        out = format_rating_output(_make_rating(score=60.0))
-        assert "60.0/100" in out
-
-    def test_includes_explanation(self):
-        assert "Composite rating" in self._output()
-
-    def test_includes_technical_summary(self):
-        assert "Technical score" in self._output()
-
-    def test_includes_positive_factors(self):
-        out = format_rating_output(
-            _make_rating(positives=["Above SMA 200", "RSI neutral"])
-        )
-        assert "Above SMA 200" in out
-        assert "RSI neutral" in out
-
-    def test_empty_positive_factors_prints_none(self):
-        out = format_rating_output(_make_rating(positives=[]))
-        assert "- None" in out
-
-    def test_includes_key_risks(self):
-        out = format_rating_output(_make_rating(risks=["RSI overbought"]))
-        assert "RSI overbought" in out
-
-    def test_empty_risks_prints_none(self):
-        out = format_rating_output(_make_rating(risks=[]))
-        assert "- None" in out
-
-    def test_includes_buy_trigger(self):
-        assert "Consider after fundamentals" in self._output()
-
-    def test_includes_sell_avoid_trigger(self):
-        assert "Reassess if score falls" in self._output()
-
-    def test_includes_disclaimer(self):
-        assert "not financial advice" in self._output()
-
 
 # ---------------------------------------------------------------------------
 # analyze_ticker() — news fetch behaviour

@@ -1,5 +1,13 @@
 # Development Log
 
+## 2026-05-24 — Remove dead format_rating_output() helper
+
+- Confirmed via full-repo search: `format_rating_output()` was defined in `app/main.py` and tested in `tests/test_main.py` but never called by the production pipeline (which uses `generate_stock_report()`)
+- Deleted `format_rating_output()` and its `# Formatting` section from `app/main.py`
+- Removed `TestFormatRatingOutput` class (14 tests) from `tests/test_main.py`; removed `format_rating_output` from the import line
+- No production behavior changed; `Rating` import retained (still used by `analyze_ticker` return annotation)
+- Full suite 828/828 passing (−14 dead-code tests)
+
 ## 2026-05-24 — Consolidate shared helpers into app/utils/helpers.py
 
 - Implemented `safe_float(value) -> float | None` and `normalize_ticker(ticker) -> str` in `app/utils/helpers.py`
