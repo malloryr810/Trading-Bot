@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -19,6 +20,7 @@ from app.analysis.technicals import TechnicalAnalysisError
 from app.data.fundamentals import FundamentalDataFetchError
 from app.data.market_data import DataFetchError
 from app.data.news_data import NewsFetchError
+from app.data.storage import StorageError
 from app.main import analyze_ticker, format_rating_output, main
 from app.models.rating import ConfidenceLevel, Rating, RatingCategory
 from app.models.signal import Signal, SignalCategory, SignalDirection, SignalStrength
@@ -85,6 +87,11 @@ _BUILD_TECH   = "app.main.build_technical_signals"
 _BUILD_FUND   = "app.main.build_fundamental_signals"
 _RISK         = "app.main.analyze_risk_conditions"
 _SCORE        = "app.main.score_signals"
+_SAVE_REPORT  = "app.main.save_text_report"
+_SAVE_JSON    = "app.main.save_json_result"
+
+_FAKE_REPORT_PATH = Path("outputs/reports/AAPL_20240601_000000.txt")
+_FAKE_JSON_PATH   = Path("outputs/results/AAPL_20240601_000000.json")
 
 
 def _mock_pipeline(rating: Rating | None = None):
@@ -410,3 +417,164 @@ class TestNewsFetchInPipeline:
             analyze_ticker("AAPL")
         called_signals = mock_score.call_args.kwargs["signals"]
         assert any(s.category == SignalCategory.NEWS for s in called_signals)
+
+
+# ---------------------------------------------------------------------------
+# main() — --save-report and --save-json flags
+# ---------------------------------------------------------------------------
+
+class TestSaveFlags:
+    def test_default_does_not_call_save_text_report(self):
+        with _mock_pipeline():
+            with patch(_SAVE_REPORT) as mock_save:
+                main(["AAPL"])
+        mock_save.assert_not_called()
+
+    def test_default_does_not_call_save_json_result(self):
+        with _mock_pipeline():
+            with patch(_SAVE_JSON) as mock_save:
+                main(["AAPL"])
+        mock_save.assert_not_called()
+
+    def test_save_report_flag_calls_save_text_report(self):
+        with _mock_pipeline():
+            with patch(_SAVE_REPORT, return_value=_FAKE_REPORT_PATH) as mock_save:
+                main(["AAPL", "--save-report"])
+        mock_save.assert_called_once()
+
+    def test_save_json_flag_calls_save_json_result(self):
+        with _mock_pipeline():
+            with patch(_SAVE_JSON, return_value=_FAKE_JSON_PATH) as mock_save:
+                main(["AAPL", "--save-json"])
+        mock_save.assert_called_once()
+
+    def test_both_flags_call_both_save_functions(self):
+        with _mock_pipeline():
+            with (
+                patch(_SAVE_REPORT, return_value=_FAKE_REPORT_PATH) as mock_report,
+                patch(_SAVE_JSON,   return_value=_FAKE_JSON_PATH)   as mock_json,
+            ):
+                main(["AAPL", "--save-report", "--save-json"])
+        mock_report.assert_called_once()
+        mock_json.assert_called_once()
+
+    def test_save_report_receives_report_text_and_ticker(self):
+        with _mock_pipeline():
+            with patch(_SAVE_REPORT, return_value=_FAKE_REPORT_PATH) as mock_save:
+                main(["AAPL", "--save-report"])
+        call_args = mock_save.call_args.args
+        assert isinstance(call_args[0], str)   # report_text is a non-empty string
+        assert len(call_args[0]) > 0
+        assert call_args[1] == "AAPL"          # ticker
+
+    def test_save_report_text_matches_printed_report(self, capsys):
+        with _mock_pipeline():
+            with patch(_SAVE_REPORT, return_value=_FAKE_REPORT_PATH) as mock_save:
+                main(["AAPL", "--save-report"])
+        printed = capsys.readouterr().out
+        saved_text = mock_save.call_args.args[0]
+        # The same text printed to stdout is passed to save_text_report
+        assert saved_text in printed
+
+    def test_save_json_receives_rating_and_ticker(self):
+        with _mock_pipeline():
+            with patch(_SAVE_JSON, return_value=_FAKE_JSON_PATH) as mock_save:
+                main(["AAPL", "--save-json"])
+        call_args = mock_save.call_args.args
+        assert isinstance(call_args[0], Rating)  # result is the Rating model
+        assert call_args[0].ticker == "AAPL"
+        assert call_args[1] == "AAPL"            # ticker
+
+    def test_save_json_rating_has_score(self):
+        with _mock_pipeline():
+            with patch(_SAVE_JSON, return_value=_FAKE_JSON_PATH) as mock_save:
+                main(["AAPL", "--save-json"])
+        rating_arg = mock_save.call_args.args[0]
+        assert hasattr(rating_arg, "score")
+        assert hasattr(rating_arg, "final_category")
+
+    def test_save_report_confirmation_printed(self, capsys):
+        with _mock_pipeline():
+            with patch(_SAVE_REPORT, return_value=_FAKE_REPORT_PATH):
+                main(["AAPL", "--save-report"])
+        out = capsys.readouterr().out
+        assert "Saved text report to:" in out
+        assert str(_FAKE_REPORT_PATH) in out
+
+    def test_save_json_confirmation_printed(self, capsys):
+        with _mock_pipeline():
+            with patch(_SAVE_JSON, return_value=_FAKE_JSON_PATH):
+                main(["AAPL", "--save-json"])
+        out = capsys.readouterr().out
+        assert "Saved JSON result to:" in out
+        assert str(_FAKE_JSON_PATH) in out
+
+    def test_save_report_storage_error_does_not_crash(self, capsys):
+        with _mock_pipeline():
+            with patch(_SAVE_REPORT, side_effect=StorageError("disk full")):
+                result = main(["AAPL", "--save-report"])
+        assert result == 0
+
+    def test_save_report_storage_error_prints_warning(self, capsys):
+        with _mock_pipeline():
+            with patch(_SAVE_REPORT, side_effect=StorageError("disk full")):
+                main(["AAPL", "--save-report"])
+        assert "Warning" in capsys.readouterr().err
+
+    def test_save_json_storage_error_does_not_crash(self, capsys):
+        with _mock_pipeline():
+            with patch(_SAVE_JSON, side_effect=StorageError("no space")):
+                result = main(["AAPL", "--save-json"])
+        assert result == 0
+
+    def test_save_json_storage_error_prints_warning(self, capsys):
+        with _mock_pipeline():
+            with patch(_SAVE_JSON, side_effect=StorageError("no space")):
+                main(["AAPL", "--save-json"])
+        assert "Warning" in capsys.readouterr().err
+
+    def test_report_still_printed_when_save_fails(self, capsys):
+        with _mock_pipeline():
+            with patch(_SAVE_REPORT, side_effect=StorageError("disk full")):
+                main(["AAPL", "--save-report"])
+        out = capsys.readouterr().out
+        assert "STOCK RESEARCH REPORT" in out
+
+    def test_both_flags_independent_errors(self, capsys):
+        with _mock_pipeline():
+            with (
+                patch(_SAVE_REPORT, return_value=_FAKE_REPORT_PATH),
+                patch(_SAVE_JSON,   side_effect=StorageError("json err")),
+            ):
+                result = main(["AAPL", "--save-report", "--save-json"])
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Saved text report to:" in captured.out
+        assert "Warning" in captured.err
+
+    def test_save_report_does_not_call_save_json(self):
+        with _mock_pipeline():
+            with (
+                patch(_SAVE_REPORT, return_value=_FAKE_REPORT_PATH),
+                patch(_SAVE_JSON) as mock_json,
+            ):
+                main(["AAPL", "--save-report"])
+        mock_json.assert_not_called()
+
+    def test_save_json_does_not_call_save_report(self):
+        with _mock_pipeline():
+            with (
+                patch(_SAVE_REPORT) as mock_report,
+                patch(_SAVE_JSON,   return_value=_FAKE_JSON_PATH),
+            ):
+                main(["AAPL", "--save-json"])
+        mock_report.assert_not_called()
+
+    def test_save_flags_return_0_on_success(self):
+        with _mock_pipeline():
+            with (
+                patch(_SAVE_REPORT, return_value=_FAKE_REPORT_PATH),
+                patch(_SAVE_JSON,   return_value=_FAKE_JSON_PATH),
+            ):
+                result = main(["AAPL", "--save-report", "--save-json"])
+        assert result == 0

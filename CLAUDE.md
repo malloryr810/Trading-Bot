@@ -25,8 +25,17 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the entry point
+# Run the entry point (print report to terminal)
 python -m app.main <TICKER>
+
+# Save plain-text report to outputs/reports/
+python -m app.main <TICKER> --save-report
+
+# Save structured JSON result to outputs/results/
+python -m app.main <TICKER> --save-json
+
+# Save both
+python -m app.main <TICKER> --save-report --save-json
 
 # Run all tests
 pytest

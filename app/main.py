@@ -4,10 +4,14 @@ Entry point for the Investment Bot.
 Runs a full single-ticker analysis pipeline from the terminal:
 
     python -m app.main <TICKER>
+    python -m app.main <TICKER> --save-report
+    python -m app.main <TICKER> --save-json
+    python -m app.main <TICKER> --save-report --save-json
 
 Fetches historical OHLCV data and company fundamentals, computes technical,
-fundamental, and risk signals, scores them with composite weights, and prints
-a plain-text research report.
+fundamental, risk, and news signals, scores them with composite weights, and
+prints a plain-text research report. Optionally saves the report as a .txt
+file and/or a structured .json result when the respective flags are provided.
 """
 
 from __future__ import annotations
@@ -31,6 +35,7 @@ from app.analysis.technicals import (
 from app.data.fundamentals import FundamentalDataFetchError, get_company_fundamentals
 from app.data.market_data import DataFetchError, get_price_history
 from app.data.news_data import get_recent_news
+from app.data.storage import StorageError, save_json_result, save_text_report
 from app.models.rating import Rating
 from app.reports.stock_report import generate_stock_report
 
@@ -143,11 +148,18 @@ def main(argv: list[str] | None = None) -> int:
     """
     args = argv if argv is not None else sys.argv[1:]
 
-    if not args:
-        print("Usage: python -m app.main <TICKER>", file=sys.stderr)
+    positional = [a for a in args if not a.startswith("--")]
+
+    if not positional:
+        print(
+            "Usage: python -m app.main <TICKER> [--save-report] [--save-json]",
+            file=sys.stderr,
+        )
         return 1
 
-    ticker = args[0]
+    ticker = positional[0]
+    do_save_report = "--save-report" in args
+    do_save_json   = "--save-json"   in args
 
     try:
         rating = analyze_ticker(ticker)
@@ -176,6 +188,21 @@ def main(argv: list[str] | None = None) -> int:
         signals=rating.signals_used,
     )
     print(report)
+
+    if do_save_report:
+        try:
+            path = save_text_report(report, rating.ticker)
+            print(f"Saved text report to: {path}")
+        except StorageError as exc:
+            print(f"Warning: failed to save text report: {exc}", file=sys.stderr)
+
+    if do_save_json:
+        try:
+            path = save_json_result(rating, rating.ticker)
+            print(f"Saved JSON result to: {path}")
+        except StorageError as exc:
+            print(f"Warning: failed to save JSON result: {exc}", file=sys.stderr)
+
     return 0
 
 

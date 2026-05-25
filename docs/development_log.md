@@ -1,5 +1,16 @@
 # Development Log
 
+## 2026-05-24 — CLI save flags
+
+- Added `--save-report` and `--save-json` optional flags to `app/main.py`
+- Default behavior unchanged: `python -m app.main AAPL` prints to terminal only, no files written
+- `--save-report`: calls `save_text_report(report, ticker)` after printing; prints confirmation with saved path; `StorageError` handled gracefully (warning to stderr, exit 0)
+- `--save-json`: calls `save_json_result(rating, ticker)` after printing; passes the `Rating` Pydantic model directly so all fields (ticker, score, category, confidence, sub-scores, signals) are serialised; prints confirmation with saved path; same graceful error handling
+- Both flags can be combined: `python -m app.main AAPL --save-report --save-json`
+- Updated module docstring with new usage examples
+- Added 20 tests in `TestSaveFlags` class within `tests/test_main.py`; all mock storage functions — no real file writes
+- Full suite 784/784 passing
+
 ## 2026-05-24 — Local storage layer
 
 - Replaced docstring-only stub with full implementation of `app/data/storage.py`
