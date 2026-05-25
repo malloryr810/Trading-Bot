@@ -1,5 +1,26 @@
 # Development Log
 
+## 2026-05-24 — Report quality polish
+
+**`app/analysis/scoring.py`**
+
+- `_build_buy_trigger` and `_build_sell_avoid_trigger` now accept sub-scores and the active-category set; language no longer hardcodes "technical score" — triggers describe the weakest active category by name and reference the composite score
+- `_build_positive_factors` now sorts by signal strength (STRONG → MODERATE → WEAK) so the highest-conviction factors appear first in the report
+- `_build_risk_factors` now also includes cautionary neutral signals — those with `direction=NEUTRAL` and a description matching any keyword in `_CAUTION_KEYWORDS` (e.g. "elevated", "overbought", "warning"); capped at 10 items; bearish signals (score_impact < 0) are not double-counted
+- `news_summary` now characterises sentiment qualitatively: "positive" (≥65), "moderately positive" (≥55), "mixed or neutral" (≥45), "cautionary" (≥35), "negative" (<35)
+- Fixed stale docstring on `score_signals()` (previously said "NEWS signals are silently ignored")
+- Added `_STRENGTH_ORDER`, `_CATEGORY_LABELS`, `_CAUTION_KEYWORDS`, `_weak_category_labels` helpers
+
+**`app/reports/stock_report.py`**
+
+- `_signals_section` now sorts signals by category before rendering: Technical → Fundamental → News → Risk; stable sort preserves within-category order; original list is not mutated
+
+**Tests**
+
+- `test_composite_scoring.py`: added `TestTriggers` (7 tests), `TestPositiveFactorsOrdering` (3 tests), `TestCautionaryNeutralRisks` (5 tests), `TestNewsSummaryQuality` (6 tests); added `RatingCategory` to imports
+- `test_stock_report.py`: added `TestSignalsOrdering` (7 tests); added `_CATEGORY_ORDER` to imports
+- Full suite 812/812 passing
+
 ## 2026-05-24 — CLI save flags
 
 - Added `--save-report` and `--save-json` optional flags to `app/main.py`

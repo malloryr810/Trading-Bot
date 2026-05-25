@@ -1,0 +1,127 @@
+================================================================================
+                     INVESTMENT BOT — STOCK RESEARCH REPORT                     
+================================================================================
+  Ticker:  AAPL
+  Date:    2026-05-24
+  Data:    yfinance
+
+================================================================================
+                                 RECOMMENDATION                                 
+================================================================================
+  Rating:      Buy Candidate
+  Score:       74.9 / 100
+  Confidence:  Medium
+
+  Composite rating for AAPL based on 7 technical and 5 fundamental and 3 news and 5 risk signals.
+
+================================================================================
+                                SCORE BREAKDOWN                                 
+================================================================================
+  Technical:       87.5 / 100
+  Fundamental:     77.5 / 100
+  News:            57.5 / 100
+  Risk:            70.0 / 100
+
+================================================================================
+                               TECHNICAL ANALYSIS                               
+================================================================================
+  Technical score: 87.5/100 based on trend, RSI, MACD, moving-average, and volume signals.
+
+================================================================================
+                              FUNDAMENTAL ANALYSIS                              
+================================================================================
+  Fundamental score: 77.5/100 based on valuation, profitability, growth, debt, and cash flow signals.
+
+================================================================================
+                                NEWS / SENTIMENT                                
+================================================================================
+  News score: 57.5/100 based on sentiment, risk headlines, and coverage signals.
+
+================================================================================
+                                RISK CONDITIONS                                 
+================================================================================
+  Risk score: 70.0/100 based on volatility, drawdown, recent trend, liquidity, and beta signals.
+
+================================================================================
+                                    SIGNALS                                     
+================================================================================
+  20 signals   13 bullish   1 bearish   6 neutral
+
+  [+] BULLISH   MODERATE    Trend
+      Price is above SMA 20 which is above SMA 50, indicating an uptrend.
+  [-] BEARISH   MODERATE    RSI Condition
+      RSI is above 70, suggesting the stock may be overbought.
+  [+] BULLISH   MODERATE    MACD Condition
+      MACD line is above the signal line, indicating bullish momentum.
+  [+] BULLISH   WEAK        Price vs SMA 20
+      Price is above the 20-period moving average.
+  [+] BULLISH   MODERATE    Price vs SMA 50
+      Price is above the 50-period moving average.
+  [+] BULLISH   STRONG      Price vs SMA 200
+      Price is above the 200-period moving average.
+  [ ] NEUTRAL   WEAK        Volume vs Volume SMA 20
+      Volume is at or below the 20-period average.
+  [ ] NEUTRAL   WEAK        Valuation
+      Forward p/e of 32.2 is elevated but not extreme.
+  [+] BULLISH   STRONG      Profitability
+      Strong profit margin of 27.2% indicates robust profitability.
+  [+] BULLISH   MODERATE    Growth
+      Both revenue (16.6%) and earnings (21.8%) are growing strongly.
+  [ ] NEUTRAL   WEAK        Debt Levels
+      Moderate debt-to-equity of 79.5 is within an acceptable range.
+  [+] BULLISH   MODERATE    Free Cash Flow
+      Positive free cash flow indicates the company generates cash after capital expenditures.
+  [+] BULLISH   WEAK        Volatility Risk
+      Low annualized volatility of 22.2% indicates relatively stable pricing.
+  [+] BULLISH   WEAK        Maximum Drawdown Risk
+      Mild maximum drawdown of -13.8%; price has been relatively resilient.
+  [+] BULLISH   WEAK        Recent Trend Risk
+      Recent 30-day return of 18.7% indicates recent price strength.
+  [+] BULLISH   WEAK        Liquidity Risk
+      Adequate average daily volume (49,667,591 shares) suggests good liquidity.
+  [ ] NEUTRAL   WEAK        Beta Risk
+      Beta of 1.06 is within a normal market-sensitivity range.
+  [+] BULLISH   MODERATE    News Sentiment
+      Recent news appears positive: found positive terms such as 'beat', 'beats', 'partnership'.
+  [ ] NEUTRAL   WEAK        News Risk Headlines
+      No risk-related terms found in recent news.
+  [ ] NEUTRAL   WEAK        News Coverage
+      10 recent news items were available for analysis.
+
+================================================================================
+                                 KEY STRENGTHS                                  
+================================================================================
+  + Price is above SMA 20 which is above SMA 50, indicating an uptrend.
+  + MACD line is above the signal line, indicating bullish momentum.
+  + Price is above the 20-period moving average.
+  + Price is above the 50-period moving average.
+  + Price is above the 200-period moving average.
+  + Strong profit margin of 27.2% indicates robust profitability.
+  + Both revenue (16.6%) and earnings (21.8%) are growing strongly.
+  + Positive free cash flow indicates the company generates cash after capital expenditures.
+  + Low annualized volatility of 22.2% indicates relatively stable pricing.
+  + Mild maximum drawdown of -13.8%; price has been relatively resilient.
+  + Recent 30-day return of 18.7% indicates recent price strength.
+  + Adequate average daily volume (49,667,591 shares) suggests good liquidity.
+  + Recent news appears positive: found positive terms such as 'beat', 'beats', 'partnership'.
+
+================================================================================
+                                   KEY RISKS                                    
+================================================================================
+  - RSI is above 70, suggesting the stock may be overbought.
+
+================================================================================
+                                    TRIGGERS                                    
+================================================================================
+  Buy Trigger:
+    Already showing positive technical conditions; consider waiting for confirmation from fundamentals and risk analysis.
+
+  Sell / Avoid Trigger:
+    Reassess if technical score falls below 45 or bearish signals strengthen.
+
+================================================================================
+                                   DISCLAIMER                                   
+================================================================================
+  This report is for research and decision-support purposes only.
+  It is not financial advice. It does not place, recommend, or imply trades.
+================================================================================

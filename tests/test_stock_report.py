@@ -12,7 +12,7 @@ import pytest
 
 from app.models.rating import ConfidenceLevel, Rating, RatingCategory
 from app.models.signal import Signal, SignalCategory, SignalDirection, SignalStrength
-from app.reports.stock_report import generate_stock_report
+from app.reports.stock_report import generate_stock_report, _CATEGORY_ORDER
 
 
 # ---------------------------------------------------------------------------
@@ -480,3 +480,64 @@ class TestRiskConditionsSection:
         )
         out = generate_stock_report("AAPL", rating, [])
         assert "Risk score: 55.0/100" in out
+
+
+# ---------------------------------------------------------------------------
+# Signal ordering
+# ---------------------------------------------------------------------------
+
+class TestSignalsOrdering:
+    def _cat_signal(self, name: str, category: SignalCategory) -> Signal:
+        return Signal(
+            name=name,
+            category=category,
+            direction=SignalDirection.NEUTRAL,
+            strength=SignalStrength.MODERATE,
+            description=f"Description for {name}.",
+            score_impact=0.0,
+            confidence=0.60,
+        )
+
+    def test_technical_appears_before_fundamental(self):
+        tech = self._cat_signal("TechSig", SignalCategory.TECHNICAL)
+        fund = self._cat_signal("FundSig", SignalCategory.FUNDAMENTAL)
+        out = _report(signals=[fund, tech])  # fund listed first in input
+        assert out.index("TechSig") < out.index("FundSig")
+
+    def test_fundamental_appears_before_news(self):
+        fund = self._cat_signal("FundSig", SignalCategory.FUNDAMENTAL)
+        news = self._cat_signal("NewsSig", SignalCategory.NEWS)
+        out = _report(signals=[news, fund])  # news listed first in input
+        assert out.index("FundSig") < out.index("NewsSig")
+
+    def test_news_appears_before_risk(self):
+        news = self._cat_signal("NewsSig", SignalCategory.NEWS)
+        risk = self._cat_signal("RiskSig", SignalCategory.RISK)
+        out = _report(signals=[risk, news])  # risk listed first in input
+        assert out.index("NewsSig") < out.index("RiskSig")
+
+    def test_technical_appears_before_risk(self):
+        tech = self._cat_signal("TechSig", SignalCategory.TECHNICAL)
+        risk = self._cat_signal("RiskSig", SignalCategory.RISK)
+        out = _report(signals=[risk, tech])  # risk listed first in input
+        assert out.index("TechSig") < out.index("RiskSig")
+
+    def test_original_signals_list_not_mutated_by_ordering(self):
+        fund = self._cat_signal("FundSig", SignalCategory.FUNDAMENTAL)
+        tech = self._cat_signal("TechSig", SignalCategory.TECHNICAL)
+        signals = [fund, tech]
+        _report(signals=signals)
+        assert signals[0].name == "FundSig"
+        assert signals[1].name == "TechSig"
+
+    def test_category_order_covers_all_four_categories(self):
+        assert SignalCategory.TECHNICAL   in _CATEGORY_ORDER
+        assert SignalCategory.FUNDAMENTAL in _CATEGORY_ORDER
+        assert SignalCategory.NEWS        in _CATEGORY_ORDER
+        assert SignalCategory.RISK        in _CATEGORY_ORDER
+
+    def test_within_same_category_order_preserved(self):
+        sig_a = self._cat_signal("SigA", SignalCategory.TECHNICAL)
+        sig_b = self._cat_signal("SigB", SignalCategory.TECHNICAL)
+        out = _report(signals=[sig_a, sig_b])
+        assert out.index("SigA") < out.index("SigB")

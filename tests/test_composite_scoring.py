@@ -7,7 +7,7 @@ All tests use locally constructed Signal objects — no network calls.
 import pytest
 
 from app.analysis.scoring import ScoringError, score_signals
-from app.models.rating import ConfidenceLevel, Rating
+from app.models.rating import ConfidenceLevel, Rating, RatingCategory
 from app.models.signal import Signal, SignalCategory, SignalDirection, SignalStrength
 
 
@@ -613,3 +613,191 @@ class TestFourWayWeighting:
             _risk("R1", 0.0),
         ])
         assert "news" in r.explanation.lower()
+
+
+# ---------------------------------------------------------------------------
+# Trigger quality
+# ---------------------------------------------------------------------------
+
+class TestTriggers:
+    def test_buy_trigger_buy_category_all_constructive(self):
+        # tech impact=0.6→score=80, fund impact=0.2→score=60; both above 55
+        # composite = 80*(7/12)+60*(5/12) ≈ 71.67 → BUY_CANDIDATE
+        r = score_signals("AAPL", [_tech("T1", 0.6), _fund("F1", 0.2)])
+        assert r.final_category == RatingCategory.BUY_CANDIDATE
+        assert "constructive" in r.buy_trigger.lower()
+
+    def test_buy_trigger_buy_category_weak_fundamental_mentioned(self):
+        # tech impact=0.9→score=95, fund impact=-0.2→score=40 (weak, < 55)
+        # composite = 95*(7/12)+40*(5/12) ≈ 72.1 → BUY_CANDIDATE
+        r = score_signals("AAPL", [_tech("T1", 0.9), _fund("F1", -0.2)])
+        assert r.final_category == RatingCategory.BUY_CANDIDATE
+        assert "fundamental" in r.buy_trigger.lower()
+
+    def test_buy_trigger_hold_category_no_entry_language(self):
+        r = score_signals("AAPL", [_tech("T1", 0.0)])  # HOLD
+        assert "no" in r.buy_trigger.lower() or "wait" in r.buy_trigger.lower()
+
+    def test_sell_trigger_avoid_category_mentions_weakness(self):
+        # tech_score=35 → AVOID
+        r = score_signals("AAPL", [_tech("T1", -0.3)])
+        assert r.final_category == RatingCategory.AVOID
+        assert "weak" in r.sell_or_avoid_trigger.lower() or "broadly" in r.sell_or_avoid_trigger.lower()
+
+    def test_sell_trigger_watchlist_category_has_reassess_language(self):
+        r = score_signals("AAPL", [_tech("T1", 0.1)])  # WATCHLIST
+        assert "reassess" in r.sell_or_avoid_trigger.lower()
+
+    def test_buy_trigger_multi_category_does_not_say_technical_score(self):
+        r = score_signals("AAPL", [
+            _tech("T1", 0.1),
+            _fund("F1", 0.1),
+            _news("N1", 0.1),
+            _risk("R1", 0.1),
+        ])
+        assert "technical score" not in r.buy_trigger.lower()
+
+    def test_sell_trigger_multi_category_does_not_say_technical_score(self):
+        r = score_signals("AAPL", [
+            _tech("T1", 0.1),
+            _fund("F1", 0.1),
+            _news("N1", 0.1),
+            _risk("R1", 0.1),
+        ])
+        assert "technical score" not in r.sell_or_avoid_trigger.lower()
+
+
+# ---------------------------------------------------------------------------
+# Positive factors ordering
+# ---------------------------------------------------------------------------
+
+class TestPositiveFactorsOrdering:
+    def _signal(
+        self,
+        name: str,
+        strength: SignalStrength,
+        desc: str,
+        impact: float = 0.2,
+    ) -> Signal:
+        return Signal(
+            name=name,
+            category=SignalCategory.TECHNICAL,
+            direction=SignalDirection.BULLISH,
+            strength=strength,
+            description=desc,
+            score_impact=impact,
+            confidence=0.70,
+        )
+
+    def test_strong_factors_appear_before_weak(self):
+        strong = self._signal("S", SignalStrength.STRONG, "Strong uptrend confirmed.")
+        weak   = self._signal("W", SignalStrength.WEAK,   "Minor bullish signal.", impact=0.1)
+        r = score_signals("AAPL", [weak, strong])  # weak listed first in input
+        assert r.key_positive_factors[0] == "Strong uptrend confirmed."
+        assert r.key_positive_factors[1] == "Minor bullish signal."
+
+    def test_moderate_factors_appear_before_weak(self):
+        moderate = self._signal("M", SignalStrength.MODERATE, "Moderate uptrend.", impact=0.2)
+        weak     = self._signal("W", SignalStrength.WEAK,     "Minor signal.",     impact=0.1)
+        r = score_signals("AAPL", [weak, moderate])
+        assert r.key_positive_factors[0] == "Moderate uptrend."
+        assert r.key_positive_factors[1] == "Minor signal."
+
+    def test_strong_moderate_weak_ordering(self):
+        strong   = self._signal("S", SignalStrength.STRONG,   "Strong signal.",   impact=0.3)
+        moderate = self._signal("M", SignalStrength.MODERATE, "Moderate signal.", impact=0.2)
+        weak     = self._signal("W", SignalStrength.WEAK,     "Weak signal.",     impact=0.1)
+        r = score_signals("AAPL", [weak, moderate, strong])
+        assert r.key_positive_factors == ["Strong signal.", "Moderate signal.", "Weak signal."]
+
+
+# ---------------------------------------------------------------------------
+# Cautionary neutral signals in risk factors
+# ---------------------------------------------------------------------------
+
+class TestCautionaryNeutralRisks:
+    def _cautionary(self, description: str) -> Signal:
+        return Signal(
+            name="CautionSignal",
+            category=SignalCategory.RISK,
+            direction=SignalDirection.NEUTRAL,
+            strength=SignalStrength.MODERATE,
+            description=description,
+            score_impact=0.0,
+            confidence=0.60,
+        )
+
+    def test_elevated_in_description_adds_to_risks(self):
+        sig = self._cautionary("Volatility is elevated relative to peers.")
+        r = score_signals("AAPL", [_tech("T1", 0.2), sig])
+        assert "Volatility is elevated relative to peers." in r.key_risks
+
+    def test_overbought_in_description_adds_to_risks(self):
+        sig = self._cautionary("RSI is in overbought territory.")
+        r = score_signals("AAPL", [_tech("T1", 0.2), sig])
+        assert "RSI is in overbought territory." in r.key_risks
+
+    def test_non_cautionary_neutral_not_in_risks(self):
+        sig = self._cautionary("Volume is within normal range.")
+        r = score_signals("AAPL", [_tech("T1", 0.2), sig])
+        assert "Volume is within normal range." not in r.key_risks
+
+    def test_bearish_signal_still_in_risks(self):
+        r = score_signals("AAPL", [_tech("T1", 0.2), _fund("F1", -0.3)])
+        assert r.key_risks  # bearish path still works
+
+    def test_cautionary_neutral_not_double_counted(self):
+        # score_impact < 0 but direction neutral — should appear once only
+        sig = Signal(
+            name="WeirdSig",
+            category=SignalCategory.RISK,
+            direction=SignalDirection.NEUTRAL,
+            strength=SignalStrength.MODERATE,
+            description="Elevated risk with slight negative impact.",
+            score_impact=-0.05,
+            confidence=0.60,
+        )
+        r = score_signals("AAPL", [_tech("T1", 0.2), sig])
+        desc = "Elevated risk with slight negative impact."
+        assert r.key_risks.count(desc) == 1
+
+
+# ---------------------------------------------------------------------------
+# News summary quality
+# ---------------------------------------------------------------------------
+
+class TestNewsSummaryQuality:
+    def test_positive_label_for_high_news_score(self):
+        # impact=0.3 → news_score=65 → "positive"
+        r = score_signals("AAPL", [_news("N1", 0.3)])
+        assert r.news_summary is not None
+        assert "positive" in r.news_summary.lower()
+
+    def test_cautionary_label_for_low_news_score(self):
+        # impact=-0.2 → news_score=40 → "cautionary"
+        r = score_signals("AAPL", [_news("N1", -0.2)])
+        assert r.news_summary is not None
+        assert "cautionary" in r.news_summary.lower()
+
+    def test_mixed_or_neutral_label_for_neutral_news_score(self):
+        # impact=0.0 → news_score=50 → "mixed or neutral"
+        r = score_signals("AAPL", [_news("N1", 0.0)])
+        assert r.news_summary is not None
+        assert "mixed" in r.news_summary.lower() or "neutral" in r.news_summary.lower()
+
+    def test_moderately_positive_label_for_modest_news_score(self):
+        # impact=0.1 → news_score=55 → "moderately positive"
+        r = score_signals("AAPL", [_news("N1", 0.1)])
+        assert r.news_summary is not None
+        assert "moderately positive" in r.news_summary.lower()
+
+    def test_negative_label_for_very_low_news_score(self):
+        # impact=-0.4 → news_score=30 → "negative"
+        r = score_signals("AAPL", [_news("N1", -0.4)])
+        assert r.news_summary is not None
+        assert "negative" in r.news_summary.lower()
+
+    def test_news_summary_still_contains_score(self):
+        r = score_signals("AAPL", [_news("N1", 0.2)])
+        assert r.news_summary is not None
+        assert "score" in r.news_summary.lower()

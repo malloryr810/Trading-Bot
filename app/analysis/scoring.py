@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from app.models.rating import ConfidenceLevel, Rating, RatingCategory
-from app.models.signal import Signal, SignalCategory
+from app.models.signal import Signal, SignalCategory, SignalDirection, SignalStrength
 
 
 class ScoringError(Exception):
@@ -28,6 +28,25 @@ _WEIGHTS: dict[SignalCategory, float] = {
     SignalCategory.RISK:        0.15,
 }
 
+_STRENGTH_ORDER: dict[SignalStrength, int] = {
+    SignalStrength.STRONG:   0,
+    SignalStrength.MODERATE: 1,
+    SignalStrength.WEAK:     2,
+}
+
+_CATEGORY_LABELS: dict[SignalCategory, str] = {
+    SignalCategory.TECHNICAL:   "technical",
+    SignalCategory.FUNDAMENTAL: "fundamental",
+    SignalCategory.NEWS:        "news sentiment",
+    SignalCategory.RISK:        "risk",
+}
+
+_CAUTION_KEYWORDS: frozenset[str] = frozenset({
+    "elevated", "caution", "warning", "declining",
+    "concern", "overbought", "overextended",
+    "low liquidity", "thin volume", "no news", "absence",
+})
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -41,9 +60,9 @@ def score_signals(
 ) -> Rating:
     """Score a mixed list of signals and return a composite Rating.
 
-    Supported categories are TECHNICAL (35%), FUNDAMENTAL (25%), and RISK (15%).
-    Base weights sum to 0.75 and are re-normalised to 100% when categories are
-    absent. NEWS signals are silently ignored.
+    Supported categories are TECHNICAL (35%), FUNDAMENTAL (25%), NEWS (25%),
+    and RISK (15%). Weights are re-normalised to 100% when any category is
+    absent.
 
     Args:
         ticker: Stock ticker symbol (e.g. "AAPL").
@@ -125,9 +144,19 @@ def score_signals(
 
     news_summary: str | None = None
     if news_signals:
+        if news_score >= 65:
+            sentiment_label = "positive"
+        elif news_score >= 55:
+            sentiment_label = "moderately positive"
+        elif news_score >= 45:
+            sentiment_label = "mixed or neutral"
+        elif news_score >= 35:
+            sentiment_label = "cautionary"
+        else:
+            sentiment_label = "negative"
         news_summary = (
-            f"News score: {news_score:.1f}/100 based on sentiment, risk headlines, "
-            "and coverage signals."
+            f"News score: {news_score:.1f}/100 — sentiment is {sentiment_label} "
+            "based on recent headlines, risk indicators, and coverage."
         )
 
     risk_summary: str | None = None
@@ -137,8 +166,15 @@ def score_signals(
             "recent trend, liquidity, and beta signals."
         )
 
-    buy_trigger = _build_buy_trigger(category)
-    sell_or_avoid_trigger = _build_sell_avoid_trigger(category)
+    active_categories = frozenset(by_category.keys())
+    buy_trigger = _build_buy_trigger(
+        category, technical_score, fundamental_score, news_score, risk_score,
+        active_categories,
+    )
+    sell_or_avoid_trigger = _build_sell_avoid_trigger(
+        category, technical_score, fundamental_score, news_score, risk_score,
+        active_categories,
+    )
 
     return Rating(
         ticker=ticker,
@@ -208,8 +244,13 @@ def score_technical_signals(
         f"Technical score: {technical_score:.1f}/100 based on trend, RSI, MACD, "
         "moving-average, and volume signals."
     )
-    buy_trigger = _build_buy_trigger(category)
-    sell_or_avoid_trigger = _build_sell_avoid_trigger(category)
+    active_categories = frozenset({SignalCategory.TECHNICAL})
+    buy_trigger = _build_buy_trigger(
+        category, technical_score, 0.0, 0.0, 0.0, active_categories,
+    )
+    sell_or_avoid_trigger = _build_sell_avoid_trigger(
+        category, technical_score, 0.0, 0.0, 0.0, active_categories,
+    )
 
     return Rating(
         ticker=ticker,
@@ -304,39 +345,139 @@ def _map_confidence(signals: list[Signal]) -> ConfidenceLevel:
 
 
 def _build_positive_factors(signals: list[Signal]) -> list[str]:
-    return [
-        s.description
-        for s in signals
-        if s.score_impact > 0
-    ]
+    positives = sorted(
+        (s for s in signals if s.score_impact > 0),
+        key=lambda s: _STRENGTH_ORDER.get(s.strength, 1),
+    )
+    return [s.description for s in positives]
+
+
+def _is_cautionary_neutral(signal: Signal) -> bool:
+    """Return True for neutral signals whose description contains a caution keyword."""
+    if signal.direction != SignalDirection.NEUTRAL or signal.score_impact < 0:
+        return False
+    desc_lower = signal.description.lower()
+    return any(kw in desc_lower for kw in _CAUTION_KEYWORDS)
 
 
 def _build_risk_factors(signals: list[Signal]) -> list[str]:
-    return [
-        s.description
-        for s in signals
-        if s.score_impact < 0
-    ]
+    bearish = [s.description for s in signals if s.score_impact < 0]
+    cautionary = [s.description for s in signals if _is_cautionary_neutral(s)]
+    return (bearish + cautionary)[:10]
 
 
-def _build_buy_trigger(category: RatingCategory) -> str:
+def _weak_category_labels(
+    active_scores: dict[SignalCategory, float],
+    threshold: float,
+) -> list[str]:
+    """Return category labels for active categories scoring below threshold, lowest first."""
+    below = [(cat, sc) for cat, sc in active_scores.items() if sc < threshold]
+    below.sort(key=lambda x: x[1])
+    return [_CATEGORY_LABELS[cat] for cat, _ in below]
+
+
+def _build_buy_trigger(
+    category: RatingCategory,
+    technical_score: float,
+    fundamental_score: float,
+    news_score: float,
+    risk_score: float,
+    active_categories: frozenset[SignalCategory],
+) -> str:
+    active_scores = {
+        cat: sc
+        for cat, sc in [
+            (SignalCategory.TECHNICAL,   technical_score),
+            (SignalCategory.FUNDAMENTAL, fundamental_score),
+            (SignalCategory.NEWS,        news_score),
+            (SignalCategory.RISK,        risk_score),
+        ]
+        if cat in active_categories
+    }
+
     if category in {RatingCategory.STRONG_BUY_CANDIDATE, RatingCategory.BUY_CANDIDATE}:
+        weak = _weak_category_labels(active_scores, 55.0)
+        if weak:
+            dragging = " and ".join(weak)
+            return (
+                f"Setup is broadly positive. Monitor {dragging} conditions — "
+                "these are the weakest active signal areas."
+            )
         return (
-            "Already showing positive technical conditions; consider waiting for "
-            "confirmation from fundamentals and risk analysis."
+            "All active signal categories are constructive. "
+            "Confirm position sizing before entry."
+        )
+
+    if category == RatingCategory.WATCHLIST:
+        weak = _weak_category_labels(active_scores, 60.0)
+        if weak:
+            dragging = " and ".join(weak)
+            return (
+                f"Near entry territory. Consider a position only once {dragging} "
+                "conditions improve and the composite score exceeds 65."
+            )
+        return (
+            "Near entry territory. Wait for the composite score to push "
+            "above 65 before committing."
+        )
+
+    weak = _weak_category_labels(active_scores, 50.0)
+    if weak:
+        dragging = " and ".join(weak)
+        return (
+            f"No entry signal. {dragging.capitalize()} conditions are a headwind; "
+            "wait for the composite score to recover above 65."
         )
     return (
-        "Consider only if technical score improves above 70 and future "
-        "fundamentals/risk checks support the setup."
+        "No clear entry signal. Wait for the composite score to improve "
+        "above 65 across multiple signal categories."
     )
 
 
-def _build_sell_avoid_trigger(category: RatingCategory) -> str:
+def _build_sell_avoid_trigger(
+    category: RatingCategory,
+    technical_score: float,
+    fundamental_score: float,
+    news_score: float,
+    risk_score: float,
+    active_categories: frozenset[SignalCategory],
+) -> str:
+    active_scores = {
+        cat: sc
+        for cat, sc in [
+            (SignalCategory.TECHNICAL,   technical_score),
+            (SignalCategory.FUNDAMENTAL, fundamental_score),
+            (SignalCategory.NEWS,        news_score),
+            (SignalCategory.RISK,        risk_score),
+        ]
+        if cat in active_categories
+    }
+
     if category in {RatingCategory.AVOID, RatingCategory.SELL_EXIT_WARNING}:
+        strong = [
+            _CATEGORY_LABELS[cat]
+            for cat, sc in active_scores.items()
+            if sc >= 55.0
+        ]
+        if strong:
+            holding_up = " and ".join(strong)
+            return (
+                f"Conditions are weak. {holding_up.capitalize()} signals "
+                "are holding up but overall analysis does not support entry."
+            )
         return (
-            "Technical conditions are weak; avoid or review for exit unless "
-            "future analysis provides a strong counterargument."
+            "Conditions are broadly weak across all signal categories. "
+            "Avoid until a clear recovery pattern emerges."
+        )
+
+    weak = _weak_category_labels(active_scores, 55.0)
+    if weak:
+        dragging = " and ".join(weak)
+        return (
+            f"Reassess if {dragging} conditions deteriorate further "
+            "or the composite score falls below 45."
         )
     return (
-        "Reassess if technical score falls below 45 or bearish signals strengthen."
+        "Reassess if the composite score falls below 45 or "
+        "bearish signals accumulate across multiple categories."
     )

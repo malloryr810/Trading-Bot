@@ -14,11 +14,18 @@ from __future__ import annotations
 from datetime import date
 
 from app.models.rating import Rating
-from app.models.signal import Signal, SignalDirection
+from app.models.signal import Signal, SignalCategory, SignalDirection
 
 
 _WIDTH = 80
 _SEP = "=" * _WIDTH
+
+_CATEGORY_ORDER: dict[SignalCategory, int] = {
+    SignalCategory.TECHNICAL:   0,
+    SignalCategory.FUNDAMENTAL: 1,
+    SignalCategory.NEWS:        2,
+    SignalCategory.RISK:        3,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -164,9 +171,10 @@ def _signals_section(signals: list[Signal]) -> str:
         f"  {n} signal{'s' if n != 1 else ''}   "
         f"{bullish} bullish   {bearish} bearish   {neutral} neutral",
     ]
-    if signals:
+    ordered = sorted(signals, key=lambda s: _CATEGORY_ORDER.get(s.category, 99))
+    if ordered:
         lines.append("")
-        for sig in signals:
+        for sig in ordered:
             ind = _direction_indicator(sig.direction)
             dir_str = sig.direction.value.upper()
             str_str = sig.strength.value.upper()
