@@ -1,5 +1,16 @@
 # Development Log
 
+## 2026-05-24 — Local storage layer
+
+- Replaced docstring-only stub with full implementation of `app/data/storage.py`
+- `StorageError` — single exception class for all storage failures
+- `build_report_filename(ticker, timestamp=None, extension="txt") -> str` — deterministic `TICKER_YYYYMMDD_HHMMSS.ext` filenames; validates ticker and extension; supports `"txt"`, `".txt"`, `"json"`, `".json"`
+- `ensure_output_dir(output_dir) -> Path` — creates directory tree with `parents=True, exist_ok=True`; wraps `OSError` in `StorageError`
+- `save_text_report(report_text, ticker, output_dir="outputs/reports", timestamp=None) -> Path` — validates non-blank text, calls `ensure_output_dir`, writes UTF-8
+- `save_json_result(result, ticker, output_dir="outputs/results", timestamp=None) -> Path` — accepts plain `Mapping` or Pydantic `BaseModel`; uses `model_dump(mode="json")` for models; `json.dumps` with `indent=2, sort_keys=True`; `_json_default` fallback handles `datetime` objects
+- Added 77 tests in `tests/test_storage.py`; all use `tmp_path` — no writes to real project directories
+- Not wired into CLI yet; that is the recommended next step
+
 ## 2026-05-24 — Wire news analysis into pipeline
 
 - Updated `_WEIGHTS` in `scoring.py`: Technical 35%, Fundamental 25%, **News 25%**, Risk 15% (sum 1.00; re-normalised when a category is absent)

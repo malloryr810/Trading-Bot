@@ -43,6 +43,7 @@ python -m py_compile app/analysis/scoring.py
 | Module | Purpose |
 |--------|---------|
 | `app/data/market_data.py` | Fetches, validates, and normalizes OHLCV price data from yfinance |
+| `app/data/storage.py` | Saves plain-text reports (`.txt`) and structured results (`.json`) to local disk |
 | `app/data/fundamentals.py` | Fetches company fundamentals (P/E, margins, growth, D/E, FCF, beta) from yfinance |
 | `app/data/news_data.py` | Fetches recent news headlines from yfinance; returns typed `NewsItem` objects |
 | `app/models/signal.py` | Typed `Signal` Pydantic model; shared contract across the analysis layer |
@@ -103,7 +104,6 @@ Each analysis module follows the same pattern:
 ## Not Yet Implemented
 
 These files exist as docstring-only stubs:
-- `app/data/storage.py` — data persistence layer
 - `app/reports/report_generator.py` — full report orchestration
 - `app/reports/templates.py` — report templates
 - `app/models/stock_report.py` — top-level StockReport model
