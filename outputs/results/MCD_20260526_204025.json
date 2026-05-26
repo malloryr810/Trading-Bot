@@ -1,0 +1,370 @@
+{
+  "buy_trigger": "No entry signal. Technical conditions are a headwind; wait for the composite score to recover above 65.",
+  "company_name": "McDonald's Corporation",
+  "confidence": "medium",
+  "confidence_diagnostics": {
+    "average_signal_confidence": 0.6175,
+    "bearish_count": 4,
+    "bullish_count": 8,
+    "fundamental_average_confidence": 0.58,
+    "max_signal_confidence": 0.7,
+    "min_signal_confidence": 0.3,
+    "missing_count": 1,
+    "neutral_count": 8,
+    "news_average_confidence": 0.7,
+    "risk_average_confidence": 0.62,
+    "signal_count": 20,
+    "technical_average_confidence": 0.6071
+  },
+  "current_price": 279.260009765625,
+  "data_sources_used": [
+    "yfinance"
+  ],
+  "data_timestamp": "2026-05-26T20:40:25.454165Z",
+  "explanation": "Composite rating for MCD based on 7 technical and 5 fundamental and 3 news and 5 risk signals.",
+  "final_category": "Hold",
+  "fundamental_score": 82.5,
+  "fundamental_summary": "Fundamental score: 82.5/100 based on valuation, profitability, growth, debt, and cash flow signals.",
+  "key_positive_factors": [
+    "Strong profit margin of 31.6% indicates robust profitability.",
+    "MACD line is above the signal line, indicating bullish momentum.",
+    "Forward p/e of 19.6 is in an attractive valuation range.",
+    "Positive free cash flow indicates the company generates cash after capital expenditures.",
+    "Revenue (9.4%) and earnings (6.9%) are both growing positively.",
+    "Low annualized volatility of 16.4% indicates relatively stable pricing.",
+    "Adequate average daily volume (3,385,519 shares) suggests good liquidity.",
+    "Low beta of 0.44 indicates lower sensitivity to market moves."
+  ],
+  "key_risks": [
+    "Price is below SMA 20 which is below SMA 50, indicating a downtrend.",
+    "Price is below the 20-period moving average.",
+    "Price is below the 50-period moving average.",
+    "Price is below the 200-period moving average."
+  ],
+  "metadata": {},
+  "news_score": 50.0,
+  "news_summary": "News score: 50.0/100 \u2014 sentiment is mixed or neutral based on recent headlines, risk indicators, and coverage.",
+  "risk_score": 65.0,
+  "risk_summary": "Risk score: 65.0/100 based on volatility, drawdown, recent trend, liquidity, and beta signals.",
+  "score": 50.75,
+  "sell_or_avoid_trigger": "Reassess if technical and news sentiment conditions deteriorate further or the composite score falls below 45.",
+  "signals_used": [
+    {
+      "category": "technical",
+      "confidence": 0.7,
+      "description": "Price is below SMA 20 which is below SMA 50, indicating a downtrend.",
+      "direction": "bearish",
+      "metadata": {
+        "latest_close": 279.260009765625,
+        "sma_20": 282.0635025024414,
+        "sma_50": 297.50160095214846
+      },
+      "name": "Trend",
+      "score_impact": -0.25,
+      "source": null,
+      "strength": "moderate",
+      "timestamp": null,
+      "value": "bearish"
+    },
+    {
+      "category": "technical",
+      "confidence": 0.5,
+      "description": "RSI is between 30 and 70, indicating neutral momentum.",
+      "direction": "neutral",
+      "metadata": {
+        "rsi_14": 40.44617001228398
+      },
+      "name": "RSI Condition",
+      "score_impact": 0.0,
+      "source": null,
+      "strength": "weak",
+      "timestamp": null,
+      "value": 40.44617001228398
+    },
+    {
+      "category": "technical",
+      "confidence": 0.65,
+      "description": "MACD line is above the signal line, indicating bullish momentum.",
+      "direction": "bullish",
+      "metadata": {
+        "macd": -5.239788336518927,
+        "macd_signal": -6.525591120628721
+      },
+      "name": "MACD Condition",
+      "score_impact": 0.2,
+      "source": null,
+      "strength": "moderate",
+      "timestamp": null,
+      "value": -5.239788336518927
+    },
+    {
+      "category": "technical",
+      "confidence": 0.6,
+      "description": "Price is below the 20-period moving average.",
+      "direction": "bearish",
+      "metadata": {
+        "latest_close": 279.260009765625,
+        "sma_20": 282.0635025024414
+      },
+      "name": "Price vs SMA 20",
+      "score_impact": -0.1,
+      "source": null,
+      "strength": "weak",
+      "timestamp": null,
+      "value": false
+    },
+    {
+      "category": "technical",
+      "confidence": 0.65,
+      "description": "Price is below the 50-period moving average.",
+      "direction": "bearish",
+      "metadata": {
+        "latest_close": 279.260009765625,
+        "sma_50": 297.50160095214846
+      },
+      "name": "Price vs SMA 50",
+      "score_impact": -0.15,
+      "source": null,
+      "strength": "moderate",
+      "timestamp": null,
+      "value": false
+    },
+    {
+      "category": "technical",
+      "confidence": 0.7,
+      "description": "Price is below the 200-period moving average.",
+      "direction": "bearish",
+      "metadata": {
+        "latest_close": 279.260009765625,
+        "sma_200": 305.7642021179199
+      },
+      "name": "Price vs SMA 200",
+      "score_impact": -0.25,
+      "source": null,
+      "strength": "strong",
+      "timestamp": null,
+      "value": false
+    },
+    {
+      "category": "technical",
+      "confidence": 0.45,
+      "description": "Volume is at or below the 20-period average.",
+      "direction": "neutral",
+      "metadata": {
+        "volume": 4139394.0,
+        "volume_sma_20": 4304489.7
+      },
+      "name": "Volume vs Volume SMA 20",
+      "score_impact": 0.0,
+      "source": null,
+      "strength": "weak",
+      "timestamp": null,
+      "value": 4139394.0
+    },
+    {
+      "category": "fundamental",
+      "confidence": 0.65,
+      "description": "Forward p/e of 19.6 is in an attractive valuation range.",
+      "direction": "bullish",
+      "metadata": {
+        "forward_pe": 19.639326,
+        "pe_source": "forward P/E",
+        "pe_used": 19.639326,
+        "price_to_book": -154.28731,
+        "trailing_pe": 23.003296
+      },
+      "name": "Valuation",
+      "score_impact": 0.2,
+      "source": null,
+      "strength": "moderate",
+      "timestamp": null,
+      "value": 19.639326
+    },
+    {
+      "category": "fundamental",
+      "confidence": 0.7,
+      "description": "Strong profit margin of 31.6% indicates robust profitability.",
+      "direction": "bullish",
+      "metadata": {
+        "profit_margin": 0.31618
+      },
+      "name": "Profitability",
+      "score_impact": 0.2,
+      "source": null,
+      "strength": "strong",
+      "timestamp": null,
+      "value": 0.31618
+    },
+    {
+      "category": "fundamental",
+      "confidence": 0.6,
+      "description": "Revenue (9.4%) and earnings (6.9%) are both growing positively.",
+      "direction": "bullish",
+      "metadata": {
+        "earnings_growth": 0.069,
+        "revenue_growth": 0.094
+      },
+      "name": "Growth",
+      "score_impact": 0.1,
+      "source": null,
+      "strength": "weak",
+      "timestamp": null,
+      "value": 0.094
+    },
+    {
+      "category": "fundamental",
+      "confidence": 0.3,
+      "description": "Debt-to-equity data is unavailable.",
+      "direction": "neutral",
+      "metadata": {
+        "debt_to_equity": null
+      },
+      "name": "Debt Levels",
+      "score_impact": 0.0,
+      "source": null,
+      "strength": "weak",
+      "timestamp": null,
+      "value": null
+    },
+    {
+      "category": "fundamental",
+      "confidence": 0.65,
+      "description": "Positive free cash flow indicates the company generates cash after capital expenditures.",
+      "direction": "bullish",
+      "metadata": {
+        "free_cash_flow": 5952249856.0
+      },
+      "name": "Free Cash Flow",
+      "score_impact": 0.15,
+      "source": null,
+      "strength": "moderate",
+      "timestamp": null,
+      "value": 5952249856.0
+    },
+    {
+      "category": "risk",
+      "confidence": 0.65,
+      "description": "Low annualized volatility of 16.4% indicates relatively stable pricing.",
+      "direction": "bullish",
+      "metadata": {
+        "annualized_volatility": 0.1636
+      },
+      "name": "Volatility Risk",
+      "score_impact": 0.1,
+      "source": null,
+      "strength": "weak",
+      "timestamp": null,
+      "value": 0.1636
+    },
+    {
+      "category": "risk",
+      "confidence": 0.65,
+      "description": "Moderate maximum drawdown of -19.0%; some historical price weakness.",
+      "direction": "neutral",
+      "metadata": {
+        "max_drawdown": -0.1904
+      },
+      "name": "Maximum Drawdown Risk",
+      "score_impact": 0.0,
+      "source": null,
+      "strength": "moderate",
+      "timestamp": null,
+      "value": -0.1904
+    },
+    {
+      "category": "risk",
+      "confidence": 0.55,
+      "description": "Recent 30-day return of -8.3%; no strong directional signal.",
+      "direction": "neutral",
+      "metadata": {
+        "return_30d": -0.0829
+      },
+      "name": "Recent Trend Risk",
+      "score_impact": 0.0,
+      "source": null,
+      "strength": "weak",
+      "timestamp": null,
+      "value": -0.0829
+    },
+    {
+      "category": "risk",
+      "confidence": 0.6,
+      "description": "Adequate average daily volume (3,385,519 shares) suggests good liquidity.",
+      "direction": "bullish",
+      "metadata": {
+        "average_volume": 3385519.0
+      },
+      "name": "Liquidity Risk",
+      "score_impact": 0.1,
+      "source": null,
+      "strength": "weak",
+      "timestamp": null,
+      "value": 3385519.0
+    },
+    {
+      "category": "risk",
+      "confidence": 0.65,
+      "description": "Low beta of 0.44 indicates lower sensitivity to market moves.",
+      "direction": "bullish",
+      "metadata": {
+        "beta": 0.436
+      },
+      "name": "Beta Risk",
+      "score_impact": 0.1,
+      "source": null,
+      "strength": "weak",
+      "timestamp": null,
+      "value": 0.436
+    },
+    {
+      "category": "news",
+      "confidence": 0.7,
+      "description": "No positive or negative news terms were found; sentiment is neutral.",
+      "direction": "neutral",
+      "metadata": {
+        "negative_matches": [],
+        "net_sentiment": 0,
+        "positive_matches": []
+      },
+      "name": "News Sentiment",
+      "score_impact": 0.0,
+      "source": null,
+      "strength": "weak",
+      "timestamp": null,
+      "value": 0
+    },
+    {
+      "category": "news",
+      "confidence": 0.7,
+      "description": "No risk-related terms found in recent news.",
+      "direction": "neutral",
+      "metadata": {
+        "risk_matches": []
+      },
+      "name": "News Risk Headlines",
+      "score_impact": 0.0,
+      "source": null,
+      "strength": "weak",
+      "timestamp": null,
+      "value": 0
+    },
+    {
+      "category": "news",
+      "confidence": 0.7,
+      "description": "10 recent news items were available for analysis.",
+      "direction": "neutral",
+      "metadata": {
+        "article_count": 10
+      },
+      "name": "News Coverage",
+      "score_impact": 0.0,
+      "source": null,
+      "strength": "weak",
+      "timestamp": null,
+      "value": 10
+    }
+  ],
+  "technical_score": 22.5,
+  "technical_summary": "Technical score: 22.5/100 based on trend, RSI, MACD, moving-average, and volume signals.",
+  "ticker": "MCD"
+}

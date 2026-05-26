@@ -1,5 +1,30 @@
 # Development Log
 
+## 2026-05-26 — Confidence diagnostics review pass completed; docs updated
+
+Reran KO, XOM, MSFT, MCD, and PFE with `--save-markdown --save-json` and
+extracted actual `ConfidenceDiagnostics` values from JSON output. No Python
+code was changed.
+
+**Key findings:**
+- All five tickers returned Medium confidence (measured avg: 0.6100–0.6425).
+- Average confidence spread across a 29-point score range is only 0.0325.
+- Technical avg is structurally uniform (four tickers at exactly 0.6071; PFE 0.5786).
+- News avg is always 0.70 (structural cap — all tickers hit 8+ article floor).
+- Fundamental avg is the only differentiator: 0.58 (MCD) to 0.67 (MSFT).
+- MCD has one missing-data signal (D/E null → confidence 0.30); no other ticker did.
+- MSFT measured 0.6425 — the mathematical ceiling from the audit, confirming HIGH (≥0.70) is unreachable.
+- Audit's KO estimate (~0.637) matched measured value (0.6375) within 0.0005.
+
+**Updated: `docs/calibration_review_notes.md`**
+
+Appended `## Confidence Diagnostics Review Pass` section with run details,
+full diagnostics table, pattern summary, and decision. No code change recommended.
+
+1280 tests pass (pytest; no new tests — no code changes in this task).
+
+---
+
 ## 2026-05-26 — Confidence diagnostics added; no confidence formula changes made
 
 **New: `app/models/confidence_diagnostics.py`**

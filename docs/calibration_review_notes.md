@@ -429,3 +429,133 @@ The confidence compression issue identified here is now fully documented in
 the full evidence table, four possible fix options, the recommended next step
 (signal confidence audit), and the decision gate that must be cleared before any
 code change.
+
+---
+
+## Confidence Diagnostics Review Pass
+
+**Important:** Not financial advice. Not a backtest. No scoring code was changed.
+
+---
+
+### Run Details
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-26 |
+| Time (UTC approx.) | ~20:39–20:43 |
+| Tickers reviewed | KO, XOM, MSFT, MCD, PFE |
+| All five succeeded | Yes — no errors |
+| Purpose | Extract actual `ConfidenceDiagnostics` values now that the diagnostic model is wired into the pipeline |
+
+Commands used:
+
+```
+python -m app.main KO   --save-markdown --save-json
+python -m app.main XOM  --save-markdown --save-json
+python -m app.main MSFT --save-markdown --save-json
+python -m app.main MCD  --save-markdown --save-json
+python -m app.main PFE  --save-markdown --save-json
+```
+
+Output files reviewed (not committed):
+
+| Ticker | Markdown | JSON |
+|--------|----------|------|
+| KO | `outputs/reports/KO_20260526_203946.md` | `outputs/results/KO_20260526_203946.json` |
+| XOM | `outputs/reports/XOM_20260526_203956.md` | `outputs/results/XOM_20260526_203956.json` |
+| MSFT | `outputs/reports/MSFT_20260526_204019.md` | `outputs/results/MSFT_20260526_204019.json` |
+| MCD | `outputs/reports/MCD_20260526_204025.md` | `outputs/results/MCD_20260526_204025.json` |
+| PFE | `outputs/reports/PFE_20260526_204030.md` | `outputs/results/PFE_20260526_204030.json` |
+
+Diagnostic values were extracted from the JSON exports
+(`confidence_diagnostics` key inside the `Rating` object). The Markdown
+`## Confidence Diagnostics` table was reviewed in the KO report and confirmed
+to render correctly.
+
+---
+
+### Diagnostics Table
+
+Values are exact — read directly from JSON output. `Conf Level` in all cases is `medium`.
+
+| Ticker | Score | Category | Avg Conf | Min | Max | Bullish | Bearish | Neutral | Missing | Tech Avg | Fund Avg | News Avg | Risk Avg | Calibration Note |
+|--------|-------|----------|----------|-----|-----|---------|---------|---------|---------|----------|----------|----------|----------|-----------------|
+| KO | 79.8 | Buy Candidate | 0.6375 | 0.45 | 0.70 | 14 | 0 | 6 | 0 | 0.6071 | 0.6600 | 0.70 | 0.6200 | Highest avg confidence (0.6375); 14/0/6 direction split. Zero bearish signals; still Medium. |
+| MSFT | 66.2 | Watchlist | 0.6425 | 0.45 | 0.70 | 12 | 3 | 5 | 0 | 0.6071 | 0.6700 | 0.70 | 0.6300 | Highest avg confidence overall (0.6425); fewest neutral signals (5). Strongest fundamental avg (0.67). |
+| XOM | 59.5 | Watchlist | 0.6250 | 0.45 | 0.70 | 10 | 3 | 7 | 0 | 0.6071 | 0.6100 | 0.70 | 0.6200 | Mid-range avg confidence (0.6250); 10/3/7 split. |
+| MCD | 50.8 | Hold | 0.6175 | 0.30 | 0.70 | 8 | 4 | 8 | 1 | 0.6071 | 0.5800 | 0.70 | 0.6200 | Only ticker with missing_count=1 (D/E null → 0.30 confidence); min=0.30. Weakest fundamental avg (0.58). |
+| PFE | 65.0 | Watchlist | 0.6100 | 0.45 | 0.70 | 10 | 2 | 8 | 0 | 0.5786 | 0.6000 | 0.70 | 0.6100 | Lowest avg confidence (0.6100); most neutral signals (8); only ticker with tech avg below 0.60 (0.5786). |
+
+---
+
+### Pattern Summary
+
+**Average confidence cluster is narrow across very different tickers.**
+The five tickers span a 29-point score range (50.8–79.8) and four different
+categories (Buy Candidate, Watchlist, Hold). Their average confidence values span
+only 0.0325 (0.6100–0.6425). The confidence output carries almost no information
+about signal composition or ticker quality.
+
+**Technical average is structurally uniform.**
+Four of five tickers produced a technical average confidence of exactly 0.6071.
+PFE's technical average (0.5786) is slightly lower due to a different mix of
+neutral signals. This near-uniform floor reflects the shared signal confidence
+values in `app/analysis/technicals.py` and confirms the signal confidence audit
+finding: the technical sub-average has almost no ticker-to-ticker variance.
+
+**News average is always 0.70 — a structural ceiling.**
+All five tickers produced a news average confidence of exactly 0.70. This is the
+formula cap in `news_analysis.py` (`coverage_conf = min(0.40 + n * 0.04, 0.70)`),
+which is reached with 8 or more articles. Every ticker reviewed hit that floor.
+The news area contributes the highest per-signal confidence of any area but has
+zero variance across tickers.
+
+**Fundamental average is the primary differentiator.**
+The fund avg ranges from 0.58 (MCD, one null field) to 0.67 (MSFT). This is
+the only area that varies meaningfully across tickers and corresponds to the
+actual signal composition (which fields had data, which were bullish vs neutral).
+
+**MCD is the only ticker with a missing-data signal.**
+The single missing_count=1 for MCD (min confidence 0.30) corresponds to the
+D/E null case noted in the Individual Ticker Review Pass. No other ticker had
+a null-data fallback signal in this run.
+
+**Audit methodology validated.**
+The signal confidence audit (`docs/signal_confidence_audit.md`) estimated KO's
+average confidence at approximately 0.637. The measured value is 0.6375 — a
+difference of only 0.0005. This validates the audit's approach of reading actual
+signal confidence assignments to predict average values.
+
+**HIGH threshold gap is confirmed empirically.**
+The audit proved mathematically that the theoretical maximum average confidence
+for any ticker is ~0.6425. MSFT reached exactly 0.6425 in this run — the
+closest any real ticker has come to the ceiling. The HIGH threshold (0.70) is
+0.0575 above MSFT's measured maximum, confirming it is unreachable without a
+formula or threshold change.
+
+**Potential threshold targets (for future proposal only — no code change):**
+- Threshold ≤ 0.6375: KO reaches HIGH (measured 0.6375)
+- Threshold ≤ 0.6425: KO and MSFT reach HIGH (MSFT measured 0.6425)
+- Threshold ≤ 0.6250: KO, MSFT, and XOM reach HIGH (XOM measured 0.6250)
+- MCD (0.6175) and PFE (0.6100) would remain Medium under all three options above
+
+These are observations only. No specific threshold value is proposed here — that
+requires clearing all five gates in `docs/confidence_calibration_design.md`.
+
+---
+
+### Decision
+
+**No confidence formula changes yet.**
+
+The measured diagnostic values confirm the structural compression described in
+`docs/confidence_calibration_design.md` and `docs/signal_confidence_audit.md`.
+The diagnostic data now provides the empirical foundation needed for a confidence
+calibration proposal.
+
+Diagnostics should be used to define expected before/after labels for a future
+confidence calibration implementation. The next step should be a scoped confidence
+calibration proposal with exact expected before/after outcomes for KO, XOM, MSFT,
+MCD, and PFE — meeting all five gates in the decision gate section of
+`docs/confidence_calibration_design.md` before any code change is made.
