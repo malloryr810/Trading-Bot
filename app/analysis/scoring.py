@@ -342,9 +342,9 @@ def _map_score_to_category(score: float) -> RatingCategory:
 
 def _map_confidence(signals: list[Signal]) -> ConfidenceLevel:
     avg = sum(s.confidence for s in signals) / len(signals)
-    if avg >= 0.70:
+    if avg >= 0.63:
         return ConfidenceLevel.HIGH
-    if avg >= 0.45:
+    if avg >= 0.50:
         return ConfidenceLevel.MEDIUM
     return ConfidenceLevel.LOW
 

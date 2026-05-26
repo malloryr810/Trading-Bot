@@ -350,7 +350,7 @@ class TestScoreSignalsIntegration:
     def test_diagnostics_does_not_change_confidence_label(self):
         signals = _make_composite_signals()
         rating = score_signals("AAPL", signals)
-        # avg 0.60 → MEDIUM (0.45 ≤ avg < 0.70)
+        # avg 0.60 → MEDIUM (0.50 ≤ avg < 0.63)
         assert rating.confidence == ConfidenceLevel.MEDIUM
 
     def test_diagnostics_does_not_change_score(self):

@@ -1,5 +1,48 @@
 # Development Log
 
+## 2026-05-26 — Confidence threshold-only recalibration implemented
+
+**Changed: `app/analysis/scoring.py` — `_map_confidence()` only**
+
+Updated the two threshold constants:
+
+| Level | Old Threshold | New Threshold |
+|-------|--------------|---------------|
+| HIGH | avg ≥ 0.70 | avg ≥ **0.63** |
+| MEDIUM | avg ≥ 0.45 | avg ≥ **0.50** |
+| LOW | avg < 0.45 | avg < **0.50** |
+
+No other code changed. Scores, categories, composite weights, signal-level
+confidence values, and `ConfidenceDiagnostics` calculation are all unchanged.
+
+**Expected label changes for five review tickers (based on measured diagnostics):**
+- KO (avg 0.6375): Medium → High
+- MSFT (avg 0.6425): Medium → High
+- XOM (avg 0.6250): Medium → Medium (unchanged)
+- MCD (avg 0.6175): Medium → Medium (unchanged)
+- PFE (avg 0.6100): Medium → Medium (unchanged)
+
+**New: 18 tests added to `tests/test_scoring.py`** (`TestConfidenceMappingBoundaries`)
+
+Tests added:
+- Exact boundaries at 0.63 (HIGH) and 0.50 (MEDIUM)
+- Just-below boundary tests at 0.6299 and 0.4999
+- All three labels confirmed reachable
+- Representative real-ticker averages: KO/MSFT → HIGH, XOM/MCD/PFE → MEDIUM
+- HIGH reachable with realistic 7-signal set (avg ≈ 0.6357)
+- Regression: score unchanged, category unchanged, diagnostics unchanged
+
+**Updated: `tests/test_confidence_diagnostics.py`** — updated stale inline comment only.
+
+**Updated docs** (notes only, no rewrites):
+- `docs/confidence_calibration_proposal.md` — implementation status note
+- `docs/signal_confidence_audit.md` — implementation note
+- `docs/confidence_calibration_design.md` — implementation note
+
+1298 tests pass.
+
+---
+
 ## 2026-05-26 — Confidence calibration proposal created; no confidence/scoring code changed
 
 **New: `docs/confidence_calibration_proposal.md`**

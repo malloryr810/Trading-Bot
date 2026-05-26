@@ -1,5 +1,11 @@
 # Confidence Calibration Proposal
 
+> **Implementation status:** The threshold-only recalibration described in this
+> document has been implemented. `_map_confidence()` in
+> `app/analysis/scoring.py` now uses HIGH ≥ 0.63 and MEDIUM ≥ 0.50.
+> Scores, categories, signal confidence values, and diagnostics are unchanged.
+> 18 new boundary and regression tests were added to `tests/test_scoring.py`.
+
 ## Purpose
 
 This document proposes a future confidence calibration change. It does not change

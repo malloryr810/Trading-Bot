@@ -2,6 +2,11 @@
 
 ## Purpose
 
+> **Implementation note:** The initial threshold-only calibration (Option A) has
+> been implemented. `_map_confidence()` in `app/analysis/scoring.py` now uses
+> HIGH ≥ 0.63 and MEDIUM ≥ 0.50. See `docs/confidence_calibration_proposal.md`
+> for the full rationale and expected before/after outcomes.
+
 This document defines the observed confidence output problem, summarizes the
 evidence collected during calibration, outlines possible future fixes, and
 establishes a decision gate that must be cleared before any code change is made.

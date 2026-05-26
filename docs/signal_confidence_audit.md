@@ -2,6 +2,12 @@
 
 ## Purpose
 
+> **Implementation note:** The HIGH threshold issue identified in this audit
+> has been addressed. `_map_confidence()` in `app/analysis/scoring.py` now uses
+> HIGH ≥ 0.63 (down from 0.70). Signal-level confidence values documented here
+> are unchanged. This audit remains the historical record of why the old threshold
+> was unreachable.
+
 This document inventories the signal-level confidence values currently assigned
 by each analysis module. It does not change any scoring or confidence logic.
 
