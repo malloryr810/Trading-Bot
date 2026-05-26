@@ -13,7 +13,7 @@ import pytest
 from app.models.rating import ConfidenceLevel, RatingCategory
 from app.models.signal import Signal, SignalCategory, SignalDirection, SignalStrength
 from app.models.stock_report import StockReport
-from app.reports.templates import format_plain_text_report
+from app.reports.templates import format_plain_text_report, format_report_markdown
 
 
 # ---------------------------------------------------------------------------
@@ -384,3 +384,220 @@ class TestDisclaimer:
 
     def test_no_trades_text(self):
         assert "does not place" in _format()
+
+
+# ===========================================================================
+# format_report_markdown tests
+# ===========================================================================
+
+def _md(**overrides) -> str:
+    return format_report_markdown(_make_report(**overrides))
+
+
+class TestMarkdownReturnType:
+    def test_returns_string(self):
+        assert isinstance(_md(), str)
+
+    def test_returns_non_empty_string(self):
+        assert len(_md()) > 0
+
+
+class TestMarkdownHeader:
+    def test_h1_title_present(self):
+        assert "# AAPL" in _md()
+
+    def test_h1_contains_report_label(self):
+        assert "Stock Research Report" in _md()
+
+    def test_contains_ticker(self):
+        assert "AAPL" in _md(ticker="AAPL")
+
+    def test_contains_company_name_when_provided(self):
+        assert "Apple Inc." in _md(company_name="Apple Inc.")
+
+    def test_omits_company_name_when_not_provided(self):
+        assert "Apple Inc." not in _md(company_name=None)
+
+    def test_contains_today_date(self):
+        assert date.today().isoformat() in _md()
+
+    def test_contains_price_when_provided(self):
+        assert "182.50" in _md(current_price=182.50)
+
+    def test_omits_price_when_not_provided(self):
+        assert "Price:" not in _md(current_price=None)
+
+    def test_contains_data_timestamp_when_provided(self):
+        assert "2024-06-01" in _md()
+
+    def test_omits_as_of_when_no_timestamp(self):
+        assert "As of:" not in _md(data_timestamp=None)
+
+    def test_contains_data_source(self):
+        assert "yfinance" in _md(data_sources_used=["yfinance"])
+
+    def test_omits_data_line_when_no_sources(self):
+        out = format_report_markdown(StockReport(
+            ticker="AAPL",
+            final_category=RatingCategory.WATCHLIST,
+            score=50.0,
+            confidence_level=ConfidenceLevel.MEDIUM,
+            data_sources_used=[],
+        ))
+        assert "Data:" not in out
+
+
+class TestMarkdownRecommendation:
+    def test_recommendation_section_present(self):
+        assert "## Recommendation" in _md()
+
+    def test_contains_rating_category(self):
+        assert "Watchlist" in _md(final_category=RatingCategory.WATCHLIST)
+
+    def test_contains_strong_buy_category(self):
+        assert "Strong Buy Candidate" in _md(
+            final_category=RatingCategory.STRONG_BUY_CANDIDATE, score=90.0
+        )
+
+    def test_contains_score(self):
+        assert "62.0 / 100" in _md(score=62.0)
+
+    def test_contains_confidence(self):
+        assert "Medium" in _md(confidence_level=ConfidenceLevel.MEDIUM)
+
+    def test_contains_high_confidence(self):
+        assert "High" in _md(confidence_level=ConfidenceLevel.HIGH)
+
+    def test_contains_low_confidence(self):
+        assert "Low" in _md(confidence_level=ConfidenceLevel.LOW)
+
+    def test_recommendation_table_uses_markdown_pipe_syntax(self):
+        out = _md()
+        assert "| Rating |" in out
+        assert "| Score |" in out
+        assert "| Confidence |" in out
+
+
+class TestMarkdownAnalysisSummaries:
+    def test_technical_section_present_when_summary_provided(self):
+        assert "## Technical Analysis" in _md()
+
+    def test_technical_summary_text_shown(self):
+        assert "62.0/100 based on indicators" in _md()
+
+    def test_technical_section_omitted_when_none(self):
+        assert "## Technical Analysis" not in _md(technical_summary=None)
+
+    def test_fundamental_section_present_when_provided(self):
+        out = _md(fundamental_summary="Fundamentals look solid.")
+        assert "## Fundamental Analysis" in out
+        assert "Fundamentals look solid." in out
+
+    def test_fundamental_section_omitted_when_none(self):
+        assert "## Fundamental Analysis" not in _md(fundamental_summary=None)
+
+    def test_news_section_present_when_provided(self):
+        out = _md(news_summary="Mostly neutral coverage.")
+        assert "## News / Sentiment" in out
+
+    def test_news_section_omitted_when_none(self):
+        assert "## News / Sentiment" not in _md(news_summary=None)
+
+    def test_risk_section_present(self):
+        assert "## Risk Conditions" in _md()
+
+    def test_risk_fallback_text_when_no_risk_summary(self):
+        out = _md(risk_summary=None)
+        assert "not assessed" in out.lower()
+
+    def test_risk_summary_shown_when_provided(self):
+        out = _md(risk_summary="Elevated volatility detected.")
+        assert "Elevated volatility detected." in out
+
+
+class TestMarkdownKeyStrengths:
+    def test_section_present(self):
+        assert "## Key Strengths" in _md()
+
+    def test_factors_rendered_as_bullets(self):
+        out = _md(key_positive_factors=["Above SMA 200", "RSI neutral"])
+        assert "- Above SMA 200" in out
+        assert "- RSI neutral" in out
+
+    def test_none_identified_when_empty(self):
+        assert "none identified" in _md(key_positive_factors=[])
+
+
+class TestMarkdownKeyRisks:
+    def test_section_present(self):
+        assert "## Key Risks" in _md()
+
+    def test_risks_rendered_as_bullets(self):
+        out = _md(key_risks=["RSI overbought", "Below SMA 200"])
+        assert "- RSI overbought" in out
+        assert "- Below SMA 200" in out
+
+    def test_none_identified_when_empty(self):
+        assert "none identified" in _md(key_risks=[])
+
+
+class TestMarkdownTriggers:
+    def test_section_present(self):
+        assert "## Triggers" in _md()
+
+    def test_buy_trigger_shown(self):
+        assert "Wait for score above 65." in _md()
+
+    def test_sell_trigger_shown(self):
+        assert "Reassess if score falls below 45." in _md()
+
+    def test_buy_trigger_uses_bold_label(self):
+        assert "**Buy Trigger:**" in _md()
+
+    def test_sell_trigger_uses_bold_label(self):
+        assert "**Sell / Avoid Trigger:**" in _md()
+
+    def test_no_triggers_message_when_both_none(self):
+        assert "no triggers defined" in _md(buy_trigger=None, sell_or_avoid_trigger=None)
+
+    def test_sell_trigger_omitted_when_only_buy_set(self):
+        out = _md(buy_trigger="Enter above 65.", sell_or_avoid_trigger=None)
+        assert "Enter above 65." in out
+        assert "Sell / Avoid Trigger:" not in out
+
+
+class TestMarkdownMetadata:
+    def test_metadata_section_present_when_timestamp_provided(self):
+        assert "## Metadata" in _md()
+
+    def test_metadata_contains_timestamp(self):
+        assert "2024-06-01" in _md()
+
+    def test_metadata_contains_data_source(self):
+        assert "yfinance" in _md(data_sources_used=["yfinance"])
+
+    def test_metadata_section_omitted_when_no_data(self):
+        out = format_report_markdown(StockReport(
+            ticker="AAPL",
+            final_category=RatingCategory.WATCHLIST,
+            score=50.0,
+            confidence_level=ConfidenceLevel.MEDIUM,
+            data_sources_used=[],
+            data_timestamp=None,
+        ))
+        assert "## Metadata" not in out
+
+
+class TestMarkdownDisclaimer:
+    def test_disclaimer_separator_present(self):
+        assert "---" in _md()
+
+    def test_not_financial_advice(self):
+        assert "not financial advice" in _md()
+
+    def test_does_not_place_trades(self):
+        assert "does not place" in _md()
+
+    def test_disclaimer_uses_italic_markdown(self):
+        out = _md()
+        assert "*This report" in out

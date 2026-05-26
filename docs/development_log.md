@@ -1,5 +1,45 @@
 # Development Log
 
+## 2026-05-26 — Add Markdown report export (`--save-markdown`)
+
+**`app/reports/templates.py`** (updated)
+
+- Added `format_report_markdown(report: StockReport) -> str` — produces a clean
+  Markdown document from an existing `StockReport` with H1 title, summary metadata,
+  Recommendation table, per-category analysis sections, Key Strengths/Risks bullet
+  lists, Triggers, Metadata, and a disclaimer footer.
+- No new analysis or scoring logic; formatter consumes already-computed `StockReport`.
+
+**`app/data/storage.py`** (updated)
+
+- Added `"md"` to `_SUPPORTED_EXTENSIONS` so `build_report_filename` accepts `.md`.
+- Added `save_markdown_report(report_text, ticker, output_dir, timestamp) -> Path`
+  following the same pattern as `save_text_report`. Saves to `outputs/reports/` with
+  a `.md` extension.
+
+**`app/main.py`** (updated)
+
+- Added `--save-markdown` argparse flag.
+- Single-ticker mode: calls `format_report_markdown(stock_report)` and
+  `save_markdown_report(md_text, ticker)` when the flag is set.
+- Watchlist mode: saves the plain-text watchlist summary as a `.md` file via
+  `save_markdown_report(summary, "WATCHLIST")` when the flag is set.
+- StorageError is non-fatal in both modes (warns to stderr, returns 0).
+
+**`tests/test_report_templates.py`** (updated)
+
+- Added `TestMarkdownReturnType`, `TestMarkdownHeader`, `TestMarkdownRecommendation`,
+  `TestMarkdownAnalysisSummaries`, `TestMarkdownKeyStrengths`, `TestMarkdownKeyRisks`,
+  `TestMarkdownTriggers`, `TestMarkdownMetadata`, `TestMarkdownDisclaimer` — 44 new tests.
+
+**`tests/test_main.py`** (updated)
+
+- Added `TestSaveMarkdownFlag` (13 tests), `TestArgParserMarkdown` (5 tests),
+  `TestWatchlistSaveMarkdown` (5 tests) — 23 new tests.
+
+No scoring weights or thresholds changed. No new dependencies added. No existing
+entries modified. Full suite passing.
+
 ## 2026-05-25 — Update architecture.md and project_plan.md to match current codebase
 
 **`docs/architecture.md`** (rewritten)

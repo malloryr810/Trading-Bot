@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from app.utils.helpers import normalize_ticker
 
 
-_SUPPORTED_EXTENSIONS: frozenset[str] = frozenset({"txt", "json"})
+_SUPPORTED_EXTENSIONS: frozenset[str] = frozenset({"txt", "json", "md"})
 
 
 class StorageError(Exception):
@@ -119,6 +119,45 @@ def save_text_report(
     except OSError as exc:
         raise StorageError(
             f"Could not write text report to '{filepath}': {exc}"
+        ) from exc
+    return filepath
+
+
+def save_markdown_report(
+    report_text: str,
+    ticker: str,
+    output_dir: str | Path = "outputs/reports",
+    timestamp: datetime | None = None,
+) -> Path:
+    """Save a Markdown report to disk as a UTF-8 .md file.
+
+    Args:
+        report_text: The Markdown string to save. Must be non-empty.
+        ticker: Stock ticker symbol used in the filename.
+        output_dir: Directory to write into (created if absent).
+        timestamp: Datetime to embed in the filename. Defaults to current UTC time.
+
+    Returns:
+        The full Path to the saved file.
+
+    Raises:
+        StorageError: If report_text is blank, ticker is invalid, or a
+            filesystem error occurs while writing.
+    """
+    if not isinstance(report_text, str) or not report_text.strip():
+        raise StorageError("report_text must be a non-empty string.")
+    try:
+        normalize_ticker(ticker)
+    except ValueError as exc:
+        raise StorageError(str(exc)) from exc
+    directory = ensure_output_dir(output_dir)
+    filename = build_report_filename(ticker, timestamp=timestamp, extension="md")
+    filepath = directory / filename
+    try:
+        filepath.write_text(report_text, encoding="utf-8")
+    except OSError as exc:
+        raise StorageError(
+            f"Could not write Markdown report to '{filepath}': {exc}"
         ) from exc
     return filepath
 

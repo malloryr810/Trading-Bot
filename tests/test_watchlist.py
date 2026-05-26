@@ -422,26 +422,26 @@ class TestMainWatchlistCLI:
         p = _write_watchlist(tmp_path, "AAPL\n")
         with patch("app.main._run_watchlist", return_value=0) as mock_run:
             result = main(["--watchlist", str(p)])
-        mock_run.assert_called_once_with(str(p), False, False)
+        mock_run.assert_called_once_with(str(p), False, False, False)
         assert result == 0
 
     def test_watchlist_passes_save_report_flag(self, tmp_path):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with patch("app.main._run_watchlist", return_value=0) as mock_run:
             main(["--watchlist", str(p), "--save-report"])
-        mock_run.assert_called_once_with(str(p), True, False)
+        mock_run.assert_called_once_with(str(p), True, False, False)
 
     def test_watchlist_passes_save_json_flag(self, tmp_path):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with patch("app.main._run_watchlist", return_value=0) as mock_run:
             main(["--watchlist", str(p), "--save-json"])
-        mock_run.assert_called_once_with(str(p), False, True)
+        mock_run.assert_called_once_with(str(p), False, True, False)
 
     def test_watchlist_passes_both_save_flags(self, tmp_path):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with patch("app.main._run_watchlist", return_value=0) as mock_run:
             main(["--watchlist", str(p), "--save-report", "--save-json"])
-        mock_run.assert_called_once_with(str(p), True, True)
+        mock_run.assert_called_once_with(str(p), True, True, False)
 
     def test_watchlist_flag_missing_path_returns_1(self, capsys):
         result = main(["--watchlist"])

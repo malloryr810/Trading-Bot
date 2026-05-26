@@ -6,6 +6,7 @@ Single-ticker mode:
     python -m app.main <TICKER>
     python -m app.main <TICKER> --save-report
     python -m app.main <TICKER> --save-json
+    python -m app.main <TICKER> --save-markdown
     python -m app.main <TICKER> --save-report --save-json
 
 Watchlist mode:
@@ -13,12 +14,14 @@ Watchlist mode:
     python -m app.main --watchlist <file>
     python -m app.main --watchlist <file> --save-report
     python -m app.main --watchlist <file> --save-json
+    python -m app.main --watchlist <file> --save-markdown
     python -m app.main --watchlist <file> --save-report --save-json
 
 Fetches historical OHLCV data and company fundamentals, computes technical,
 fundamental, risk, and news signals, scores them with composite weights, and
 prints a plain-text research report. Optionally saves the report as a .txt
-file and/or a structured .json result when the respective flags are provided.
+file, a .md Markdown file, and/or a structured .json result when the
+respective flags are provided.
 """
 
 from __future__ import annotations
@@ -43,9 +46,10 @@ from app.analysis.technicals import (
 from app.data.fundamentals import FundamentalDataFetchError, get_company_fundamentals
 from app.data.market_data import DataFetchError, get_price_history
 from app.data.news_data import get_recent_news
-from app.data.storage import StorageError, save_json_result, save_text_report
+from app.data.storage import StorageError, save_json_result, save_markdown_report, save_text_report
 from app.models.rating import Rating
 from app.reports.report_generator import build_stock_report, generate_plain_text_report
+from app.reports.templates import format_report_markdown
 
 
 # ---------------------------------------------------------------------------
@@ -105,6 +109,7 @@ def _run_watchlist(
     watchlist_path: str,
     do_save_report: bool = False,
     do_save_json: bool = False,
+    do_save_markdown: bool = False,
 ) -> int:
     """Run watchlist scan mode, print a ranked summary table, and optionally save."""
     from app.watchlist import (
@@ -134,6 +139,13 @@ def _run_watchlist(
             print(f"Saved text report to: {path}")
         except StorageError as exc:
             print(f"Warning: failed to save text report: {exc}", file=sys.stderr)
+
+    if do_save_markdown:
+        try:
+            path = save_markdown_report(summary, "WATCHLIST")
+            print(f"Saved Markdown report to: {path}")
+        except StorageError as exc:
+            print(f"Warning: failed to save Markdown report: {exc}", file=sys.stderr)
 
     if do_save_json:
         try:
@@ -184,6 +196,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Save a structured JSON result to outputs/results/.",
     )
+    parser.add_argument(
+        "--save-markdown",
+        action="store_true",
+        help="Save a Markdown report to outputs/reports/.",
+    )
     return parser
 
 
@@ -194,7 +211,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         argv: Argument list. If None, uses sys.argv[1:].
 
     Returns:
-        Parsed Namespace with fields: ticker, watchlist, save_report, save_json.
+        Parsed Namespace with fields: ticker, watchlist, save_report, save_json, save_markdown.
 
     Raises:
         SystemExit: On parse errors or --help.
@@ -240,7 +257,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     if args.watchlist:
-        return _run_watchlist(args.watchlist, args.save_report, args.save_json)
+        return _run_watchlist(args.watchlist, args.save_report, args.save_json, args.save_markdown)
 
     ticker = args.ticker
 
@@ -278,6 +295,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Saved text report to: {path}")
         except StorageError as exc:
             print(f"Warning: failed to save text report: {exc}", file=sys.stderr)
+
+    if args.save_markdown:
+        try:
+            md_text = format_report_markdown(stock_report)
+            path = save_markdown_report(md_text, rating.ticker)
+            print(f"Saved Markdown report to: {path}")
+        except StorageError as exc:
+            print(f"Warning: failed to save Markdown report: {exc}", file=sys.stderr)
 
     if args.save_json:
         try:

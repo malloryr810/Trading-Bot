@@ -1,9 +1,9 @@
 """
 Report templates.
 
-Plain-text formatting helpers for StockReport. The single public entry
-point is format_plain_text_report(report) which produces a terminal-
-readable research report from a completed StockReport object.
+Formatting helpers for StockReport. Two public entry points:
+  format_plain_text_report(report) — terminal-readable plain text
+  format_report_markdown(report)   — clean Markdown document
 """
 
 from __future__ import annotations
@@ -212,3 +212,130 @@ def _disclaimer() -> str:
         _SEP,
     ]
     return "\n".join(lines)
+
+
+# ===========================================================================
+# Markdown formatter
+# ===========================================================================
+
+def format_report_markdown(report: StockReport) -> str:
+    """Render a StockReport as a Markdown document.
+
+    Args:
+        report: A completed StockReport produced by report_generator.
+
+    Returns:
+        A single formatted Markdown string.
+    """
+    parts = [
+        _md_header(report),
+        _md_recommendation(report),
+        _md_analysis_summaries(report),
+        _md_key_strengths(report),
+        _md_key_risks(report),
+        _md_triggers(report),
+        _md_metadata(report),
+        _md_disclaimer(),
+    ]
+    return "\n\n".join(p for p in parts if p)
+
+
+# ---------------------------------------------------------------------------
+# Markdown section builders
+# ---------------------------------------------------------------------------
+
+def _md_header(report: StockReport) -> str:
+    name_label = (
+        f"{report.ticker} — {report.company_name}"
+        if report.company_name
+        else report.ticker
+    )
+    lines = [f"# {name_label} — Stock Research Report", ""]
+    lines.append(f"**Date:** {date.today().isoformat()}")
+    if report.current_price is not None:
+        lines.append(f"**Price:** ${report.current_price:,.2f}")
+    if report.data_timestamp is not None:
+        ts = report.data_timestamp.strftime("%Y-%m-%d %H:%M UTC")
+        lines.append(f"**As of:** {ts}")
+    if report.data_sources_used:
+        lines.append(f"**Data:** {', '.join(report.data_sources_used)}")
+    return "\n".join(lines)
+
+
+def _md_recommendation(report: StockReport) -> str:
+    lines = [
+        "## Recommendation",
+        "",
+        "| Field | Value |",
+        "|-------|-------|",
+        f"| Rating | {report.final_category.value} |",
+        f"| Score | {report.score:.1f} / 100 |",
+        f"| Confidence | {report.confidence_level.value.capitalize()} |",
+    ]
+    return "\n".join(lines)
+
+
+def _md_analysis_summaries(report: StockReport) -> str:
+    risk_text = report.risk_summary or "Risk conditions were not assessed for this report."
+    candidates = [
+        ("## Technical Analysis",   report.technical_summary),
+        ("## Fundamental Analysis", report.fundamental_summary),
+        ("## News / Sentiment",     report.news_summary),
+        ("## Risk Conditions",      risk_text),
+    ]
+    active = [(heading, summary) for heading, summary in candidates if summary]
+    if not active:
+        return ""
+    return "\n\n".join(f"{heading}\n\n{summary}" for heading, summary in active)
+
+
+def _md_key_strengths(report: StockReport) -> str:
+    lines = ["## Key Strengths", ""]
+    if report.key_positive_factors:
+        lines.extend(f"- {factor}" for factor in report.key_positive_factors)
+    else:
+        lines.append("*(none identified)*")
+    return "\n".join(lines)
+
+
+def _md_key_risks(report: StockReport) -> str:
+    lines = ["## Key Risks", ""]
+    if report.key_risks:
+        lines.extend(f"- {risk}" for risk in report.key_risks)
+    else:
+        lines.append("*(none identified)*")
+    return "\n".join(lines)
+
+
+def _md_triggers(report: StockReport) -> str:
+    has_buy = bool(report.buy_trigger)
+    has_sell = bool(report.sell_or_avoid_trigger)
+
+    lines = ["## Triggers", ""]
+    if has_buy:
+        lines.append(f"**Buy Trigger:** {report.buy_trigger}")
+    if has_sell:
+        lines.append(f"**Sell / Avoid Trigger:** {report.sell_or_avoid_trigger}")
+    if not has_buy and not has_sell:
+        lines.append("*(no triggers defined)*")
+    return "\n".join(lines)
+
+
+def _md_metadata(report: StockReport) -> str:
+    lines = ["## Metadata", ""]
+    if report.data_timestamp is not None:
+        ts = report.data_timestamp.strftime("%Y-%m-%d %H:%M UTC")
+        lines.append(f"- **Data timestamp:** {ts}")
+    if report.data_sources_used:
+        lines.append(f"- **Data sources:** {', '.join(report.data_sources_used)}")
+    if len(lines) == 2:
+        return ""
+    return "\n".join(lines)
+
+
+def _md_disclaimer() -> str:
+    return (
+        "---\n\n"
+        "*This report is for research and decision-support purposes only. "
+        "It is not financial advice. It does not place, recommend, or imply trades.*"
+    )
