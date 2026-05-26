@@ -559,3 +559,6 @@ confidence calibration implementation. The next step should be a scoped confiden
 calibration proposal with exact expected before/after outcomes for KO, XOM, MSFT,
 MCD, and PFE — meeting all five gates in the decision gate section of
 `docs/confidence_calibration_design.md` before any code change is made.
+
+A confidence calibration proposal has been created at
+`docs/confidence_calibration_proposal.md`.

@@ -1,5 +1,35 @@
 # Development Log
 
+## 2026-05-26 — Confidence calibration proposal created; no confidence/scoring code changed
+
+**New: `docs/confidence_calibration_proposal.md`**
+
+Created a scoped implementation proposal for the confidence threshold calibration.
+No Python code was changed. This is a planning document only.
+
+**Recommended approach:** Option A — threshold-only recalibration.
+Change only `_map_confidence()` in `app/analysis/scoring.py`.
+
+Proposed new thresholds (current values in parentheses):
+- HIGH: avg ≥ **0.63** (was ≥ 0.70 — currently unreachable)
+- MEDIUM: 0.50 ≤ avg < **0.63** (was 0.45 ≤ avg < 0.70 — far too wide)
+- LOW: avg < **0.50** (was < 0.45)
+
+Expected before/after for five review tickers:
+- KO (avg 0.6375): Medium → **High**
+- MSFT (avg 0.6425): Medium → **High**
+- XOM (avg 0.6250): Medium → Medium (unchanged — mixed signals)
+- MCD (avg 0.6175): Medium → Medium (unchanged — missing D/E, weakest fund avg)
+- PFE (avg 0.6100): Medium → Medium (unchanged — most neutral signals)
+
+**Updated: `docs/confidence_calibration_design.md`** — added cross-reference to proposal.
+**Updated: `docs/signal_confidence_audit.md`** — added cross-reference to proposal.
+**Updated: `docs/calibration_review_notes.md`** — added one-line note that proposal exists.
+
+1280 tests pass. No new tests required (docs-only task).
+
+---
+
 ## 2026-05-26 — Confidence diagnostics review pass completed; docs updated
 
 Reran KO, XOM, MSFT, MCD, and PFE with `--save-markdown --save-json` and

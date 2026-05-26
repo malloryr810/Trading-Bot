@@ -498,6 +498,9 @@ Before changing confidence logic (thresholds or signal values), require:
 ---
 
 *See also:*
+- `docs/confidence_calibration_proposal.md` — **scoped implementation proposal**:
+  recommended threshold (HIGH ≥ 0.63, MEDIUM ≥ 0.50), expected before/after
+  outcomes for all five review tickers, and full test plan
 - `docs/confidence_calibration_design.md` — problem statement and four fix options
 - `docs/calibration_review_notes.md` — evidence from calibration runs
 - `docs/scoring_calibration_plan.md` — calibration process and decision framework

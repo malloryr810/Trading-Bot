@@ -279,6 +279,9 @@ gates above being cleared.**
 ---
 
 *See also:*
+- `docs/confidence_calibration_proposal.md` — **scoped implementation proposal**:
+  recommended threshold (HIGH ≥ 0.63, MEDIUM ≥ 0.50), expected before/after
+  outcomes for KO/XOM/MSFT/MCD/PFE, and full test plan
 - `docs/signal_confidence_audit.md` — complete signal-level confidence inventory,
   mathematical proof that HIGH is unreachable, and specific fix targets
 - `docs/scoring_calibration_plan.md` — calibration process and decision framework
