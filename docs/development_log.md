@@ -1,5 +1,34 @@
 # Development Log
 
+## 2026-05-25 — Refactor CLI to use argparse
+
+**`app/main.py`** (updated)
+
+- Replaced manual argument parsing with `argparse`; no product behavior changed
+- Added `build_parser() -> argparse.ArgumentParser` — single source of truth for all flags and help text
+- Added `parse_args(argv) -> argparse.Namespace` — thin public wrapper around `build_parser().parse_args(argv)`
+- `main()` now calls `parser.parse_args(argv)` inside a `try/except SystemExit` so parse errors return 1 and `--help` returns 0 without propagating `SystemExit` to callers
+- Mutual exclusion (ticker + `--watchlist` together) is validated after parsing; same "not both" error message preserved
+- "No args" case validated after parsing; prints argparse-style usage to stderr and returns 1
+- Removed manual `_USAGE` string constant
+- All single-ticker and watchlist flags (`--save-report`, `--save-json`, `--watchlist`) preserved with identical behavior
+
+**Tests updated**
+
+- `tests/test_main.py`: Updated `test_no_ticker_prints_usage` to match argparse's lowercase `"usage:"` output (previously checked `"Usage"`)
+- `tests/test_watchlist.py`: Updated `test_watchlist_flag_missing_path_returns_1` to check for `"--watchlist"` in stderr (argparse says `"argument --watchlist: expected one argument"`; previously checked `"requires a file path"`); updated `test_no_args_still_prints_usage` to lowercase `"usage"`
+
+**Tests added**
+
+- `tests/test_main.py` — `TestArgParser` (15 tests): unit tests for `parse_args()` covering single ticker, save flags, watchlist path, combined flags, no-args defaults, unknown flag raises SystemExit, `--help` raises SystemExit 0, flag order independence, and `build_parser()` return type
+- `tests/test_main.py` — `TestMainBehaviorValidation` (11 tests): behavior tests for unknown flag returns 1 with "unrecognized" in stderr, `--help` returns 0 with expected text, ticker + watchlist mutual exclusion, no-args returns 1 with usage in stderr
+
+**Intentional CLI behavior change**
+
+Usage/error lines now use argparse's lowercase `"usage:"` prefix instead of the previous custom `"Usage:"`. All exit codes and error semantics are identical.
+
+No trading functionality added. Full suite 1103/1103 passing (previously 1077, +26 tests).
+
 ## 2026-05-25 — Add watchlist save/export support
 
 **`app/watchlist.py`** (updated)

@@ -446,7 +446,7 @@ class TestMainWatchlistCLI:
     def test_watchlist_flag_missing_path_returns_1(self, capsys):
         result = main(["--watchlist"])
         assert result == 1
-        assert "requires a file path" in capsys.readouterr().err
+        assert "--watchlist" in capsys.readouterr().err
 
     def test_watchlist_and_ticker_together_returns_1(self, tmp_path, capsys):
         p = _write_watchlist(tmp_path, "AAPL\n")
@@ -517,7 +517,7 @@ class TestMainWatchlistCLI:
 
     def test_no_args_still_prints_usage(self, capsys):
         main([])
-        assert "Usage" in capsys.readouterr().err
+        assert "usage" in capsys.readouterr().err
 
 
 # ---------------------------------------------------------------------------

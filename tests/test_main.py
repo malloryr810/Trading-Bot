@@ -22,7 +22,7 @@ from app.data.fundamentals import FundamentalDataFetchError
 from app.data.market_data import DataFetchError
 from app.data.news_data import NewsFetchError
 from app.data.storage import StorageError
-from app.main import analyze_ticker, main
+from app.main import analyze_ticker, build_parser, main, parse_args
 from app.models.rating import ConfidenceLevel, Rating, RatingCategory
 from app.models.signal import Signal, SignalCategory, SignalDirection, SignalStrength
 
@@ -133,7 +133,7 @@ class TestMainArguments:
 
     def test_no_ticker_prints_usage(self, capsys):
         main([])
-        assert "Usage" in capsys.readouterr().err
+        assert "usage" in capsys.readouterr().err
 
 
 # ---------------------------------------------------------------------------
@@ -535,3 +535,141 @@ class TestSaveFlags:
             ):
                 result = main(["AAPL", "--save-report", "--save-json"])
         assert result == 0
+
+
+# ---------------------------------------------------------------------------
+# parse_args() — parser unit tests
+# ---------------------------------------------------------------------------
+
+class TestArgParser:
+    def test_single_ticker_parses_correctly(self):
+        args = parse_args(["AAPL"])
+        assert args.ticker == "AAPL"
+        assert args.watchlist is None
+        assert args.save_report is False
+        assert args.save_json is False
+
+    def test_save_report_flag_parsed(self):
+        args = parse_args(["AAPL", "--save-report"])
+        assert args.save_report is True
+        assert args.save_json is False
+
+    def test_save_json_flag_parsed(self):
+        args = parse_args(["AAPL", "--save-json"])
+        assert args.save_json is True
+        assert args.save_report is False
+
+    def test_both_save_flags_parsed(self):
+        args = parse_args(["AAPL", "--save-report", "--save-json"])
+        assert args.save_report is True
+        assert args.save_json is True
+
+    def test_watchlist_path_parsed(self):
+        args = parse_args(["--watchlist", "watchlists/default.txt"])
+        assert args.watchlist == "watchlists/default.txt"
+        assert args.ticker is None
+        assert args.save_report is False
+        assert args.save_json is False
+
+    def test_watchlist_with_save_report(self):
+        args = parse_args(["--watchlist", "watchlists/default.txt", "--save-report"])
+        assert args.watchlist == "watchlists/default.txt"
+        assert args.save_report is True
+        assert args.save_json is False
+
+    def test_watchlist_with_save_json(self):
+        args = parse_args(["--watchlist", "watchlists/default.txt", "--save-json"])
+        assert args.watchlist == "watchlists/default.txt"
+        assert args.save_json is True
+
+    def test_watchlist_with_both_save_flags(self):
+        args = parse_args(["--watchlist", "watchlists/default.txt", "--save-report", "--save-json"])
+        assert args.save_report is True
+        assert args.save_json is True
+
+    def test_no_args_ticker_is_none(self):
+        args = parse_args([])
+        assert args.ticker is None
+
+    def test_no_args_watchlist_is_none(self):
+        args = parse_args([])
+        assert args.watchlist is None
+
+    def test_no_args_save_flags_default_false(self):
+        args = parse_args([])
+        assert args.save_report is False
+        assert args.save_json is False
+
+    def test_unknown_flag_raises_system_exit(self, capsys):
+        with pytest.raises(SystemExit) as exc_info:
+            parse_args(["AAPL", "--unknown-flag"])
+        assert exc_info.value.code != 0
+
+    def test_help_raises_system_exit_0(self, capsys):
+        with pytest.raises(SystemExit) as exc_info:
+            parse_args(["--help"])
+        assert exc_info.value.code == 0
+
+    def test_build_parser_returns_argument_parser(self):
+        import argparse
+        assert isinstance(build_parser(), argparse.ArgumentParser)
+
+    def test_flags_order_does_not_matter(self):
+        args1 = parse_args(["--save-report", "AAPL", "--save-json"])
+        args2 = parse_args(["AAPL", "--save-json", "--save-report"])
+        assert args1.ticker == args2.ticker == "AAPL"
+        assert args1.save_report == args2.save_report is True
+        assert args1.save_json == args2.save_json is True
+
+
+# ---------------------------------------------------------------------------
+# main() — validation and error behavior
+# ---------------------------------------------------------------------------
+
+class TestMainBehaviorValidation:
+    def test_unknown_flag_returns_1(self, capsys):
+        result = main(["AAPL", "--unknown-flag"])
+        assert result == 1
+
+    def test_unknown_flag_prints_error_to_stderr(self, capsys):
+        main(["AAPL", "--unknown-flag"])
+        assert "unrecognized" in capsys.readouterr().err
+
+    def test_help_returns_0(self, capsys):
+        result = main(["--help"])
+        assert result == 0
+
+    def test_help_output_mentions_ticker(self, capsys):
+        main(["--help"])
+        assert "ticker" in capsys.readouterr().out.lower()
+
+    def test_help_output_mentions_watchlist(self, capsys):
+        main(["--help"])
+        assert "--watchlist" in capsys.readouterr().out
+
+    def test_help_output_mentions_save_report(self, capsys):
+        main(["--help"])
+        assert "--save-report" in capsys.readouterr().out
+
+    def test_help_output_mentions_save_json(self, capsys):
+        main(["--help"])
+        assert "--save-json" in capsys.readouterr().out
+
+    def test_ticker_and_watchlist_together_returns_1(self, tmp_path):
+        p = tmp_path / "w.txt"
+        p.write_text("AAPL\n", encoding="utf-8")
+        result = main(["AAPL", "--watchlist", str(p)])
+        assert result == 1
+
+    def test_ticker_and_watchlist_together_prints_not_both(self, tmp_path, capsys):
+        p = tmp_path / "w.txt"
+        p.write_text("AAPL\n", encoding="utf-8")
+        main(["AAPL", "--watchlist", str(p)])
+        assert "not both" in capsys.readouterr().err
+
+    def test_no_args_returns_1(self):
+        assert main([]) == 1
+
+    def test_no_args_prints_usage_to_stderr(self, capsys):
+        main([])
+        assert "usage" in capsys.readouterr().err

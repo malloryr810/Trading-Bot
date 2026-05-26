@@ -23,6 +23,7 @@ file and/or a structured .json result when the respective flags are provided.
 
 from __future__ import annotations
 
+import argparse
 import sys
 from datetime import datetime, timezone
 
@@ -146,14 +147,64 @@ def _run_watchlist(
 
 
 # ---------------------------------------------------------------------------
-# Entry point
+# CLI argument parser
 # ---------------------------------------------------------------------------
 
-_USAGE = (
-    "Usage: python -m app.main <TICKER> [--save-report] [--save-json]\n"
-    "       python -m app.main --watchlist <file> [--save-report] [--save-json]"
-)
+def build_parser() -> argparse.ArgumentParser:
+    """Build and return the CLI argument parser."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.main",
+        description="Stock research and analysis tool. Prints a scored research report.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "examples:\n"
+            "  python -m app.main AAPL\n"
+            "  python -m app.main AAPL --save-report --save-json\n"
+            "  python -m app.main --watchlist watchlists/default.txt\n"
+            "  python -m app.main --watchlist watchlists/default.txt --save-report\n"
+        ),
+    )
+    parser.add_argument(
+        "ticker",
+        nargs="?",
+        help="Stock ticker symbol to analyze (e.g. AAPL).",
+    )
+    parser.add_argument(
+        "--watchlist",
+        metavar="FILE",
+        help="Path to a plain-text watchlist file (one ticker per line).",
+    )
+    parser.add_argument(
+        "--save-report",
+        action="store_true",
+        help="Save a plain-text report to outputs/reports/.",
+    )
+    parser.add_argument(
+        "--save-json",
+        action="store_true",
+        help="Save a structured JSON result to outputs/results/.",
+    )
+    return parser
 
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse CLI arguments and return a Namespace.
+
+    Args:
+        argv: Argument list. If None, uses sys.argv[1:].
+
+    Returns:
+        Parsed Namespace with fields: ticker, watchlist, save_report, save_json.
+
+    Raises:
+        SystemExit: On parse errors or --help.
+    """
+    return build_parser().parse_args(argv)
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point.
@@ -164,41 +215,34 @@ def main(argv: list[str] | None = None) -> int:
     Returns:
         0 on success, 1 on any handled error.
     """
-    args = argv if argv is not None else sys.argv[1:]
+    parser = build_parser()
 
-    # Extract --watchlist value, if present.
-    watchlist_path: str | None = None
-    if "--watchlist" in args:
-        idx = args.index("--watchlist")
-        if idx + 1 >= len(args):
-            print("Error: --watchlist requires a file path.", file=sys.stderr)
-            return 1
-        watchlist_path = args[idx + 1]
+    try:
+        args = parser.parse_args(argv)
+    except SystemExit as exc:
+        code = exc.code if isinstance(exc.code, int) else 1
+        return 0 if code == 0 else 1
 
-    # Positionals are non-flag args, excluding the watchlist path value.
-    positional = [
-        a for a in args
-        if not a.startswith("--") and a != (watchlist_path or "")
-    ]
-
-    do_save_report = "--save-report" in args
-    do_save_json   = "--save-json"   in args
-
-    if watchlist_path and positional:
+    if args.ticker and args.watchlist:
+        parser.print_usage(sys.stderr)
         print(
-            "Error: provide either a ticker or --watchlist, not both.",
+            "error: provide either a ticker or --watchlist, not both.",
             file=sys.stderr,
         )
         return 1
 
-    if watchlist_path:
-        return _run_watchlist(watchlist_path, do_save_report, do_save_json)
-
-    if not positional:
-        print(_USAGE, file=sys.stderr)
+    if not args.ticker and not args.watchlist:
+        parser.print_usage(sys.stderr)
+        print(
+            "error: provide a ticker symbol or --watchlist file.",
+            file=sys.stderr,
+        )
         return 1
 
-    ticker = positional[0]
+    if args.watchlist:
+        return _run_watchlist(args.watchlist, args.save_report, args.save_json)
+
+    ticker = args.ticker
 
     try:
         rating = analyze_ticker(ticker)
@@ -228,14 +272,14 @@ def main(argv: list[str] | None = None) -> int:
     report = generate_plain_text_report(stock_report)
     print(report)
 
-    if do_save_report:
+    if args.save_report:
         try:
             path = save_text_report(report, rating.ticker)
             print(f"Saved text report to: {path}")
         except StorageError as exc:
             print(f"Warning: failed to save text report: {exc}", file=sys.stderr)
 
-    if do_save_json:
+    if args.save_json:
         try:
             path = save_json_result(rating, rating.ticker)
             print(f"Saved JSON result to: {path}")
