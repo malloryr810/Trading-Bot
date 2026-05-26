@@ -9,7 +9,6 @@ Does not fetch data — accepts a DataFrame from the data layer.
 from __future__ import annotations
 
 import math
-from math import sqrt
 
 import pandas as pd
 
@@ -130,7 +129,7 @@ def _volatility_signal(close: pd.Series) -> Signal:
             {"annualized_volatility": None},
         )
 
-    annualized = vol_daily * sqrt(252)
+    annualized = vol_daily * math.sqrt(252)
 
     if annualized >= _VOL_HIGH:
         direction, strength = SignalDirection.BEARISH, SignalStrength.STRONG

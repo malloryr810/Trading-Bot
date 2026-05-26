@@ -1,5 +1,39 @@
 # Development Log
 
+## 2026-05-26 — Code review and cleanup pass; README and CLAUDE.md updates
+
+**`app/analysis/risk_analysis.py`** (minor cleanup)
+
+Removed the redundant `from math import sqrt` import. `math` was already
+imported; replaced the single call-site `sqrt(252)` with `math.sqrt(252)`.
+No behavior change.
+
+**`app/reports/report_generator.py`** (minor cleanup)
+
+Restored the blank line between `from __future__ import annotations` and the
+first import, consistent with all other modules in the codebase.
+
+**`README.md`**, **`CLAUDE.md`**, **`docs/architecture.md`**, **`docs/project_plan.md`**
+(documentation updates)
+
+Updated all four documents to reflect the current feature set:
+- Added `--save-markdown` to CLI examples and flag tables everywhere it was missing.
+- Updated `templates.py` descriptions to reflect its three public formatters
+  (`format_plain_text_report`, `format_report_markdown`, `format_watchlist_markdown`).
+- Updated `storage.py` descriptions to include `.md` as an output format.
+- Removed stale hardcoded test counts (1029, 1103) where they appeared.
+- Moved "Richer report formats (Markdown)" from Near-Term future work to
+  Completed in `docs/project_plan.md`, where it belongs.
+- Added recently completed items to `docs/project_plan.md`: Markdown export flags,
+  market data validation improvement, company name/price pipeline flow,
+  calibration plan and worksheet, and first calibration review notes.
+- Removed Markdown from README Planned Future Work (it is now done).
+- Added calibration plan reference to README Planned Future Work.
+
+All 1210 tests pass.
+
+---
+
 ## 2026-05-26 — Fix watchlist data completeness gap
 
 **`app/models/rating.py`**, **`app/main.py`**, **`app/reports/report_generator.py`**, **`app/watchlist.py`**

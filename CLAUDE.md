@@ -34,7 +34,8 @@ python -m app.main AAPL
 # Single-ticker with save flags
 python -m app.main AAPL --save-report
 python -m app.main AAPL --save-json
-python -m app.main AAPL --save-report --save-json
+python -m app.main AAPL --save-markdown
+python -m app.main AAPL --save-report --save-json --save-markdown
 
 # Watchlist scanning (print ranked summary table)
 python -m app.main --watchlist watchlists/default.txt
@@ -42,7 +43,8 @@ python -m app.main --watchlist watchlists/default.txt
 # Watchlist with save flags
 python -m app.main --watchlist watchlists/default.txt --save-report
 python -m app.main --watchlist watchlists/default.txt --save-json
-python -m app.main --watchlist watchlists/default.txt --save-report --save-json
+python -m app.main --watchlist watchlists/default.txt --save-markdown
+python -m app.main --watchlist watchlists/default.txt --save-report --save-json --save-markdown
 
 # Show CLI help
 python -m app.main --help
@@ -64,7 +66,7 @@ python -m py_compile app/analysis/scoring.py
 | `app/data/market_data.py` | Fetches, validates, and normalizes OHLCV price data from yfinance |
 | `app/data/fundamentals.py` | Fetches company fundamentals (P/E, margins, growth, D/E, FCF, beta) from yfinance |
 | `app/data/news_data.py` | Fetches recent news headlines from yfinance; returns typed `NewsItem` objects |
-| `app/data/storage.py` | Saves plain-text reports (`.txt`) and structured results (`.json`) to local disk |
+| `app/data/storage.py` | Saves plain-text (`.txt`), Markdown (`.md`), and structured JSON (`.json`) outputs to local disk |
 | `app/models/signal.py` | Typed `Signal` Pydantic model; shared contract across the analysis layer |
 | `app/models/rating.py` | Typed `Rating` Pydantic model; output of the scoring engine |
 | `app/models/fundamentals.py` | Typed `CompanyFundamentals` Pydantic model; output of the fundamentals data layer |
@@ -76,7 +78,7 @@ python -m py_compile app/analysis/scoring.py
 | `app/analysis/news_analysis.py` | Builds exactly 3 NEWS Signals (Sentiment, Risk Headlines, Coverage) via keyword matching |
 | `app/analysis/scoring.py` | Composite scoring engine; `score_signals()` aggregates all signal categories into a Rating |
 | `app/reports/report_generator.py` | `build_stock_report()` assembles a StockReport from a Rating; `generate_plain_text_report()` delegates to templates |
-| `app/reports/templates.py` | `format_plain_text_report()` renders a StockReport as a plain-text terminal report |
+| `app/reports/templates.py` | Three public formatters: `format_plain_text_report()` (terminal), `format_report_markdown()` (single-ticker Markdown), `format_watchlist_markdown()` (watchlist Markdown) |
 | `app/watchlist.py` | Loads watchlist files, scans multiple tickers, formats ranked summary tables, and serializes results |
 | `app/utils/helpers.py` | Shared low-level helpers: `safe_float` and `normalize_ticker` |
 | `app/main.py` | argparse-based CLI entry point — orchestrates the full pipeline for single tickers and watchlists |

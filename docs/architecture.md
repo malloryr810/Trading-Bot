@@ -33,7 +33,7 @@ main.py                            ← argparse CLI; orchestrates the pipeline
   │   ├── market_data.py           ← OHLCV price history from yfinance
   │   ├── fundamentals.py          ← company fundamentals from yfinance
   │   ├── news_data.py             ← recent news headlines from yfinance
-  │   └── storage.py               ← saves .txt reports and .json results to disk
+  │   └── storage.py               ← saves .txt, .md, and .json outputs to disk
   │
   ├── analysis/                    ← compute signals from data
   │   ├── technicals.py            ← SMA 20/50/200, RSI 14, MACD, volume SMA; 7 signals
@@ -51,7 +51,7 @@ main.py                            ← argparse CLI; orchestrates the pipeline
   │
   ├── reports/                     ← format and render output
   │   ├── report_generator.py      ← builds StockReport from a Rating
-  │   └── templates.py             ← canonical plain-text report formatter
+  │   └── templates.py             ← plain-text, Markdown, and watchlist formatters
   │
   ├── watchlist.py                 ← multi-ticker scanning and ranked summaries
   └── utils/
@@ -67,6 +67,7 @@ news list.
 
 `storage.py` writes outputs to disk:
 - `outputs/reports/TICKER_YYYYMMDD_HHMMSS.txt` — plain-text reports
+- `outputs/reports/TICKER_YYYYMMDD_HHMMSS.md` — Markdown reports
 - `outputs/results/TICKER_YYYYMMDD_HHMMSS.json` — structured JSON results
 
 ## Analysis Layer
@@ -93,8 +94,10 @@ Weights are re-normalised to 100% when a category produces no signals.
 model by partitioning signals into per-category lists and mapping Rating fields
 onto the StockReport contract. It does not re-score or re-analyse.
 
-`templates.py` takes a `StockReport` and renders it as a plain-text string.
-It is the single canonical formatter — there is one report layout.
+`templates.py` provides three public formatters:
+- `format_plain_text_report(report)` — terminal-readable plain text (single ticker)
+- `format_report_markdown(report)` — Markdown document (single ticker)
+- `format_watchlist_markdown(results)` — Markdown document (watchlist scan)
 
 Full pipeline flow for a single ticker:
 
@@ -103,8 +106,8 @@ analyze_ticker()
   → Rating
   → build_stock_report()
   → StockReport
-  → format_plain_text_report()
-  → str  (printed or saved)
+  → format_plain_text_report()   (printed or --save-report)
+  → format_report_markdown()     (--save-markdown)
 ```
 
 ## Watchlist Flow
@@ -113,8 +116,9 @@ analyze_ticker()
 watchlist file
   → load_watchlist()
   → scan_watchlist()        ← runs single-stock pipeline for each ticker
-  → ranked summary table    ← sorted by composite score
+  → ranked summary table    ← sorted by composite score, includes company name and price
   → optional .txt export    (--save-report)
+  → optional .md export     (--save-markdown)
   → optional .json export   (--save-json)
 ```
 
@@ -123,17 +127,18 @@ analysis logic of its own.
 
 ## CLI
 
-`main.py` uses `argparse` with four flags:
+`main.py` uses `argparse` with five flags:
 
 | Flag              | Effect |
 |-------------------|--------|
 | `TICKER`          | Analyze a single ticker symbol |
 | `--watchlist FILE`| Scan all tickers in a plain-text watchlist file |
 | `--save-report`   | Save plain-text output to `outputs/reports/` |
+| `--save-markdown` | Save Markdown output to `outputs/reports/` |
 | `--save-json`     | Save structured JSON to `outputs/results/` |
 
-`--save-report` and `--save-json` apply to both single-ticker and watchlist
-modes. `TICKER` and `--watchlist` are mutually exclusive; at least one must
+All three save flags apply to both single-ticker and watchlist modes.
+`TICKER` and `--watchlist` are mutually exclusive; at least one must
 be provided.
 
 ## Models Layer
@@ -144,7 +149,7 @@ no layer owns them exclusively.
 
 ## Testing Approach
 
-All 1029 tests are deterministic. Tests construct DataFrames and Pydantic
+All tests are deterministic. Tests construct DataFrames and Pydantic
 models locally — no live yfinance or API calls. Analysis modules receive
 pre-built inputs; data fetchers are tested against locally constructed mock
 data, never against the network.

@@ -26,9 +26,11 @@ This tool prints reports. It does not place trades.
 - **Composite scoring** — weighted across all four signal categories; maps to a rated category
 - **Structured StockReport model** — typed Pydantic output for downstream use or export
 - **Plain-text reports** — terminal-readable, section-by-section output
+- **Markdown reports** — clean Markdown documents for single tickers and watchlists (`--save-markdown`)
 - **JSON export** — structured result files for single tickers and watchlists
-- **Watchlist scanning** — analyze multiple tickers from a plain-text file; ranked summary table
-- **Watchlist export** — save watchlist summaries as plain text or JSON
+- **Watchlist scanning** — analyze multiple tickers from a plain-text file; ranked summary table with company name and price
+- **Watchlist export** — save watchlist summaries as plain text, Markdown, or JSON
+- **Improved market data validation** — full OHLCV column, null-check, and numeric-type validation
 - **argparse CLI** — full flag support including `--help`
 
 ## What Is Not Included (By Design)
@@ -68,11 +70,14 @@ python -m app.main AAPL
 # Save plain-text report to outputs/reports/
 python -m app.main AAPL --save-report
 
+# Save Markdown report to outputs/reports/
+python -m app.main AAPL --save-markdown
+
 # Save structured JSON result to outputs/results/
 python -m app.main AAPL --save-json
 
-# Save both
-python -m app.main AAPL --save-report --save-json
+# Save all three
+python -m app.main AAPL --save-report --save-markdown --save-json
 ```
 
 ### Watchlist analysis
@@ -84,11 +89,11 @@ python -m app.main --watchlist watchlists/default.txt
 # Save plain-text summary to outputs/reports/
 python -m app.main --watchlist watchlists/default.txt --save-report
 
+# Save Markdown report to outputs/reports/
+python -m app.main --watchlist watchlists/default.txt --save-markdown
+
 # Save JSON results to outputs/results/
 python -m app.main --watchlist watchlists/default.txt --save-json
-
-# Save both
-python -m app.main --watchlist watchlists/default.txt --save-report --save-json
 ```
 
 ### Help
@@ -121,7 +126,7 @@ AMZN
 pytest
 ```
 
-All 1029 tests are deterministic — no live API calls.
+All tests are deterministic — no live API calls.
 
 ---
 
@@ -191,7 +196,7 @@ app/
     scoring.py                     # Composite scoring engine
   reports/
     report_generator.py            # Assembles StockReport; delegates to templates
-    templates.py                   # Plain-text report formatter
+    templates.py                   # Plain-text, Markdown, and watchlist formatters
   models/
     signal.py                      # Signal Pydantic model
     rating.py                      # Rating Pydantic model
@@ -202,7 +207,7 @@ app/
     helpers.py                     # safe_float, normalize_ticker
 watchlists/
   default.txt                      # Sample watchlist (AAPL, MSFT, NVDA, GOOGL, AMZN)
-tests/                             # pytest suite (1103 tests, no live API calls)
+tests/                             # pytest suite — deterministic, no live API calls
 docs/                              # Architecture, scoring rules, data sources, dev log
 outputs/
   reports/                         # Saved plain-text reports (TICKER_YYYYMMDD_HHMMSS.txt)
@@ -220,9 +225,8 @@ produces scored reports with technical, fundamental, news, and risk signals.
 
 These areas are on the roadmap but not yet built:
 
-- **Improved scoring rules** — better-calibrated weights and thresholds
-- **Better data validation** — richer error messages for bad or stale data
-- **Richer report formats** — Markdown or HTML output options
+- **Improved scoring calibration** — better-calibrated weights and thresholds (see `docs/scoring_calibration_plan.md`)
+- **Better data validation** — richer error messages for missing or stale data fields
 - **Backtesting** — validate signals against historical outcomes (requires careful design)
 - **Paper trading simulation** — test signal-driven strategies without real capital (requires backtesting first)
 - **ML/LLM sentiment** — replace keyword matching with a trained model (later phase)

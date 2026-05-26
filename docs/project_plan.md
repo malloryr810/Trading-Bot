@@ -50,13 +50,22 @@ All items below are implemented and tested.
 - [x] Watchlist ranked summary — formatted table sorted by composite score
 - [x] Watchlist plain-text export — `--watchlist FILE --save-report`
 - [x] Watchlist JSON export — `--watchlist FILE --save-json`
+- [x] Single-stock Markdown export — `--save-markdown` (plain Markdown report)
+- [x] Watchlist Markdown export — `--watchlist FILE --save-markdown` (Markdown with pipe table)
 - [x] argparse CLI — full flag support including `--help`
+
+### Data quality and pipeline
+
+- [x] Improved market data validation — full OHLCV column, null, and numeric checks
+- [x] Company name and current price propagated through pipeline — Rating → StockReport → watchlist summary
 
 ### Maintenance
 
 - [x] Documentation cleanup — `CLAUDE.md`, `README.md`, `architecture.md`, `project_plan.md`
 - [x] Code review and dead-code removal — removed unused stubs and empty modules
-- [x] Legacy formatter consolidation — single canonical report path in `templates.py`
+- [x] Legacy formatter consolidation — three canonical formatters in `templates.py`
+- [x] Scoring calibration plan and worksheet — `docs/scoring_calibration_plan.md`, `docs/scoring_calibration_worksheet.md`
+- [x] First calibration review notes — `docs/calibration_review_notes.md`
 
 ---
 
@@ -70,7 +79,6 @@ later phases, in rough priority order.
 - Improved scoring calibration — better-tuned weights and thresholds, validated
   against historical data (see `docs/scoring_calibration_plan.md`)
 - Better data validation — richer error messages for missing or stale data fields
-- Richer report formats — Markdown or HTML output options alongside plain text
 - Optional alternate data providers — Alpha Vantage, Polygon.io, Finnhub, or
   Financial Modeling Prep as alternatives to yfinance
 
