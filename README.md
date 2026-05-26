@@ -1,40 +1,51 @@
 # Investment Bot
 
-A modular, personal stock analysis and decision-support tool built in Python.
+A modular, personal stock research and decision-support tool built in Python.
 
 > **Disclaimer:** This project is for personal research and education only.
 > It does not provide financial advice and is **not** an automated trading system.
-> All output should be treated as a starting point for your own due diligence.
+> All output should be treated as a starting point for your own due diligence,
+> not as a recommendation to buy, sell, or hold any security.
 
 ---
 
-## Purpose
+## What It Does
 
 Analyze individual stocks using market data, technical indicators, company
 fundamentals, news sentiment, and risk signals — then produce a structured,
-scored plain-text research report to support personal investment decisions.
+scored plain-text research report. Run a single ticker or scan an entire watchlist.
 
-## What Is Implemented
+This tool prints reports. It does not place trades.
 
-| Module | Description |
-|--------|-------------|
-| `app/data/market_data.py` | Fetches and validates historical OHLCV price data via yfinance |
-| `app/data/fundamentals.py` | Fetches company fundamentals (P/E, margins, growth, D/E, FCF, beta) via yfinance |
-| `app/data/news_data.py` | Fetches recent news headlines via yfinance; returns typed `NewsItem` objects |
-| `app/data/storage.py` | Saves plain-text reports (`.txt`) and structured results (`.json`) to local disk |
-| `app/models/signal.py` | Typed `Signal` Pydantic model; shared contract across the analysis layer |
-| `app/models/rating.py` | Typed `Rating` Pydantic model; output of the scoring engine |
-| `app/models/fundamentals.py` | Typed `CompanyFundamentals` Pydantic model |
-| `app/models/news.py` | Typed `NewsItem` Pydantic model |
-| `app/analysis/technicals.py` | Computes SMA 20/50/200, RSI 14, MACD, volume SMA; produces 7 typed Signals |
-| `app/analysis/fundamentals_analysis.py` | Produces 5 typed Signals from valuation, profitability, growth, debt, and cash flow |
-| `app/analysis/news_analysis.py` | Produces 3 typed NEWS Signals via keyword matching (sentiment, risk headlines, coverage) |
-| `app/analysis/risk_analysis.py` | Produces 4–5 typed Signals from volatility, drawdown, trend, liquidity, and beta |
-| `app/analysis/scoring.py` | Composite scoring engine; weights Technical 35%, Fundamental 25%, News 25%, Risk 15% |
-| `app/reports/stock_report.py` | Generates a formatted plain-text research report from a Rating and its Signals |
-| `app/main.py` | CLI entry point — orchestrates the full pipeline and prints the report |
+## Features
 
-All implemented modules have full unit test coverage with no live API calls (812 tests).
+- **Technical analysis** — SMA 20/50/200, RSI 14, MACD, volume SMA; 7 typed signals
+- **Fundamental analysis** — P/E, profit margin, revenue/EPS growth, debt-to-equity, free cash flow; 5 signals
+- **News sentiment** — keyword-based sentiment, risk headline detection, coverage density; 3 signals
+- **Risk analysis** — volatility, max drawdown, recent trend, liquidity, beta; 4–5 signals
+- **Composite scoring** — weighted across all four signal categories; maps to a rated category
+- **Structured StockReport model** — typed Pydantic output for downstream use or export
+- **Plain-text reports** — terminal-readable, section-by-section output
+- **JSON export** — structured result files for single tickers and watchlists
+- **Watchlist scanning** — analyze multiple tickers from a plain-text file; ranked summary table
+- **Watchlist export** — save watchlist summaries as plain text or JSON
+- **argparse CLI** — full flag support including `--help`
+
+## What Is Not Included (By Design)
+
+This project intentionally does not implement:
+
+- Live or paper trading
+- Broker API integrations
+- Order execution of any kind
+- Automatic position management
+- Margin or options trading
+- Portfolio automation
+- ML/LLM sentiment models
+- Database or cloud storage
+- Backtesting (planned for a future phase)
+
+---
 
 ## Setup
 
@@ -44,7 +55,11 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+---
+
 ## Running the CLI
+
+### Single-ticker analysis
 
 ```bash
 # Print report to terminal
@@ -60,8 +75,45 @@ python -m app.main AAPL --save-json
 python -m app.main AAPL --save-report --save-json
 ```
 
-Output is a full composite research report covering technical, fundamental, news
-sentiment, and risk analysis. This tool does not place trades.
+### Watchlist analysis
+
+```bash
+# Print ranked summary table to terminal
+python -m app.main --watchlist watchlists/default.txt
+
+# Save plain-text summary to outputs/reports/
+python -m app.main --watchlist watchlists/default.txt --save-report
+
+# Save JSON results to outputs/results/
+python -m app.main --watchlist watchlists/default.txt --save-json
+
+# Save both
+python -m app.main --watchlist watchlists/default.txt --save-report --save-json
+```
+
+### Help
+
+```bash
+python -m app.main --help
+```
+
+### Watchlist file format
+
+Plain text, one ticker per line. Blank lines and lines starting with `#` are ignored.
+Tickers are normalized to uppercase and deduplicated automatically.
+
+```
+# My watchlist
+AAPL
+MSFT
+NVDA
+
+# More picks
+GOOGL
+AMZN
+```
+
+---
 
 ## Running Tests
 
@@ -69,14 +121,27 @@ sentiment, and risk analysis. This tool does not place trades.
 pytest
 ```
 
-## Data Flow
+All 1029 tests are deterministic — no live API calls.
+
+---
+
+## Architecture
 
 ```
 app/data/ → app/analysis/ → app/analysis/scoring.py → app/reports/
 ```
 
-Each layer has one job: data modules fetch and validate, analysis modules produce
-signals, scoring aggregates signals into a Rating, reports format the Rating for output.
+| Layer | Responsibility |
+|-------|---------------|
+| `app/data/` | Fetch and validate raw data; return typed models or DataFrames |
+| `app/analysis/` | Compute independent signal lists from data |
+| `app/analysis/scoring.py` | Aggregate signals into a composite Rating |
+| `app/reports/` | Format a Rating into a human-readable report |
+| `app/watchlist.py` | Orchestrate the pipeline across multiple tickers |
+| `app/main.py` | argparse CLI entry point |
+
+Each layer has one job. Analysis modules do not call each other. Scoring is not
+done inside analysis modules. Reports do not re-run analysis.
 
 ## Scoring
 
@@ -104,12 +169,15 @@ Score-to-category thresholds:
 | ≥ 30 | Avoid |
 | < 30 | Sell / Exit Warning |
 
+---
+
 ## Project Structure
 
 ```
 app/
-  main.py                          # CLI entry point
+  main.py                          # argparse CLI entry point
   config.py                        # Env-var settings via python-dotenv
+  watchlist.py                     # Watchlist scanning and formatting
   data/
     market_data.py                 # OHLCV price history
     fundamentals.py                # Company fundamentals
@@ -122,30 +190,42 @@ app/
     risk_analysis.py               # Risk signals
     scoring.py                     # Composite scoring engine
   reports/
-    stock_report.py                # Plain-text report generator
-    report_generator.py            # Stub — full report orchestration (not yet implemented)
-    templates.py                   # Stub — report templates (not yet implemented)
+    report_generator.py            # Assembles StockReport; delegates to templates
+    templates.py                   # Plain-text report formatter
   models/
     signal.py                      # Signal Pydantic model
     rating.py                      # Rating Pydantic model
+    stock_report.py                # StockReport Pydantic model
     fundamentals.py                # CompanyFundamentals Pydantic model
     news.py                        # NewsItem Pydantic model
-    stock_report.py                # Stub — top-level StockReport model (not yet implemented)
-tests/                             # pytest suite (812 tests, no live API calls)
+  utils/
+    helpers.py                     # safe_float, normalize_ticker
+watchlists/
+  default.txt                      # Sample watchlist (AAPL, MSFT, NVDA, GOOGL, AMZN)
+tests/                             # pytest suite (1103 tests, no live API calls)
 docs/                              # Architecture, scoring rules, data sources, dev log
+outputs/
+  reports/                         # Saved plain-text reports (TICKER_YYYYMMDD_HHMMSS.txt)
+  results/                         # Saved JSON results (TICKER_YYYYMMDD_HHMMSS.json)
 ```
 
-## What Is Not Included (By Design)
+---
 
-This project intentionally does not implement:
+## Current Status
 
-- Live or paper trading
-- Broker API integrations
-- Order execution of any kind
-- Automatic position management
-- Margin or options trading
-- Portfolio automation
-- Watchlist scanning (planned, not yet built)
-- Backtesting (planned, not yet built)
-- ML/LLM sentiment models
-- Database or cloud storage
+The single-ticker and watchlist analysis pipelines are complete. The tool
+produces scored reports with technical, fundamental, news, and risk signals.
+
+## Planned Future Work
+
+These areas are on the roadmap but not yet built:
+
+- **Improved scoring rules** — better-calibrated weights and thresholds
+- **Better data validation** — richer error messages for bad or stale data
+- **Richer report formats** — Markdown or HTML output options
+- **Backtesting** — validate signals against historical outcomes (requires careful design)
+- **Paper trading simulation** — test signal-driven strategies without real capital (requires backtesting first)
+- **ML/LLM sentiment** — replace keyword matching with a trained model (later phase)
+
+Phases involving live or paper trading require additional review and explicit approval
+before any implementation begins.

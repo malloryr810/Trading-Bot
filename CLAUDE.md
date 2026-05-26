@@ -4,16 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Is
 
-A modular Python investment analysis tool. It produces structured, scored plain-text
-research reports for individual stocks. **It is not an automated trading system.**
+A modular Python stock research decision-support tool. It fetches market data,
+computes signals, scores them, and produces structured plain-text research reports
+for individual stocks and watchlists. **It is not an automated trading system.**
 
-Do not implement any of the following unless explicitly instructed after backtesting is proven:
+Do not implement any of the following:
 - Broker API calls or integrations
 - Order execution of any kind
 - Live or paper trading
 - Automatic position management
 - Margin or options trading
 - Portfolio automation
+- ML/LLM sentiment models
+- Backtesting (unless explicitly scoped and approved)
 
 ## Commands
 
@@ -25,17 +28,24 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the entry point (print report to terminal)
-python -m app.main <TICKER>
+# Single-ticker analysis (print report to terminal)
+python -m app.main AAPL
 
-# Save plain-text report to outputs/reports/
-python -m app.main <TICKER> --save-report
+# Single-ticker with save flags
+python -m app.main AAPL --save-report
+python -m app.main AAPL --save-json
+python -m app.main AAPL --save-report --save-json
 
-# Save structured JSON result to outputs/results/
-python -m app.main <TICKER> --save-json
+# Watchlist scanning (print ranked summary table)
+python -m app.main --watchlist watchlists/default.txt
 
-# Save both
-python -m app.main <TICKER> --save-report --save-json
+# Watchlist with save flags
+python -m app.main --watchlist watchlists/default.txt --save-report
+python -m app.main --watchlist watchlists/default.txt --save-json
+python -m app.main --watchlist watchlists/default.txt --save-report --save-json
+
+# Show CLI help
+python -m app.main --help
 
 # Run all tests
 pytest
@@ -52,21 +62,24 @@ python -m py_compile app/analysis/scoring.py
 | Module | Purpose |
 |--------|---------|
 | `app/data/market_data.py` | Fetches, validates, and normalizes OHLCV price data from yfinance |
-| `app/data/storage.py` | Saves plain-text reports (`.txt`) and structured results (`.json`) to local disk |
 | `app/data/fundamentals.py` | Fetches company fundamentals (P/E, margins, growth, D/E, FCF, beta) from yfinance |
 | `app/data/news_data.py` | Fetches recent news headlines from yfinance; returns typed `NewsItem` objects |
+| `app/data/storage.py` | Saves plain-text reports (`.txt`) and structured results (`.json`) to local disk |
 | `app/models/signal.py` | Typed `Signal` Pydantic model; shared contract across the analysis layer |
 | `app/models/rating.py` | Typed `Rating` Pydantic model; output of the scoring engine |
 | `app/models/fundamentals.py` | Typed `CompanyFundamentals` Pydantic model; output of the fundamentals data layer |
 | `app/models/news.py` | Typed `NewsItem` Pydantic model; output of the news data layer |
+| `app/models/stock_report.py` | Typed `StockReport` Pydantic model; top-level output of a full analysis run |
 | `app/analysis/technicals.py` | Computes SMA 20/50/200, RSI 14, MACD, volume SMA; builds 7 typed Signals |
 | `app/analysis/fundamentals_analysis.py` | Builds 5 typed Signals from valuation, profitability, growth, debt, and cash flow |
 | `app/analysis/risk_analysis.py` | Builds 4–5 typed Signals from volatility, drawdown, recent trend, liquidity, and beta |
 | `app/analysis/news_analysis.py` | Builds exactly 3 NEWS Signals (Sentiment, Risk Headlines, Coverage) via keyword matching |
-| `app/analysis/scoring.py` | Composite scoring engine with `score_signals()` and `score_technical_signals()` |
-| `app/reports/stock_report.py` | Generates a formatted plain-text research report from a Rating and its Signals |
-| `app/utils/helpers.py` | Shared low-level helpers: `safe_float` (safe numeric conversion) and `normalize_ticker` (validation + uppercase normalization) |
-| `app/main.py` | CLI entry point — orchestrates the full pipeline and prints the report |
+| `app/analysis/scoring.py` | Composite scoring engine; `score_signals()` aggregates all signal categories into a Rating |
+| `app/reports/report_generator.py` | `build_stock_report()` assembles a StockReport from a Rating; `generate_plain_text_report()` delegates to templates |
+| `app/reports/templates.py` | `format_plain_text_report()` renders a StockReport as a plain-text terminal report |
+| `app/watchlist.py` | Loads watchlist files, scans multiple tickers, formats ranked summary tables, and serializes results |
+| `app/utils/helpers.py` | Shared low-level helpers: `safe_float` and `normalize_ticker` |
+| `app/main.py` | argparse-based CLI entry point — orchestrates the full pipeline for single tickers and watchlists |
 
 ## Architecture
 
@@ -83,6 +96,9 @@ data/ → analysis/ → scoring.py → reports/
 | Scoring | `app/analysis/scoring.py` | Aggregate signals into a composite Rating using weighted formula |
 | Reports | `app/reports/` | Format a Rating and its Signals into a human-readable report |
 
+`app/watchlist.py` orchestrates the single-stock pipeline across multiple tickers.
+`app/main.py` handles CLI argument parsing and dispatches to the pipeline or watchlist mode.
+
 ## Layer Rules
 
 - **Data modules** fetch and clean data only. No analysis or scoring logic.
@@ -90,6 +106,7 @@ data/ → analysis/ → scoring.py → reports/
 - **Analysis modules** are independent — `technicals.py` does not call `fundamentals_analysis.py`, etc.
 - **Scoring** stays in `scoring.py`. Analysis modules produce signals; they do not score them.
 - **Reports** consume scoring outputs. Report modules do not run analysis or scoring.
+- **Watchlist** reuses the single-stock pipeline; it adds no analysis logic of its own.
 
 ## Scoring Weights
 
@@ -111,20 +128,15 @@ Each analysis module follows the same pattern:
 - Has its own exception class (e.g. `TechnicalAnalysisError`, `NewsAnalysisError`, `RiskAnalysisError`) that `main.py` catches
 - News fetch failures in `main.py` are non-fatal: the pipeline continues with `analyze_news([])`
 
-## Not Yet Implemented
-
-These files exist as docstring-only stubs:
-- `app/reports/report_generator.py` — full report orchestration
-- `app/reports/templates.py` — report templates
-- `app/models/stock_report.py` — top-level StockReport model
-
 ## Development Standards
 
 - Add or update tests for every meaningful code change.
+- Keep tasks narrow — prefer one clean, tested feature over a large multi-feature PR.
 - Keep tests deterministic — build DataFrames and typed models locally, never call live APIs in unit tests.
 - Update `docs/development_log.md` after meaningful changes.
 - Do not add dependencies without a clear need.
 - All API keys and secrets live in `.env` (never committed). Access them only through `app/config.py`.
+- Review diffs before committing.
 
 ## Key Docs
 

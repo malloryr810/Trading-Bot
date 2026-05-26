@@ -1,5 +1,64 @@
 # Development Log
 
+## 2026-05-25 — Consolidate report formatters; remove legacy stock_report.py
+
+**`app/reports/stock_report.py`** (removed)
+
+- Deleted the older `generate_stock_report(ticker, rating, signals, ...)` formatter
+- It had no production callers — `app/main.py` already used `build_stock_report` + `generate_plain_text_report` exclusively
+- `app/reports/templates.py` is now the single canonical plain-text report implementation
+
+**`tests/test_stock_report.py`** (removed)
+
+- Deleted the 74-test suite that tested the legacy formatter only
+- All meaningful coverage already existed in `test_report_templates.py` (header, recommendation, analysis summaries, signals ordering, key strengths/risks, triggers, disclaimer)
+- Ticker validation is covered by `test_stock_report_model.py` at the Pydantic model level
+- Tests for `_score_breakdown` and `rating.explanation` were specific to the legacy formatter's output; neither feature exists in `templates.py`
+
+**`CLAUDE.md`** (updated)
+
+- Removed `app/reports/stock_report.py` row from the "Currently Implemented" table
+
+**`README.md`** (updated)
+
+- Removed `stock_report.py` from the project structure block
+- Updated test count from 1103 to 1029
+
+No trading functionality added. Full suite 1029/1029 passing.
+
+## 2026-05-25 — Code review, cleanup, and documentation update
+
+**`app/utils/logging.py`** (removed)
+
+- Removed empty docstring-only stub; nothing imported it and it contained no implementation
+
+**`app/config.py`** (updated)
+
+- Removed `OPENAI_API_KEY` and `DATABASE_URL` entries; both are aspirational for features that don't exist (no LLM, no database) and nothing imported config at all
+- Retained `MARKET_DATA_API_KEY`, `NEWS_API_KEY`, `ENVIRONMENT`, and `DEBUG` as legitimate placeholders
+
+**`CLAUDE.md`** (rewritten)
+
+- Updated "Currently Implemented" table to include all implemented modules: `app/models/stock_report.py`, `app/reports/report_generator.py`, `app/reports/templates.py`, `app/reports/stock_report.py`, `app/watchlist.py`
+- Removed "Not Yet Implemented" section (all three listed stubs are now implemented)
+- Added all watchlist CLI commands and `--help`
+- Added argparse note to `app/main.py` entry
+- Added watchlist and argparse to development standards
+- Added ML/LLM to the "Do not implement" list
+
+**`README.md`** (rewritten)
+
+- Added full feature list (all four signal categories, StockReport model, JSON export, watchlist scanning, watchlist export, argparse CLI)
+- Added complete watchlist CLI usage section
+- Added watchlist file format documentation
+- Updated "What Is Not Included" section — removed "Watchlist scanning (planned, not yet built)" since it is now built; kept backtesting as future
+- Updated test count from 812 to 1103
+- Updated project structure to show all implemented files (no more stub labels)
+- Added `outputs/` directory to structure
+- Updated "Planned Future Work" section to accurately describe remaining roadmap items
+
+No trading functionality added. Full suite 1103/1103 passing.
+
 ## 2026-05-25 — Refactor CLI to use argparse
 
 **`app/main.py`** (updated)
