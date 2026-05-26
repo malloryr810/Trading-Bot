@@ -1,5 +1,54 @@
 # Development Log
 
+## 2026-05-26 — Improve market data validation and DataFetchError messages
+
+**`app/data/market_data.py`** (refactored)
+
+Expanded the validation pipeline so invalid, empty, stale, malformed, or
+incomplete yfinance responses produce specific `DataFetchError` messages.
+No changes to scoring, analysis logic, or report formatting.
+
+New private helpers added:
+
+- **`_validate_price_history(df, symbol)`** — orchestrates all post-fetch checks.
+- **`_validate_required_columns(df, symbol)`** — raises if any OHLCV column is
+  absent; error message now also lists which columns *were* present to aid diagnosis.
+- **`_validate_column_nullability(df, symbol)`** — raises if any individual required
+  column is entirely null, naming the specific column. Previously only caught the
+  case where *all* columns were null and the row-drop step removed everything.
+- **`_validate_numeric_columns(df, symbol)`** — raises if any required column has a
+  non-numeric dtype (e.g. strings returned for a price column), naming the column
+  and its dtype.
+
+Other improvements:
+
+- Added `isinstance(raw, pd.DataFrame)` guard before `.empty` — catches unexpected
+  return types (dicts, `None`, etc.) with a clear message naming the actual type.
+- yfinance exception message now includes `period` and `interval` in addition to
+  the ticker, making it easier to reproduce a failed fetch.
+- Empty-DataFrame error message also now includes `period` and `interval`.
+- `REQUIRED_COLUMNS` promoted to `frozenset` (immutable constant).
+- Added `# TODO` comment for staleness detection (deferred — requires careful
+  handling of weekends/holidays and test fixture dates without an exchange-calendar
+  dependency).
+
+**`tests/test_market_data.py`** (expanded)
+
+- Added `_make_normalized_ohlcv()` fixture for unit-testing private helpers directly.
+- Added `TestNormalizeColumns`, `TestValidateRequiredColumns`,
+  `TestValidateColumnNullability`, `TestValidateNumericColumns`,
+  `TestValidatePriceHistory` — 29 new tests covering helpers in isolation.
+- Extended `TestDataValidation` and `TestYfinanceErrors` — 16 new integration tests
+  covering non-DataFrame returns, per-column nullability, non-numeric columns,
+  period/interval in error messages, and exception chaining.
+- Updated one existing assertion: `test_all_nan_rows_dropped_and_raises_if_empty`
+  match string updated to reflect that all-null columns are now caught earlier
+  (at `_validate_column_nullability`) with a more specific message.
+- Total: 64 tests in the market data file (was 10).
+
+No scoring weights, thresholds, or report formats changed. No new dependencies added.
+Full suite 1155/1155 passing.
+
 ## 2026-05-26 — Add Markdown report export (`--save-markdown`)
 
 **`app/reports/templates.py`** (updated)
