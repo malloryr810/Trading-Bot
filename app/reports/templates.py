@@ -1,17 +1,22 @@
 """
 Report templates.
 
-Formatting helpers for StockReport. Two public entry points:
-  format_plain_text_report(report) — terminal-readable plain text
-  format_report_markdown(report)   — clean Markdown document
+Formatting helpers for StockReport and watchlist results. Public entry points:
+  format_plain_text_report(report)     — terminal-readable plain text (single ticker)
+  format_report_markdown(report)       — clean Markdown document (single ticker)
+  format_watchlist_markdown(results)   — Markdown document for watchlist scan results
 """
 
 from __future__ import annotations
 
 from datetime import date
+from typing import TYPE_CHECKING
 
 from app.models.signal import Signal, SignalCategory, SignalDirection
 from app.models.stock_report import StockReport
+
+if TYPE_CHECKING:
+    from app.watchlist import WatchlistResult
 
 _WIDTH = 80
 _SEP = "=" * _WIDTH
@@ -339,3 +344,83 @@ def _md_disclaimer() -> str:
         "*This report is for research and decision-support purposes only. "
         "It is not financial advice. It does not place, recommend, or imply trades.*"
     )
+
+
+# ===========================================================================
+# Watchlist Markdown formatter
+# ===========================================================================
+
+def format_watchlist_markdown(results: list[WatchlistResult]) -> str:
+    """Render watchlist scan results as a Markdown document.
+
+    Args:
+        results: List of WatchlistResult as returned by scan_watchlist.
+
+    Returns:
+        A single formatted Markdown string.
+    """
+    parts = [
+        _wl_md_header(results),
+        _wl_md_results_table(results),
+        _wl_md_failures_table(results),
+        _md_disclaimer(),
+    ]
+    return "\n\n".join(p for p in parts if p)
+
+
+# ---------------------------------------------------------------------------
+# Watchlist Markdown section builders
+# ---------------------------------------------------------------------------
+
+def _wl_md_header(results: list[WatchlistResult]) -> str:
+    n = len(results)
+    n_success = sum(1 for r in results if r.succeeded)
+    n_fail = n - n_success
+    lines = [
+        "# Watchlist Report",
+        "",
+        f"**Generated:** {date.today().isoformat()}",
+        f"**Tickers scanned:** {n}   Success: {n_success}   Failed: {n_fail}",
+    ]
+    return "\n".join(lines)
+
+
+def _wl_md_results_table(results: list[WatchlistResult]) -> str:
+    successes = [r for r in results if r.succeeded]
+    lines = ["## Results", ""]
+    if not successes:
+        lines.append("*(no results)*")
+        return "\n".join(lines)
+    lines += [
+        "| Ticker | Company | Category | Score | Confidence | Price |",
+        "|--------|---------|----------|-------|------------|-------|",
+    ]
+    for r in successes:
+        company  = _md_cell(r.company_name or "—")
+        category = r.final_category.value if r.final_category else "—"
+        score    = f"{r.score:.1f}" if r.score is not None else "—"
+        conf     = r.confidence_level.value.capitalize() if r.confidence_level else "—"
+        price    = f"${r.current_price:,.2f}" if r.current_price is not None else "—"
+        lines.append(f"| {r.ticker} | {company} | {category} | {score} | {conf} | {price} |")
+    return "\n".join(lines)
+
+
+def _wl_md_failures_table(results: list[WatchlistResult]) -> str:
+    failures = [r for r in results if not r.succeeded]
+    if not failures:
+        return ""
+    lines = [
+        "## Failures",
+        "",
+        "| Ticker | Error |",
+        "|--------|-------|",
+    ]
+    for r in failures:
+        err = _md_cell(r.error_message or "unknown error")
+        lines.append(f"| {r.ticker} | {err} |")
+    return "\n".join(lines)
+
+
+def _md_cell(text: str) -> str:
+    """Escape characters that break Markdown table cells."""
+    return text.replace("|", "\\|")

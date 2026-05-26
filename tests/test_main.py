@@ -24,8 +24,9 @@ from app.data.news_data import NewsFetchError
 from app.data.storage import StorageError
 from app.main import analyze_ticker, build_parser, main, parse_args
 
-_SAVE_MARKDOWN = "app.main.save_markdown_report"
-_FAKE_MD_PATH  = Path("outputs/reports/AAPL_20240601_000000.md")
+_SAVE_MARKDOWN        = "app.main.save_markdown_report"
+_FAKE_MD_PATH         = Path("outputs/reports/AAPL_20240601_000000.md")
+_PATCH_WL_MD_FORMATTER = "app.main.format_watchlist_markdown"
 from app.models.rating import ConfidenceLevel, Rating, RatingCategory
 from app.models.signal import Signal, SignalCategory, SignalDirection, SignalStrength
 
@@ -896,3 +897,51 @@ class TestWatchlistSaveMarkdown:
             from app.main import _run_watchlist
             _run_watchlist(wl, False, False, True)
         assert "Warning" in capsys.readouterr().err
+
+    def test_save_markdown_uses_watchlist_markdown_formatter(self, tmp_path):
+        """--save-markdown must call format_watchlist_markdown, not format_watchlist_summary."""
+        wl = self._make_watchlist_file(tmp_path)
+        fake_path = Path("outputs/reports/WATCHLIST.md")
+        with (
+            patch("app.watchlist.load_watchlist", return_value=["AAPL"]),
+            patch("app.watchlist.scan_watchlist", return_value=[]),
+            patch("app.watchlist.format_watchlist_summary", return_value="PLAIN TEXT SUMMARY"),
+            patch(_PATCH_WL_MD_FORMATTER, return_value="# WL MARKDOWN") as mock_formatter,
+            patch("app.main.save_markdown_report", return_value=fake_path) as mock_save,
+        ):
+            from app.main import _run_watchlist
+            _run_watchlist(wl, False, False, True)
+        mock_formatter.assert_called_once()
+        saved_text = mock_save.call_args.args[0]
+        assert saved_text == "# WL MARKDOWN"
+        assert saved_text != "PLAIN TEXT SUMMARY"
+
+    def test_save_markdown_content_starts_with_markdown_heading(self, tmp_path):
+        """Real format_watchlist_markdown output starts with a Markdown H1."""
+        wl = self._make_watchlist_file(tmp_path)
+        fake_path = Path("outputs/reports/WATCHLIST.md")
+        with (
+            patch("app.watchlist.load_watchlist", return_value=["AAPL"]),
+            patch("app.watchlist.scan_watchlist", return_value=[]),
+            patch("app.watchlist.format_watchlist_summary", return_value="PLAIN TEXT SUMMARY"),
+            patch("app.main.save_markdown_report", return_value=fake_path) as mock_save,
+        ):
+            from app.main import _run_watchlist
+            _run_watchlist(wl, False, False, True)
+        saved_text = mock_save.call_args.args[0]
+        assert saved_text.startswith("# ")
+
+    def test_save_report_still_uses_plain_text_summary(self, tmp_path):
+        """--save-report must still save the plain-text summary, not Markdown."""
+        wl = self._make_watchlist_file(tmp_path)
+        fake_path = Path("outputs/reports/WATCHLIST.txt")
+        with (
+            patch("app.watchlist.load_watchlist", return_value=["AAPL"]),
+            patch("app.watchlist.scan_watchlist", return_value=[]),
+            patch("app.watchlist.format_watchlist_summary", return_value="PLAIN TEXT SUMMARY"),
+            patch("app.main.save_text_report", return_value=fake_path) as mock_save,
+        ):
+            from app.main import _run_watchlist
+            _run_watchlist(wl, True, False, False)
+        saved_text = mock_save.call_args.args[0]
+        assert saved_text == "PLAIN TEXT SUMMARY"

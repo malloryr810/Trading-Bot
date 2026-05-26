@@ -49,7 +49,7 @@ from app.data.news_data import get_recent_news
 from app.data.storage import StorageError, save_json_result, save_markdown_report, save_text_report
 from app.models.rating import Rating
 from app.reports.report_generator import build_stock_report, generate_plain_text_report
-from app.reports.templates import format_report_markdown
+from app.reports.templates import format_report_markdown, format_watchlist_markdown
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +142,8 @@ def _run_watchlist(
 
     if do_save_markdown:
         try:
-            path = save_markdown_report(summary, "WATCHLIST")
+            md_text = format_watchlist_markdown(results)
+            path = save_markdown_report(md_text, "WATCHLIST")
             print(f"Saved Markdown report to: {path}")
         except StorageError as exc:
             print(f"Warning: failed to save Markdown report: {exc}", file=sys.stderr)

@@ -1,5 +1,48 @@
 # Development Log
 
+## 2026-05-26 — Add real Markdown formatter for watchlist reports
+
+**`app/reports/templates.py`** (extended)
+
+Added `format_watchlist_markdown(results)` — a proper Markdown formatter for
+watchlist scan results. Watchlist `--save-markdown` now produces a real Markdown
+document instead of saving the plain-text terminal summary with a `.md` extension.
+
+New public function:
+
+- **`format_watchlist_markdown(results)`** — renders a `list[WatchlistResult]` as a
+  Markdown document with an H1 title, a generated-at date, a pipe table of successful
+  results (Ticker, Company, Category, Score, Confidence, Price), a Failures table when
+  errors exist, and the standard disclaimer footer.
+
+New private helpers:
+
+- **`_wl_md_header`** — H1 title, date, and scanned/success/failed counts.
+- **`_wl_md_results_table`** — pipe table for successful results; falls back to a
+  "*(no results)*" message when the list is empty or all-failures.
+- **`_wl_md_failures_table`** — pipe table for failed tickers; omitted when absent.
+- **`_md_cell`** — escapes `|` characters that would break table cells.
+
+**`app/main.py`** (updated)
+
+`_run_watchlist` now calls `format_watchlist_markdown(results)` for `--save-markdown`
+instead of reusing the plain-text summary string. `--save-report` behavior is unchanged.
+
+**`tests/test_report_templates.py`** (expanded)
+
+Added 40 new deterministic tests covering `format_watchlist_markdown`: return type,
+H1 heading, table structure, per-column values, empty-list handling, mixed
+success/failure rows, failures-section presence, and the disclaimer footer.
+
+**`tests/test_main.py`** (expanded)
+
+Added 3 new tests to `TestWatchlistSaveMarkdown` verifying that `--save-markdown`
+calls the new formatter (not `format_watchlist_summary`), that the saved content
+starts with a Markdown heading, and that `--save-report` still receives the plain-text
+summary.
+
+---
+
 ## 2026-05-26 — Improve market data validation and DataFetchError messages
 
 **`app/data/market_data.py`** (refactored)

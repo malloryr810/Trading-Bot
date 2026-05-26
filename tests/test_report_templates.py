@@ -13,7 +13,8 @@ import pytest
 from app.models.rating import ConfidenceLevel, RatingCategory
 from app.models.signal import Signal, SignalCategory, SignalDirection, SignalStrength
 from app.models.stock_report import StockReport
-from app.reports.templates import format_plain_text_report, format_report_markdown
+from app.reports.templates import format_plain_text_report, format_report_markdown, format_watchlist_markdown
+from app.watchlist import WatchlistResult
 
 
 # ---------------------------------------------------------------------------
@@ -601,3 +602,195 @@ class TestMarkdownDisclaimer:
     def test_disclaimer_uses_italic_markdown(self):
         out = _md()
         assert "*This report" in out
+
+
+# ===========================================================================
+# format_watchlist_markdown tests
+# ===========================================================================
+
+def _make_wl_success(
+    ticker: str = "AAPL",
+    company_name: str | None = "Apple Inc.",
+    category: RatingCategory = RatingCategory.WATCHLIST,
+    score: float = 62.0,
+    confidence: ConfidenceLevel = ConfidenceLevel.MEDIUM,
+    current_price: float | None = 182.50,
+) -> WatchlistResult:
+    return WatchlistResult(
+        ticker=ticker,
+        company_name=company_name,
+        final_category=category,
+        score=score,
+        confidence_level=confidence,
+        current_price=current_price,
+    )
+
+
+def _make_wl_failure(ticker: str = "BAD", message: str = "fetch failed") -> WatchlistResult:
+    return WatchlistResult(ticker=ticker, error_message=message)
+
+
+def _wl_md(results: list[WatchlistResult] | None = None) -> str:
+    if results is None:
+        results = [_make_wl_success()]
+    return format_watchlist_markdown(results)
+
+
+class TestWatchlistMarkdownReturnType:
+    def test_returns_string(self):
+        assert isinstance(_wl_md(), str)
+
+    def test_returns_non_empty_string(self):
+        assert len(_wl_md()) > 0
+
+
+class TestWatchlistMarkdownHeader:
+    def test_h1_title_present(self):
+        assert _wl_md().startswith("# Watchlist Report")
+
+    def test_contains_generated_date(self):
+        assert date.today().isoformat() in _wl_md()
+
+    def test_contains_tickers_scanned_count(self):
+        results = [_make_wl_success("AAPL"), _make_wl_success("MSFT")]
+        assert "Tickers scanned:** 2" in format_watchlist_markdown(results)
+
+    def test_contains_success_count(self):
+        results = [_make_wl_success("AAPL"), _make_wl_failure("BAD")]
+        out = format_watchlist_markdown(results)
+        assert "Success: 1" in out
+
+    def test_contains_failed_count(self):
+        results = [_make_wl_success("AAPL"), _make_wl_failure("BAD")]
+        out = format_watchlist_markdown(results)
+        assert "Failed: 1" in out
+
+
+class TestWatchlistMarkdownResultsTable:
+    def test_table_header_ticker_column(self):
+        assert "| Ticker |" in _wl_md()
+
+    def test_table_header_category_column(self):
+        assert "Category" in _wl_md()
+
+    def test_table_header_score_column(self):
+        assert "Score" in _wl_md()
+
+    def test_table_header_confidence_column(self):
+        assert "Confidence" in _wl_md()
+
+    def test_table_header_price_column(self):
+        assert "Price" in _wl_md()
+
+    def test_table_separator_row_present(self):
+        assert "|--------|" in _wl_md()
+
+    def test_success_ticker_appears_in_table(self):
+        assert "AAPL" in _wl_md([_make_wl_success("AAPL")])
+
+    def test_score_value_in_table(self):
+        assert "72.5" in _wl_md([_make_wl_success(score=72.5)])
+
+    def test_category_value_in_table(self):
+        out = _wl_md([_make_wl_success(category=RatingCategory.BUY_CANDIDATE)])
+        assert "Buy Candidate" in out
+
+    def test_confidence_value_in_table(self):
+        out = _wl_md([_make_wl_success(confidence=ConfidenceLevel.HIGH)])
+        assert "High" in out
+
+    def test_price_value_in_table(self):
+        out = _wl_md([_make_wl_success(current_price=182.50)])
+        assert "182.50" in out
+
+    def test_company_name_in_table(self):
+        out = _wl_md([_make_wl_success(company_name="Microsoft Corp.")])
+        assert "Microsoft Corp." in out
+
+    def test_missing_price_shown_as_dash_placeholder(self):
+        out = _wl_md([_make_wl_success(current_price=None)])
+        assert "—" in out
+
+    def test_missing_company_shown_as_dash_placeholder(self):
+        out = _wl_md([_make_wl_success(company_name=None)])
+        assert "—" in out
+
+    def test_multiple_tickers_all_appear(self):
+        results = [
+            _make_wl_success("AAPL"),
+            _make_wl_success("MSFT"),
+            _make_wl_success("NVDA"),
+        ]
+        out = format_watchlist_markdown(results)
+        assert "AAPL" in out
+        assert "MSFT" in out
+        assert "NVDA" in out
+
+    def test_results_section_heading_present(self):
+        assert "## Results" in _wl_md()
+
+
+class TestWatchlistMarkdownEmpty:
+    def test_empty_results_does_not_crash(self):
+        out = format_watchlist_markdown([])
+        assert isinstance(out, str)
+        assert len(out) > 0
+
+    def test_empty_results_starts_with_h1(self):
+        out = format_watchlist_markdown([])
+        assert out.startswith("# Watchlist Report")
+
+    def test_empty_results_contains_no_results_message(self):
+        out = format_watchlist_markdown([])
+        assert "no results" in out.lower()
+
+    def test_empty_results_no_failures_section(self):
+        out = format_watchlist_markdown([])
+        assert "## Failures" not in out
+
+
+class TestWatchlistMarkdownFailures:
+    def test_failures_section_present_when_failures_exist(self):
+        assert "## Failures" in _wl_md([_make_wl_failure("BAD", "network error")])
+
+    def test_failed_ticker_in_failures_table(self):
+        assert "BAD" in _wl_md([_make_wl_failure("BAD", "network error")])
+
+    def test_error_message_in_failures_table(self):
+        assert "network error" in _wl_md([_make_wl_failure("BAD", "network error")])
+
+    def test_failures_section_absent_when_no_failures(self):
+        assert "## Failures" not in _wl_md([_make_wl_success()])
+
+    def test_mixed_results_success_in_table(self):
+        out = _wl_md([_make_wl_success("AAPL"), _make_wl_failure("BAD")])
+        assert "AAPL" in out
+        assert "## Results" in out
+
+    def test_mixed_results_failure_in_failures_section(self):
+        out = _wl_md([_make_wl_success("AAPL"), _make_wl_failure("BAD", "timeout")])
+        assert "## Failures" in out
+        assert "timeout" in out
+
+    def test_only_failures_results_section_shows_no_results(self):
+        out = _wl_md([_make_wl_failure("BAD")])
+        assert "no results" in out.lower()
+
+    def test_failures_table_has_header(self):
+        out = _wl_md([_make_wl_failure("BAD")])
+        assert "| Ticker |" in out
+        assert "| Error |" in out
+
+
+class TestWatchlistMarkdownDisclaimer:
+    def test_disclaimer_separator_present(self):
+        assert "---" in _wl_md()
+
+    def test_not_financial_advice(self):
+        assert "not financial advice" in _wl_md()
+
+    def test_does_not_place_trades(self):
+        assert "does not place" in _wl_md()
+
+    def test_disclaimer_uses_italic_markdown(self):
+        assert "*This report" in _wl_md()
