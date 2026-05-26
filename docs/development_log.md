@@ -1,5 +1,28 @@
 # Development Log
 
+## 2026-05-25 — Update architecture.md and project_plan.md to match current codebase
+
+**`docs/architecture.md`** (rewritten)
+
+- Replaced stale layer map (most modules marked ○/planned) with accurate map showing all implemented modules
+- Added `app/models/fundamentals.py`, `app/models/news.py`, `app/watchlist.py` which were missing
+- Corrected storage description: outputs go to `outputs/reports/` and `outputs/results/`, not `data/raw/`
+- Corrected report generator description: it builds a StockReport from a Rating (does not receive one)
+- Removed the "Future Trading Layer" section — no trading layer is planned for this project
+- Added data flow diagram, watchlist flow, CLI flag table, and testing approach section
+- Removed all ○ stub markers; every listed module is implemented
+
+**`docs/project_plan.md`** (rewritten)
+
+- Replaced the original Version 1 plan (partially done) with a clean completed/future split
+- Marked as completed: all foundation, data, analysis, reports, CLI/export, and maintenance work
+- Removed v1.1/v1.2/v2.0/v2.1/v3.0/v3.1/v4.0 version table — all phases through v2.x are done
+- Removed v4.0 "Live trading" row; replaced with explicit "Out of Scope" section
+- Updated CLI example from `python app/main.py --ticker AAPL` to `python -m app.main AAPL`
+- Future work section now covers only genuinely unimplemented items
+
+No application logic changed. No trading functionality added. Full suite 1029/1029 passing.
+
 ## 2026-05-25 — Consolidate report formatters; remove legacy stock_report.py
 
 **`app/reports/stock_report.py`** (removed)
