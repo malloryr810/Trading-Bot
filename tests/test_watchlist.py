@@ -6,8 +6,9 @@ All tests are deterministic — no live yfinance or API calls.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -20,6 +21,7 @@ from app.watchlist import (
     format_watchlist_summary,
     load_watchlist,
     scan_watchlist,
+    serialize_watchlist_results,
 )
 
 
@@ -420,8 +422,26 @@ class TestMainWatchlistCLI:
         p = _write_watchlist(tmp_path, "AAPL\n")
         with patch("app.main._run_watchlist", return_value=0) as mock_run:
             result = main(["--watchlist", str(p)])
-        mock_run.assert_called_once_with(str(p))
+        mock_run.assert_called_once_with(str(p), False, False)
         assert result == 0
+
+    def test_watchlist_passes_save_report_flag(self, tmp_path):
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with patch("app.main._run_watchlist", return_value=0) as mock_run:
+            main(["--watchlist", str(p), "--save-report"])
+        mock_run.assert_called_once_with(str(p), True, False)
+
+    def test_watchlist_passes_save_json_flag(self, tmp_path):
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with patch("app.main._run_watchlist", return_value=0) as mock_run:
+            main(["--watchlist", str(p), "--save-json"])
+        mock_run.assert_called_once_with(str(p), False, True)
+
+    def test_watchlist_passes_both_save_flags(self, tmp_path):
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with patch("app.main._run_watchlist", return_value=0) as mock_run:
+            main(["--watchlist", str(p), "--save-report", "--save-json"])
+        mock_run.assert_called_once_with(str(p), True, True)
 
     def test_watchlist_flag_missing_path_returns_1(self, capsys):
         result = main(["--watchlist"])
@@ -498,6 +518,410 @@ class TestMainWatchlistCLI:
     def test_no_args_still_prints_usage(self, capsys):
         main([])
         assert "Usage" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------------------
+# Watchlist save CLI — --save-report
+# ---------------------------------------------------------------------------
+
+_FAKE_REPORT_PATH = Path("outputs/reports/WATCHLIST_20240601_000000.txt")
+_FAKE_JSON_PATH   = Path("outputs/results/WATCHLIST_20240601_000000.json")
+
+_PATCH_SAVE_TEXT = "app.main.save_text_report"
+_PATCH_SAVE_JSON = "app.main.save_json_result"
+
+
+class TestWatchlistSaveReport:
+    def test_save_report_calls_save_text_report(self, tmp_path):
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_TEXT, return_value=_FAKE_REPORT_PATH) as mock_save,
+        ):
+            main(["--watchlist", str(p), "--save-report"])
+        mock_save.assert_called_once()
+
+    def test_save_report_receives_summary_text(self, tmp_path):
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_TEXT, return_value=_FAKE_REPORT_PATH) as mock_save,
+        ):
+            main(["--watchlist", str(p), "--save-report"])
+        text_arg = mock_save.call_args.args[0]
+        assert isinstance(text_arg, str)
+        assert "WATCHLIST SCAN" in text_arg
+
+    def test_save_report_uses_watchlist_label(self, tmp_path):
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_TEXT, return_value=_FAKE_REPORT_PATH) as mock_save,
+        ):
+            main(["--watchlist", str(p), "--save-report"])
+        ticker_arg = mock_save.call_args.args[1]
+        assert ticker_arg == "WATCHLIST"
+
+    def test_save_report_confirmation_printed(self, tmp_path, capsys):
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_TEXT, return_value=_FAKE_REPORT_PATH),
+        ):
+            main(["--watchlist", str(p), "--save-report"])
+        out = capsys.readouterr().out
+        assert "Saved text report to:" in out
+        assert str(_FAKE_REPORT_PATH) in out
+
+    def test_save_report_text_same_as_printed_summary(self, tmp_path, capsys):
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_TEXT, return_value=_FAKE_REPORT_PATH) as mock_save,
+        ):
+            main(["--watchlist", str(p), "--save-report"])
+        printed = capsys.readouterr().out
+        saved_text = mock_save.call_args.args[0]
+        assert saved_text in printed
+
+    def test_save_report_storage_error_prints_warning(self, tmp_path, capsys):
+        from app.data.storage import StorageError
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_TEXT, side_effect=StorageError("disk full")),
+        ):
+            result = main(["--watchlist", str(p), "--save-report"])
+        assert result == 0
+        assert "Warning" in capsys.readouterr().err
+
+    def test_no_save_report_without_flag(self, tmp_path):
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_TEXT) as mock_save,
+        ):
+            main(["--watchlist", str(p)])
+        mock_save.assert_not_called()
+
+    def test_summary_still_printed_with_save_report(self, tmp_path, capsys):
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_TEXT, return_value=_FAKE_REPORT_PATH),
+        ):
+            main(["--watchlist", str(p), "--save-report"])
+        assert "WATCHLIST SCAN" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# Watchlist save CLI — --save-json
+# ---------------------------------------------------------------------------
+
+class TestWatchlistSaveJson:
+    def test_save_json_calls_save_json_result(self, tmp_path):
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_JSON, return_value=_FAKE_JSON_PATH) as mock_save,
+        ):
+            main(["--watchlist", str(p), "--save-json"])
+        mock_save.assert_called_once()
+
+    def test_save_json_uses_watchlist_label(self, tmp_path):
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_JSON, return_value=_FAKE_JSON_PATH) as mock_save,
+        ):
+            main(["--watchlist", str(p), "--save-json"])
+        ticker_arg = mock_save.call_args.args[1]
+        assert ticker_arg == "WATCHLIST"
+
+    def test_save_json_data_contains_results_key(self, tmp_path):
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_JSON, return_value=_FAKE_JSON_PATH) as mock_save,
+        ):
+            main(["--watchlist", str(p), "--save-json"])
+        data_arg = mock_save.call_args.args[0]
+        assert "results" in data_arg
+
+    def test_save_json_includes_successful_results(self, tmp_path):
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_JSON, return_value=_FAKE_JSON_PATH) as mock_save,
+        ):
+            main(["--watchlist", str(p), "--save-json"])
+        data_arg = mock_save.call_args.args[0]
+        assert any(r["ticker"] == "AAPL" for r in data_arg["results"])
+
+    def test_save_json_includes_failed_results(self, tmp_path):
+        p = _write_watchlist(tmp_path, "AAPL\nBAD\n")
+
+        def _pipeline(ticker: str):
+            if ticker == "BAD":
+                raise RuntimeError("bad ticker")
+            return _make_mock_rating(ticker)
+
+        with (
+            patch("app.main.analyze_ticker", side_effect=_pipeline),
+            patch(_PATCH_SAVE_JSON, return_value=_FAKE_JSON_PATH) as mock_save,
+        ):
+            main(["--watchlist", str(p), "--save-json"])
+        data_arg = mock_save.call_args.args[0]
+        failed = [r for r in data_arg["results"] if not r["succeeded"]]
+        assert any(r["ticker"] == "BAD" for r in failed)
+
+    def test_save_json_confirmation_printed(self, tmp_path, capsys):
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_JSON, return_value=_FAKE_JSON_PATH),
+        ):
+            main(["--watchlist", str(p), "--save-json"])
+        out = capsys.readouterr().out
+        assert "Saved JSON result to:" in out
+        assert str(_FAKE_JSON_PATH) in out
+
+    def test_save_json_storage_error_prints_warning(self, tmp_path, capsys):
+        from app.data.storage import StorageError
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_JSON, side_effect=StorageError("no space")),
+        ):
+            result = main(["--watchlist", str(p), "--save-json"])
+        assert result == 0
+        assert "Warning" in capsys.readouterr().err
+
+    def test_no_save_json_without_flag(self, tmp_path):
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_JSON) as mock_save,
+        ):
+            main(["--watchlist", str(p)])
+        mock_save.assert_not_called()
+
+    def test_summary_still_printed_with_save_json(self, tmp_path, capsys):
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_JSON, return_value=_FAKE_JSON_PATH),
+        ):
+            main(["--watchlist", str(p), "--save-json"])
+        assert "WATCHLIST SCAN" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# Watchlist save CLI — both flags
+# ---------------------------------------------------------------------------
+
+class TestWatchlistBothSaveFlags:
+    def test_both_flags_call_both_save_functions(self, tmp_path):
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_TEXT, return_value=_FAKE_REPORT_PATH) as mock_txt,
+            patch(_PATCH_SAVE_JSON, return_value=_FAKE_JSON_PATH) as mock_json,
+        ):
+            result = main(["--watchlist", str(p), "--save-report", "--save-json"])
+        assert result == 0
+        mock_txt.assert_called_once()
+        mock_json.assert_called_once()
+
+    def test_both_flags_print_both_confirmations(self, tmp_path, capsys):
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_TEXT, return_value=_FAKE_REPORT_PATH),
+            patch(_PATCH_SAVE_JSON, return_value=_FAKE_JSON_PATH),
+        ):
+            main(["--watchlist", str(p), "--save-report", "--save-json"])
+        out = capsys.readouterr().out
+        assert "Saved text report to:" in out
+        assert "Saved JSON result to:" in out
+
+    def test_json_error_does_not_prevent_text_save(self, tmp_path, capsys):
+        from app.data.storage import StorageError
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_TEXT, return_value=_FAKE_REPORT_PATH) as mock_txt,
+            patch(_PATCH_SAVE_JSON, side_effect=StorageError("no space")),
+        ):
+            result = main(["--watchlist", str(p), "--save-report", "--save-json"])
+        assert result == 0
+        mock_txt.assert_called_once()
+
+    def test_returns_0_with_both_flags(self, tmp_path):
+        p = _write_watchlist(tmp_path, "AAPL\n")
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_TEXT, return_value=_FAKE_REPORT_PATH),
+            patch(_PATCH_SAVE_JSON, return_value=_FAKE_JSON_PATH),
+        ):
+            assert main(["--watchlist", str(p), "--save-report", "--save-json"]) == 0
+
+
+# ---------------------------------------------------------------------------
+# serialize_watchlist_results
+# ---------------------------------------------------------------------------
+
+class TestSerializeWatchlistResults:
+    def _success(
+        self,
+        ticker: str = "AAPL",
+        score: float = 62.0,
+        category: RatingCategory = RatingCategory.WATCHLIST,
+        confidence: ConfidenceLevel = ConfidenceLevel.MEDIUM,
+        company_name: str | None = None,
+        current_price: float | None = None,
+    ) -> WatchlistResult:
+        return WatchlistResult(
+            ticker=ticker,
+            company_name=company_name,
+            final_category=category,
+            score=score,
+            confidence_level=confidence,
+            current_price=current_price,
+        )
+
+    def _failure(self, ticker: str = "BAD", message: str = "error") -> WatchlistResult:
+        return WatchlistResult(ticker=ticker, error_message=message)
+
+    def test_returns_list(self):
+        assert isinstance(serialize_watchlist_results([self._success()]), list)
+
+    def test_length_matches_input(self):
+        assert len(serialize_watchlist_results([self._success(), self._failure()])) == 2
+
+    def test_ticker_preserved(self):
+        result = serialize_watchlist_results([self._success("MSFT")])
+        assert result[0]["ticker"] == "MSFT"
+
+    def test_score_preserved(self):
+        result = serialize_watchlist_results([self._success(score=72.5)])
+        assert result[0]["score"] == pytest.approx(72.5)
+
+    def test_final_category_serialized_as_string(self):
+        result = serialize_watchlist_results([self._success(category=RatingCategory.BUY_CANDIDATE)])
+        assert result[0]["final_category"] == "Buy Candidate"
+
+    def test_confidence_level_serialized_as_string(self):
+        result = serialize_watchlist_results([self._success(confidence=ConfidenceLevel.HIGH)])
+        assert result[0]["confidence_level"] == "high"
+
+    def test_company_name_included(self):
+        result = serialize_watchlist_results([self._success(company_name="Apple Inc.")])
+        assert result[0]["company_name"] == "Apple Inc."
+
+    def test_current_price_included(self):
+        result = serialize_watchlist_results([self._success(current_price=182.50)])
+        assert result[0]["current_price"] == pytest.approx(182.50)
+
+    def test_none_fields_preserved_as_none(self):
+        result = serialize_watchlist_results([self._success(company_name=None, current_price=None)])
+        assert result[0]["company_name"] is None
+        assert result[0]["current_price"] is None
+
+    def test_succeeded_true_for_success(self):
+        result = serialize_watchlist_results([self._success()])
+        assert result[0]["succeeded"] is True
+
+    def test_error_message_none_for_success(self):
+        result = serialize_watchlist_results([self._success()])
+        assert result[0]["error_message"] is None
+
+    def test_failure_has_error_message(self):
+        result = serialize_watchlist_results([self._failure(message="timeout")])
+        assert result[0]["error_message"] == "timeout"
+
+    def test_succeeded_false_for_failure(self):
+        result = serialize_watchlist_results([self._failure()])
+        assert result[0]["succeeded"] is False
+
+    def test_failure_category_is_none(self):
+        result = serialize_watchlist_results([self._failure()])
+        assert result[0]["final_category"] is None
+
+    def test_failure_score_is_none(self):
+        result = serialize_watchlist_results([self._failure()])
+        assert result[0]["score"] is None
+
+    def test_failure_confidence_is_none(self):
+        result = serialize_watchlist_results([self._failure()])
+        assert result[0]["confidence_level"] is None
+
+    def test_order_preserved(self):
+        results = [self._success("FIRST"), self._success("SECOND"), self._failure("THIRD")]
+        serialized = serialize_watchlist_results(results)
+        assert [r["ticker"] for r in serialized] == ["FIRST", "SECOND", "THIRD"]
+
+    def test_output_is_json_serializable(self):
+        results = [self._success(), self._failure()]
+        serialized = serialize_watchlist_results(results)
+        # Should not raise
+        json_text = json.dumps({"results": serialized})
+        parsed = json.loads(json_text)
+        assert len(parsed["results"]) == 2
+
+    def test_all_required_keys_present(self):
+        result = serialize_watchlist_results([self._success()])[0]
+        required = {
+            "ticker", "company_name", "final_category", "score",
+            "confidence_level", "current_price", "error_message", "succeeded",
+        }
+        assert required <= result.keys()
+
+    def test_empty_list_returns_empty_list(self):
+        assert serialize_watchlist_results([]) == []
+
+
+# ---------------------------------------------------------------------------
+# Single-ticker save behavior unchanged
+# ---------------------------------------------------------------------------
+
+class TestSingleTickerSaveUnchanged:
+    """Verify that single-ticker --save-report/--save-json are unaffected."""
+
+    _FAKE_SINGLE_TXT  = Path("outputs/reports/AAPL_20240601_000000.txt")
+    _FAKE_SINGLE_JSON = Path("outputs/results/AAPL_20240601_000000.json")
+
+    def test_save_report_flag_still_works_for_single_ticker(self, tmp_path):
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_TEXT, return_value=self._FAKE_SINGLE_TXT) as mock_save,
+        ):
+            result = main(["AAPL", "--save-report"])
+        assert result == 0
+        mock_save.assert_called_once()
+
+    def test_save_json_flag_still_works_for_single_ticker(self, tmp_path):
+        from app.models.rating import Rating
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_JSON, return_value=self._FAKE_SINGLE_JSON) as mock_save,
+        ):
+            result = main(["AAPL", "--save-json"])
+        assert result == 0
+        mock_save.assert_called_once()
+        # Single-ticker JSON receives a Rating model, not a dict
+        data_arg = mock_save.call_args.args[0]
+        from app.models.rating import Rating
+        assert isinstance(data_arg, Rating)
+
+    def test_single_ticker_save_does_not_call_watchlist_save(self, tmp_path):
+        with (
+            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch(_PATCH_SAVE_TEXT, return_value=self._FAKE_SINGLE_TXT),
+            patch("app.main._run_watchlist") as mock_watchlist,
+        ):
+            main(["AAPL", "--save-report"])
+        mock_watchlist.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

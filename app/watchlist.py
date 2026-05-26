@@ -2,15 +2,16 @@
 Watchlist scanning.
 
 Provides functions to load a watchlist from a plain-text file, run the
-existing single-stock pipeline across every ticker, and format a ranked
-summary table. Adds no trading, order execution, or broker connectivity.
+existing single-stock pipeline across every ticker, format a ranked
+summary table, and serialize results for export. Adds no trading, order
+execution, or broker connectivity.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from app.models.rating import ConfidenceLevel, RatingCategory
 from app.models.stock_report import StockReport
@@ -196,3 +197,36 @@ def format_watchlist_summary(results: list[WatchlistResult]) -> str:
     lines += [_SEP, f"  {status}", _SEP]
 
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Serialization
+# ---------------------------------------------------------------------------
+
+def serialize_watchlist_results(results: list[WatchlistResult]) -> list[dict[str, Any]]:
+    """Convert a list of WatchlistResult to JSON-serializable dicts.
+
+    Enum fields (final_category, confidence_level) are serialized to their
+    string values. None values are preserved as null. The list order is
+    preserved so callers can guarantee sorted output in exported JSON.
+
+    Args:
+        results: List of WatchlistResult as returned by scan_watchlist.
+
+    Returns:
+        List of plain dicts safe to pass to json.dumps or save_json_result.
+    """
+    return [_result_to_dict(r) for r in results]
+
+
+def _result_to_dict(result: WatchlistResult) -> dict[str, Any]:
+    return {
+        "ticker": result.ticker,
+        "company_name": result.company_name,
+        "final_category": result.final_category.value if result.final_category else None,
+        "score": result.score,
+        "confidence_level": result.confidence_level.value if result.confidence_level else None,
+        "current_price": result.current_price,
+        "error_message": result.error_message,
+        "succeeded": result.succeeded,
+    }

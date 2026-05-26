@@ -11,6 +11,9 @@ Single-ticker mode:
 Watchlist mode:
 
     python -m app.main --watchlist <file>
+    python -m app.main --watchlist <file> --save-report
+    python -m app.main --watchlist <file> --save-json
+    python -m app.main --watchlist <file> --save-report --save-json
 
 Fetches historical OHLCV data and company fundamentals, computes technical,
 fundamental, risk, and news signals, scores them with composite weights, and
@@ -97,13 +100,18 @@ def analyze_ticker(ticker: str) -> Rating:
 # Watchlist mode
 # ---------------------------------------------------------------------------
 
-def _run_watchlist(watchlist_path: str) -> int:
-    """Run watchlist scan mode and print a ranked summary table."""
+def _run_watchlist(
+    watchlist_path: str,
+    do_save_report: bool = False,
+    do_save_json: bool = False,
+) -> int:
+    """Run watchlist scan mode, print a ranked summary table, and optionally save."""
     from app.watchlist import (
         WatchlistLoadError,
         format_watchlist_summary,
         load_watchlist,
         scan_watchlist,
+        serialize_watchlist_results,
     )
 
     try:
@@ -116,7 +124,24 @@ def _run_watchlist(watchlist_path: str) -> int:
         tickers,
         lambda ticker: build_stock_report(analyze_ticker(ticker)),
     )
-    print(format_watchlist_summary(results))
+    summary = format_watchlist_summary(results)
+    print(summary)
+
+    if do_save_report:
+        try:
+            path = save_text_report(summary, "WATCHLIST")
+            print(f"Saved text report to: {path}")
+        except StorageError as exc:
+            print(f"Warning: failed to save text report: {exc}", file=sys.stderr)
+
+    if do_save_json:
+        try:
+            data = {"results": serialize_watchlist_results(results)}
+            path = save_json_result(data, "WATCHLIST")
+            print(f"Saved JSON result to: {path}")
+        except StorageError as exc:
+            print(f"Warning: failed to save JSON result: {exc}", file=sys.stderr)
+
     return 0
 
 
@@ -126,7 +151,7 @@ def _run_watchlist(watchlist_path: str) -> int:
 
 _USAGE = (
     "Usage: python -m app.main <TICKER> [--save-report] [--save-json]\n"
-    "       python -m app.main --watchlist <file>"
+    "       python -m app.main --watchlist <file> [--save-report] [--save-json]"
 )
 
 
@@ -156,6 +181,9 @@ def main(argv: list[str] | None = None) -> int:
         if not a.startswith("--") and a != (watchlist_path or "")
     ]
 
+    do_save_report = "--save-report" in args
+    do_save_json   = "--save-json"   in args
+
     if watchlist_path and positional:
         print(
             "Error: provide either a ticker or --watchlist, not both.",
@@ -164,15 +192,13 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     if watchlist_path:
-        return _run_watchlist(watchlist_path)
+        return _run_watchlist(watchlist_path, do_save_report, do_save_json)
 
     if not positional:
         print(_USAGE, file=sys.stderr)
         return 1
 
     ticker = positional[0]
-    do_save_report = "--save-report" in args
-    do_save_json   = "--save-json"   in args
 
     try:
         rating = analyze_ticker(ticker)

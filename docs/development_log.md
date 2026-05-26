@@ -1,5 +1,26 @@
 # Development Log
 
+## 2026-05-25 — Add watchlist save/export support
+
+**`app/watchlist.py`** (updated)
+
+- Added `serialize_watchlist_results(results) -> list[dict]` — converts `WatchlistResult` entries to JSON-serializable plain dicts; enum fields (`final_category`, `confidence_level`) serialized to their string values; `None` preserved as `null`; list order preserved for deterministic JSON output
+
+**`app/main.py`** (updated)
+
+- `_run_watchlist` accepts `do_save_report: bool` and `do_save_json: bool` parameters
+- `--save-report`: saves the plain-text watchlist summary via `save_text_report(summary, "WATCHLIST")`; prints confirmation path; non-fatal on `StorageError`
+- `--save-json`: saves `{"results": [...]}` dict via `save_json_result(data, "WATCHLIST")`; prints confirmation path; non-fatal on `StorageError`
+- Both flags extracted before watchlist dispatch so they apply to both watchlist and single-ticker modes
+- `_USAGE` updated to document all four flag combinations
+- Single-ticker `--save-report`/`--save-json` behavior unchanged
+
+**Tests added**
+
+- `tests/test_watchlist.py` — 47 new tests across 5 new test classes: `TestWatchlistSaveReport` (8), `TestWatchlistSaveJson` (9), `TestWatchlistBothSaveFlags` (4), `TestSerializeWatchlistResults` (20), `TestSingleTickerSaveUnchanged` (3); also updated 4 existing flag-passing assertions to match new `_run_watchlist` signature (3 bool params)
+
+No trading functionality added. Full suite 1077/1077 passing (previously 1030, +47 tests).
+
 ## 2026-05-25 — Add basic watchlist scanning
 
 **`app/watchlist.py`** (new)
