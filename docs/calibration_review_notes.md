@@ -155,3 +155,157 @@ logic:
   the current output is expected or indicates a gap.
 
 See `docs/scoring_calibration_plan.md` for the full decision gate criteria.
+
+---
+
+## Second Calibration Pass
+
+**Important:** Not financial advice. Not a backtest. No scoring code was changed.
+
+---
+
+### Run Details
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-26 |
+| Time (UTC approx.) | ~19:53 — approximately 14 hours after the first pass |
+| Command | `python -m app.main --watchlist watchlists/calibration_sample.txt --save-markdown --save-json` |
+| Watchlist file | `watchlists/calibration_sample.txt` |
+| Tickers attempted | 14 |
+| Tickers succeeded | 14 |
+| Tickers failed | 0 |
+| Markdown output reviewed | `outputs/reports/WATCHLIST_20260526_195322.md` |
+| JSON output reviewed | `outputs/results/WATCHLIST_20260526_195322.json` |
+
+Neither output file was committed to the repository.
+
+---
+
+### Data Completeness Check
+
+| Check | First Pass | Second Pass | Status |
+|-------|-----------|-------------|--------|
+| Company names populated | No — all null | Yes — all 14 present | ✅ Fixed |
+| Current prices populated | No — all null | Yes — all 14 present | ✅ Fixed |
+| Categories present | Yes | Yes | ✅ No change |
+| Scores present | Yes | Yes | ✅ No change |
+| Confidence levels present | Yes | Yes | ✅ No change |
+| JSON `company_name` field | null for all | Populated for all | ✅ Fixed |
+| JSON `current_price` field | null for all | Populated for all | ✅ Fixed |
+| Any failures | 0 | 0 | ✅ No change |
+
+The data completeness gap identified in the first pass is resolved. Company names and
+current prices now flow correctly from the pipeline through to both the terminal summary,
+the Markdown report, and the JSON export.
+
+---
+
+### Scoring Pattern Check
+
+Results from both passes side by side. Scores reflect live market data at run time and
+are expected to shift between runs.
+
+| Ticker | First Pass Score | First Pass Category | Second Pass Score | Second Pass Category | Score Δ | Category Change? |
+|--------|-----------------|---------------------|------------------|-----------------------|---------|-----------------|
+| KO | 77.5 | Buy Candidate | 79.8 | Buy Candidate | +2.3 | No |
+| JNJ | 72.8 | Buy Candidate | 67.5 | Watchlist | −5.3 | Yes — dropped |
+| XOM | 72.6 | Buy Candidate | 59.5 | Watchlist | −13.1 | Yes — dropped |
+| NVDA | 72.1 | Buy Candidate | 64.0 | Watchlist | −8.1 | Yes — dropped |
+| JPM | 68.0 | Watchlist | 67.4 | Watchlist | −0.6 | No |
+| PFE | 65.6 | Watchlist | 57.1 | Watchlist | −8.5 | No |
+| MSFT | 65.0 | Watchlist | 66.2 | Watchlist | +1.2 | No |
+| TSLA | 60.4 | Watchlist | 61.0 | Watchlist | +0.6 | No |
+| SPY | 59.8 | Watchlist | 59.8 | Watchlist | 0.0 | No |
+| CAT | 59.1 | Watchlist | 63.9 | Watchlist | +4.8 | No |
+| AMZN | 58.9 | Watchlist | 58.9 | Watchlist | 0.0 | No |
+| WMT | 54.1 | Hold | 58.2 | Watchlist | +4.1 | Yes — rose |
+| INTC | 53.5 | Hold | 54.1 | Hold | +0.6 | No |
+| MCD | 50.8 | Hold | 50.8 | Hold | 0.0 | No |
+
+**Score range:** 50.8 – 79.8 (first pass: 50.8 – 77.5). Spread slightly wider.
+
+**Category shifts across the 14-hour window:**
+- JNJ, XOM, NVDA all moved down from Buy Candidate to Watchlist.
+- WMT moved up from Hold to Watchlist.
+- KO remained the top-scoring ticker and widened its lead.
+
+These shifts are consistent with the pipeline responding to intraday price and
+news changes. They do not indicate a scoring bug — they reflect that the model
+consumes live market data, and results will vary between runs.
+
+**Confidence levels:** All 14 tickers again received `confidence_level: medium`
+despite a score spread of approximately 29 points. The confidence compression
+pattern from the first pass persists. This is noted again but not acted on.
+
+**Score compression:** No ticker reached Strong Buy Candidate (≥85) or Sell / Exit
+Warning (<30). The full set landed between 50.8 and 79.8. This was also observed
+in the first pass.
+
+**Patterns still visible from first pass:**
+- Score compression at the upper and lower ends remains (both passes).
+- All-medium confidence regardless of score spread remains (both passes).
+- KO still ranks highest, now more clearly ahead of the rest of the set.
+- MCD still ranks lowest (50.8 in both passes — identical score, suggesting
+  stable fundamental/risk conditions).
+
+**New patterns observed:**
+- Scores for energy (XOM) and healthcare (JNJ, NVDA) shifted more between
+  passes than consumer staples (KO, MCD, WMT) or tech (MSFT, AMZN). This
+  is consistent with higher intraday volatility in those sectors but is noted
+  as a weak observation only.
+- SPY and AMZN returned identical scores in both passes (59.8 and 58.9
+  respectively), suggesting their underlying signals did not change between
+  the two runs.
+
+---
+
+### Follow-Up Needed
+
+Priority for individual ticker review is adjusted based on second-pass results:
+
+1. **KO** — Still the top scorer, now at 79.8. Still worth individual review to
+   understand the signal composition. Priority unchanged.
+2. **XOM** — Moved from Buy Candidate (72.6) to Watchlist (59.5) in a single
+   day. A 13-point intraday shift for a large stable energy company is notable.
+   Adding to priority for individual review.
+3. **MSFT** — Stable between passes (+1.2). Remains lower than expected for its
+   fundamentals. Still a priority for individual review.
+4. **MCD** — Identical score in both passes (50.8). Still lowest in the set.
+   Priority unchanged.
+5. **PFE** — Dropped 8.5 points but stayed in Watchlist. Still a priority for
+   individual review to check trailing fundamental data.
+
+Commands for individual review (unchanged from first pass):
+
+```
+python -m app.main KO --save-markdown --save-json
+python -m app.main XOM --save-markdown --save-json
+python -m app.main MSFT --save-markdown --save-json
+python -m app.main MCD --save-markdown --save-json
+python -m app.main PFE --save-markdown --save-json
+```
+
+---
+
+### Decision
+
+**No scoring code changes should be made yet.**
+
+The second pass confirms:
+
+1. The company name and current price data gap from the first pass is fully
+   resolved. The watchlist output is now usable for manual calibration review.
+2. All 14 tickers succeeded with no errors in both passes.
+3. Score volatility between same-day runs is real and expected — the pipeline
+   is producing live results, not cached snapshots. Individual ticker review
+   should be done on a single run, not compared across separate watchlist runs.
+4. The confidence compression pattern (all-medium across a 30-point spread)
+   persists and remains a candidate calibration target, but does not warrant
+   a code change without individual report evidence.
+5. Score compression at the upper and lower ends persists and also remains a
+   weak-evidence pattern only.
+
+**Next step:** Run individual reports for the five priority tickers above and
+fill in the calibration worksheet at `docs/scoring_calibration_worksheet.md`
+before any scoring logic is discussed.

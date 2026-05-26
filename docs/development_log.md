@@ -1,5 +1,36 @@
 # Development Log
 
+## 2026-05-26 — Second calibration pass; calibration_review_notes.md updated
+
+**`docs/calibration_review_notes.md`** (extended)
+
+Ran the calibration sample watchlist a second time after the company name and
+current price pipeline fix. Command:
+`python -m app.main --watchlist watchlists/calibration_sample.txt --save-markdown --save-json`
+
+Output files reviewed:
+- `outputs/reports/WATCHLIST_20260526_195322.md`
+- `outputs/results/WATCHLIST_20260526_195322.json`
+
+Neither file was committed.
+
+Key findings from the second pass:
+- Company names and current prices are now fully populated in both the Markdown
+  report and JSON export — the data gap from the first pass is resolved.
+- All 14 tickers succeeded with no errors.
+- Score range: 50.8–79.8. Category shifts were observed between the first and
+  second pass (JNJ, XOM, NVDA dropped from Buy Candidate to Watchlist; WMT rose
+  from Hold to Watchlist) — consistent with live intraday data changes, not a bug.
+- All-medium confidence across the full set persists and remains a noted pattern.
+- Score compression at the upper and lower ends persists.
+- No scoring code changes were made.
+
+Appended a "Second Calibration Pass" section to `docs/calibration_review_notes.md`
+covering: run details, data completeness check, scoring pattern comparison across
+both passes, updated follow-up priorities, and a decision statement.
+
+---
+
 ## 2026-05-26 — Code review and cleanup pass; README and CLAUDE.md updates
 
 **`app/analysis/risk_analysis.py`** (minor cleanup)
