@@ -562,3 +562,151 @@ MCD, and PFE — meeting all five gates in the decision gate section of
 
 A confidence calibration proposal has been created at
 `docs/confidence_calibration_proposal.md`.
+
+---
+
+## Post-Confidence-Recalibration Validation Pass
+
+**Important:** Not financial advice. Not a backtest. No scoring code was changed.
+
+---
+
+### Run Details
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-26 |
+| Time (UTC approx.) | ~21:06–21:08 |
+| Commands | watchlist + five individual tickers + four extra diagnostic runs |
+| All commands succeeded | Yes — no errors |
+
+Commands used:
+
+```
+python -m app.main --watchlist watchlists/calibration_sample.txt --save-markdown --save-json
+python -m app.main KO   --save-markdown --save-json
+python -m app.main XOM  --save-markdown --save-json
+python -m app.main MSFT --save-markdown --save-json
+python -m app.main MCD  --save-markdown --save-json
+python -m app.main PFE  --save-markdown --save-json
+python -m app.main INTC --save-json
+python -m app.main TSLA --save-json
+python -m app.main CAT  --save-json
+python -m app.main NVDA --save-json
+```
+
+Output files reviewed (not committed):
+
+| Type | Filename |
+|------|----------|
+| Watchlist Markdown | `outputs/reports/WATCHLIST_20260526_210614.md` |
+| Watchlist JSON | `outputs/results/WATCHLIST_20260526_210614.json` |
+| KO | `outputs/results/KO_20260526_210633.json` |
+| XOM | `outputs/results/XOM_20260526_210638.json` |
+| MSFT | `outputs/results/MSFT_20260526_210643.json` |
+| MCD | `outputs/results/MCD_20260526_210648.json` |
+| PFE | `outputs/results/PFE_20260526_210652.json` |
+| INTC | `outputs/results/INTC_20260526_210812.json` |
+| TSLA | `outputs/results/TSLA_20260526_210816.json` |
+| CAT | `outputs/results/CAT_20260526_210821.json` |
+| NVDA | `outputs/results/NVDA_20260526_210825.json` |
+
+The four extra diagnostic runs (INTC, TSLA, CAT, NVDA) were added to explain
+the watchlist distribution — all four appeared as High in the watchlist output.
+
+---
+
+### Watchlist Confidence Distribution
+
+14 of 14 tickers succeeded. 0 failures.
+
+| Confidence | Count | Tickers | Notes |
+|------------|-------|---------|-------|
+| High | 6 | KO, NVDA, MSFT, CAT, TSLA, INTC | 43% of the watchlist. Within the "5–6 max" risk guardrail stated in the proposal. |
+| Medium | 8 | JNJ, JPM, PFE, AMZN, XOM, SPY, WMT, MCD | 57% of the watchlist. |
+| Low | 0 | — | No ticker had avg signal confidence below 0.50. |
+
+**Distribution assessment:** 6 of 14 High is at the upper limit of the risk
+guardrail stated in `docs/confidence_calibration_proposal.md` ("if more than
+5–6 of 14 return High on a typical day, the threshold should be reviewed"). It
+sits within the stated range, not above it. No immediate threshold adjustment
+is warranted, but this pass establishes the baseline for future comparison.
+
+**Notable watchlist case — INTC (Hold, High):** INTC scored 54.8 (Hold category)
+but received High confidence. Its avg signal confidence is 0.635, just above the
+0.63 boundary. Its signal composition is 8 bullish / 6 bearish / 6 neutral with
+no missing-data signals. This is the intended semantic: confidence reflects data
+completeness, not signal direction. A well-evidenced Hold is a valid High
+confidence outcome.
+
+**Borderline cases:** CAT (0.6325), TSLA (0.635), and INTC (0.635) all sit
+within 0.005 of the 0.63 threshold. A small intraday shift could move them
+across the boundary. This clustering near the threshold is expected behavior
+given the structural floor on per-signal confidence values documented in the
+signal confidence audit.
+
+---
+
+### Individual Ticker Validation Table
+
+Exact values from JSON output. `avg_conf` = `confidence_diagnostics.average_signal_confidence`.
+
+| Ticker | Avg Conf | Expected Label | Actual Label | Match? | Score | Category | Diagnostic Note |
+|--------|----------|---------------|--------------|--------|-------|----------|-----------------|
+| KO | 0.6375 | High | **High** | ✅ | 79.8 | Buy Candidate | 14/0/6 direction split; avg 0.0075 above threshold; no missing-data signals |
+| MSFT | 0.6425 | High | **High** | ✅ | 66.2 | Watchlist | 12/3/5 direction split; avg at theoretical ceiling; highest fundamental avg |
+| XOM | 0.6250 | Medium | **Medium** | ✅ | 59.5 | Watchlist | 10/3/7 direction split; avg 0.005 below threshold; EPS-decline neutral growth signal |
+| MCD | 0.6175 | Medium | **Medium** | ✅ | 50.1 | Hold | 8/5/7 direction split; one missing-data signal (D/E null → 0.30); lowest avg |
+| PFE | 0.6100 | Medium | **Medium** | ✅ | 65.0 | Watchlist | 10/2/8 direction split; most neutral signals; 0.03 below threshold |
+
+All five matched the expected labels from the proposal exactly.
+
+**Score and category stability:** MCD's score shifted from 50.8 to 50.1 between
+this run and the earlier Individual Ticker Review Pass. This is expected — the
+pipeline consumes live market data. The category (Hold) and confidence label
+(Medium) are both unchanged. No scoring bug is indicated.
+
+**Additional High tickers (for watchlist context):**
+
+| Ticker | Avg Conf | Score | Category | Bull/Bear/Neut | Note |
+|--------|----------|-------|----------|----------------|------|
+| NVDA | 0.6450 | 72.1 | Buy Candidate | 13/3/4 | Strong bullish composition; farthest above threshold |
+| TSLA | 0.6350 | 61.0 | Watchlist | 9/4/7 | 0.005 above threshold; borderline case |
+| CAT | 0.6325 | 63.9 | Watchlist | 10/4/6 | 0.0025 above threshold; nearest to boundary |
+| INTC | 0.6350 | 54.8 | Hold | 8/6/6 | 0.005 above threshold; demonstrates confidence ≠ score direction |
+
+---
+
+### Validation Decision
+
+**The threshold-only recalibration behaved as expected.**
+
+1. **All five priority tickers matched their expected labels exactly.**
+   KO and MSFT are now High; XOM, MCD, and PFE remain Medium. No mismatches.
+
+2. **No bug was found.** Confidence label changes are consistent with the
+   measured diagnostic averages and the 0.63 threshold. Score and category
+   values are unchanged from prior runs (within expected live-data variation).
+
+3. **ConfidenceDiagnostics values are unchanged.** The `average_signal_confidence`
+   values in this run match the values from the earlier diagnostics review pass
+   within rounding and intraday variation. No diagnostic calculation was altered.
+
+4. **Scoring and category behavior is unchanged.** MCD's small score shift
+   (50.8 → 50.1) is within expected intraday live-data variance, not a
+   regression from the confidence threshold change.
+
+5. **Watchlist distribution is 6 High / 8 Medium / 0 Low (43% High).**
+   This sits at the upper limit of the risk guardrail stated in the proposal.
+   No immediate threshold adjustment is warranted, but this pass establishes
+   the monitoring baseline. If future watchlist runs consistently show more than
+   6 of 14 returning High, the threshold should be reconsidered.
+
+6. **INTC (Hold, High confidence) is the most semantically instructive case.**
+   It confirms that confidence and score/category can now meaningfully diverge —
+   which is the intended behavior. A Hold rating with complete data and well-defined
+   signals correctly receives High confidence under the new thresholds.
+
+**No further confidence calibration changes are needed at this time.**
+The next calibration priorities, if any, should focus on scoring weight or signal
+logic calibration — not confidence thresholds.

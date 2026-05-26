@@ -5,6 +5,12 @@
 > `app/analysis/scoring.py` now uses HIGH ≥ 0.63 and MEDIUM ≥ 0.50.
 > Scores, categories, signal confidence values, and diagnostics are unchanged.
 > 18 new boundary and regression tests were added to `tests/test_scoring.py`.
+>
+> **Validation status (2026-05-26):** Post-implementation validation confirmed
+> all five priority tickers matched expected labels (KO and MSFT → High; XOM,
+> MCD, PFE → Medium). Watchlist distribution: 6 High / 8 Medium / 0 Low.
+> See `docs/calibration_review_notes.md` — Post-Confidence-Recalibration
+> Validation Pass section.
 
 ## Purpose
 

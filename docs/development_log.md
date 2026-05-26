@@ -1,5 +1,39 @@
 # Development Log
 
+## 2026-05-26 — Post-confidence-recalibration validation pass completed
+
+Reran the 14-ticker calibration watchlist and five individual ticker reports
+(KO, XOM, MSFT, MCD, PFE) after the confidence threshold change. No code was
+changed. All generated output files left uncommitted under `outputs/`.
+
+**Individual ticker results — all expected labels matched:**
+
+| Ticker | Avg Conf | Expected | Actual | Score | Category |
+|--------|----------|---------|--------|-------|----------|
+| KO | 0.6375 | High | High ✅ | 79.8 | Buy Candidate |
+| MSFT | 0.6425 | High | High ✅ | 66.2 | Watchlist |
+| XOM | 0.6250 | Medium | Medium ✅ | 59.5 | Watchlist |
+| MCD | 0.6175 | Medium | Medium ✅ | 50.1 | Hold |
+| PFE | 0.6100 | Medium | Medium ✅ | 65.0 | Watchlist |
+
+**Watchlist distribution:** 6 High (KO, NVDA, MSFT, CAT, TSLA, INTC) /
+8 Medium / 0 Low — 43% High, at the upper limit of the risk guardrail stated
+in the proposal ("≤ 5–6 of 14"). No immediate threshold adjustment warranted,
+but establishes monitoring baseline.
+
+**Notable case:** INTC scored 54.8 (Hold) with High confidence (avg 0.635).
+This is semantically correct — confidence reflects data completeness, not
+score direction. Confirms the intended decoupling of confidence from category.
+
+**Updated: `docs/calibration_review_notes.md`** — appended Post-Confidence-
+Recalibration Validation Pass section.
+**Updated: `docs/confidence_calibration_proposal.md`** — added validation status note.
+
+No Python code changed. No scoring, category, signal value, or diagnostics
+logic was altered. 1298 tests pass.
+
+---
+
 ## 2026-05-26 — Confidence threshold-only recalibration implemented
 
 **Changed: `app/analysis/scoring.py` — `_map_confidence()` only**

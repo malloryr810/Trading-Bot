@@ -1,0 +1,144 @@
+{
+  "results": [
+    {
+      "company_name": "The Coca-Cola Company",
+      "confidence_level": "high",
+      "current_price": 80.45999908447266,
+      "error_message": null,
+      "final_category": "Buy Candidate",
+      "score": 79.75,
+      "succeeded": true,
+      "ticker": "KO"
+    },
+    {
+      "company_name": "NVIDIA Corporation",
+      "confidence_level": "high",
+      "current_price": 214.86000061035156,
+      "error_message": null,
+      "final_category": "Buy Candidate",
+      "score": 72.125,
+      "succeeded": true,
+      "ticker": "NVDA"
+    },
+    {
+      "company_name": "Johnson & Johnson",
+      "confidence_level": "medium",
+      "current_price": 230.17999267578125,
+      "error_message": null,
+      "final_category": "Watchlist",
+      "score": 67.5,
+      "succeeded": true,
+      "ticker": "JNJ"
+    },
+    {
+      "company_name": "JPMorgan Chase & Co.",
+      "confidence_level": "medium",
+      "current_price": 306.739990234375,
+      "error_message": null,
+      "final_category": "Watchlist",
+      "score": 67.375,
+      "succeeded": true,
+      "ticker": "JPM"
+    },
+    {
+      "company_name": "Microsoft Corporation",
+      "confidence_level": "high",
+      "current_price": 416.0299987792969,
+      "error_message": null,
+      "final_category": "Watchlist",
+      "score": 66.25,
+      "succeeded": true,
+      "ticker": "MSFT"
+    },
+    {
+      "company_name": "Pfizer Inc.",
+      "confidence_level": "medium",
+      "current_price": 25.850000381469727,
+      "error_message": null,
+      "final_category": "Watchlist",
+      "score": 65.0,
+      "succeeded": true,
+      "ticker": "PFE"
+    },
+    {
+      "company_name": "Caterpillar Inc.",
+      "confidence_level": "high",
+      "current_price": 908.5499877929688,
+      "error_message": null,
+      "final_category": "Watchlist",
+      "score": 63.875,
+      "succeeded": true,
+      "ticker": "CAT"
+    },
+    {
+      "company_name": "Tesla, Inc.",
+      "confidence_level": "high",
+      "current_price": 433.5899963378906,
+      "error_message": null,
+      "final_category": "Watchlist",
+      "score": 61.0,
+      "succeeded": true,
+      "ticker": "TSLA"
+    },
+    {
+      "company_name": "Amazon.com, Inc.",
+      "confidence_level": "medium",
+      "current_price": 265.2900085449219,
+      "error_message": null,
+      "final_category": "Watchlist",
+      "score": 60.125,
+      "succeeded": true,
+      "ticker": "AMZN"
+    },
+    {
+      "company_name": "Exxon Mobil Corporation",
+      "confidence_level": "medium",
+      "current_price": 149.80999755859375,
+      "error_message": null,
+      "final_category": "Watchlist",
+      "score": 59.5,
+      "succeeded": true,
+      "ticker": "XOM"
+    },
+    {
+      "company_name": "State Street SPDR S&P 500 ETF Trust",
+      "confidence_level": "medium",
+      "current_price": 750.5900268554688,
+      "error_message": null,
+      "final_category": "Watchlist",
+      "score": 59.125,
+      "succeeded": true,
+      "ticker": "SPY"
+    },
+    {
+      "company_name": "Walmart Inc.",
+      "confidence_level": "medium",
+      "current_price": 118.56999969482422,
+      "error_message": null,
+      "final_category": "Watchlist",
+      "score": 58.25,
+      "succeeded": true,
+      "ticker": "WMT"
+    },
+    {
+      "company_name": "Intel Corporation",
+      "confidence_level": "high",
+      "current_price": 123.5199966430664,
+      "error_message": null,
+      "final_category": "Hold",
+      "score": 54.75,
+      "succeeded": true,
+      "ticker": "INTC"
+    },
+    {
+      "company_name": "McDonald's Corporation",
+      "confidence_level": "medium",
+      "current_price": 279.260009765625,
+      "error_message": null,
+      "final_category": "Hold",
+      "score": 50.125,
+      "succeeded": true,
+      "ticker": "MCD"
+    }
+  ]
+}
