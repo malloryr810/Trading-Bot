@@ -1,5 +1,24 @@
 # Development Log
 
+## 2026-05-26 — Add scoring calibration plan document
+
+**`docs/scoring_calibration_plan.md`** (new)
+
+Added a planning document that defines how the rule-based scoring system will
+be evaluated and tuned over time. No scoring code, weights, or thresholds were
+changed. The document covers: current model reference (weights, thresholds,
+categories), calibration principles, a candidate evaluation set structure, the
+manual review workflow, calibration worksheet fields, a list of tunable and
+off-limits levers, future implementation ideas, and a decision gate that must
+be cleared before any scoring code changes.
+
+**`docs/project_plan.md`** (minor update)
+
+Added a reference link from the existing "Improved scoring calibration" future
+work item to the new `docs/scoring_calibration_plan.md`.
+
+---
+
 ## 2026-05-26 — Add real Markdown formatter for watchlist reports
 
 **`app/reports/templates.py`** (extended)

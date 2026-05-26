@@ -68,7 +68,7 @@ later phases, in rough priority order.
 ### Near-Term
 
 - Improved scoring calibration — better-tuned weights and thresholds, validated
-  against historical data
+  against historical data (see `docs/scoring_calibration_plan.md`)
 - Better data validation — richer error messages for missing or stale data fields
 - Richer report formats — Markdown or HTML output options alongside plain text
 - Optional alternate data providers — Alpha Vantage, Polygon.io, Finnhub, or
