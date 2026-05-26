@@ -1,5 +1,26 @@
 # Development Log
 
+## 2026-05-26 — Fix watchlist data completeness gap
+
+**`app/models/rating.py`**, **`app/main.py`**, **`app/reports/report_generator.py`**, **`app/watchlist.py`**
+
+Added `company_name` and `current_price` fields to the `Rating` model (provenance
+section). Updated `analyze_ticker` to attach those values to the rating via
+`model_copy` after scoring, sourcing `company_name` from `CompanyFundamentals`
+and `current_price` from the last close in the OHLCV DataFrame (via `safe_float`).
+Updated `build_stock_report` to fall back to `rating.company_name` and
+`rating.current_price` when the explicit keyword args are `None`, so both the
+watchlist and single-ticker paths receive the values automatically. Extended
+`format_watchlist_summary` with COMPANY and PRICE columns so the plain-text
+terminal table shows these fields when present and `—` when absent. The Markdown
+formatter and JSON serializer already referenced `WatchlistResult.company_name`
+and `WatchlistResult.current_price`, so no changes were needed there. No scoring
+logic, weights, thresholds, or confidence logic changed. Added 13 deterministic
+unit tests covering the new fallback behavior, the column display, and
+`analyze_ticker` attachment. All 1210 tests pass.
+
+---
+
 ## 2026-05-26 — First calibration review notes
 
 **`docs/calibration_review_notes.md`** (new)

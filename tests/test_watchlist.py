@@ -321,12 +321,16 @@ class TestFormatWatchlistSummary:
         score: float = 62.0,
         category: RatingCategory = RatingCategory.WATCHLIST,
         confidence: ConfidenceLevel = ConfidenceLevel.MEDIUM,
+        company_name: str | None = None,
+        current_price: float | None = None,
     ) -> WatchlistResult:
         return WatchlistResult(
             ticker=ticker,
             final_category=category,
             score=score,
             confidence_level=confidence,
+            company_name=company_name,
+            current_price=current_price,
         )
 
     def _failure(self, ticker: str = "BAD", message: str = "fetch failed") -> WatchlistResult:
@@ -402,9 +406,31 @@ class TestFormatWatchlistSummary:
     def test_column_headers_present(self):
         out = format_watchlist_summary([self._success()])
         assert "TICKER" in out
+        assert "COMPANY" in out
         assert "CATEGORY" in out
         assert "SCORE" in out
         assert "CONFIDENCE" in out
+        assert "PRICE" in out
+
+    def test_company_name_shown_when_present(self):
+        out = format_watchlist_summary([self._success(company_name="Apple Inc.")])
+        assert "Apple Inc." in out
+
+    def test_price_shown_when_present(self):
+        out = format_watchlist_summary([self._success(current_price=185.50)])
+        assert "185.50" in out
+
+    def test_dash_shown_for_missing_company_name(self):
+        out = format_watchlist_summary([self._success(company_name=None)])
+        assert "—" in out
+
+    def test_dash_shown_for_missing_price(self):
+        out = format_watchlist_summary([self._success(current_price=None)])
+        assert "—" in out
+
+    def test_price_formatted_with_dollar_sign(self):
+        out = format_watchlist_summary([self._success(current_price=1234.56)])
+        assert "$1,234.56" in out
 
     def test_long_error_message_truncated(self):
         long_err = "A" * 200

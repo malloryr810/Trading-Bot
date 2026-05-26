@@ -67,6 +67,8 @@ class Rating(BaseModel):
     sell_or_avoid_trigger: str | None = None
 
     # Provenance / metadata
+    company_name: str | None = None
+    current_price: float | None = None
     data_timestamp: datetime | None = None
     data_sources_used: list[str] = Field(default_factory=list)
     signals_used: list[Signal] = Field(default_factory=list)

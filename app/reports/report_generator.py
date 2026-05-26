@@ -34,11 +34,13 @@ def build_stock_report(
     Returns:
         A fully populated StockReport ready for formatting.
     """
+    resolved_name  = company_name  if company_name  is not None else rating.company_name
+    resolved_price = current_price if current_price is not None else rating.current_price
     signals = rating.signals_used
     return StockReport(
         ticker=rating.ticker,
-        company_name=company_name,
-        current_price=current_price,
+        company_name=resolved_name,
+        current_price=resolved_price,
         final_category=rating.final_category,
         score=rating.score,
         confidence_level=rating.confidence,

@@ -139,13 +139,15 @@ def scan_watchlist(
 # Formatting
 # ---------------------------------------------------------------------------
 
-_WIDTH = 80
+_WIDTH = 100
 _SEP = "=" * _WIDTH
 _TICKER_W = 8
+_COMPANY_W = 18
 _CATEGORY_W = 22
 _SCORE_W = 6
 _CONF_W = 10
-_MAX_ERR = 55  # truncate long error messages so rows stay within _WIDTH
+_PRICE_W = 12
+_MAX_ERR = 70  # truncate long error messages so rows stay within _WIDTH
 
 
 def format_watchlist_summary(results: list[WatchlistResult]) -> str:
@@ -163,12 +165,16 @@ def format_watchlist_summary(results: list[WatchlistResult]) -> str:
 
     title = f"WATCHLIST SCAN — {n} ticker{'s' if n != 1 else ''} scanned"
     col_header = (
-        f"  {'TICKER':<{_TICKER_W}}  {'CATEGORY':<{_CATEGORY_W}}"
+        f"  {'TICKER':<{_TICKER_W}}  {'COMPANY':<{_COMPANY_W}}"
+        f"  {'CATEGORY':<{_CATEGORY_W}}"
         f"  {'SCORE':>{_SCORE_W}}  {'CONFIDENCE':<{_CONF_W}}"
+        f"  {'PRICE':>{_PRICE_W}}"
     )
     col_divider = (
-        f"  {'-' * _TICKER_W}  {'-' * _CATEGORY_W}"
+        f"  {'-' * _TICKER_W}  {'-' * _COMPANY_W}"
+        f"  {'-' * _CATEGORY_W}"
         f"  {'-' * _SCORE_W}  {'-' * _CONF_W}"
+        f"  {'-' * _PRICE_W}"
     )
 
     lines = [
@@ -182,12 +188,16 @@ def format_watchlist_summary(results: list[WatchlistResult]) -> str:
     for result in results:
         ticker_col = result.ticker[:_TICKER_W]
         if result.succeeded:
+            company_str = (result.company_name or "—")[:_COMPANY_W]
             cat_str = result.final_category.value if result.final_category else "--"
             score_str = f"{result.score:.1f}" if result.score is not None else "--"
             conf_str = result.confidence_level.value.capitalize() if result.confidence_level else "--"
+            price_str = f"${result.current_price:,.2f}" if result.current_price is not None else "—"
             lines.append(
-                f"  {ticker_col:<{_TICKER_W}}  {cat_str:<{_CATEGORY_W}}"
+                f"  {ticker_col:<{_TICKER_W}}  {company_str:<{_COMPANY_W}}"
+                f"  {cat_str:<{_CATEGORY_W}}"
                 f"  {score_str:>{_SCORE_W}}  {conf_str:<{_CONF_W}}"
+                f"  {price_str:>{_PRICE_W}}"
             )
         else:
             err = (result.error_message or "unknown error")[:_MAX_ERR]

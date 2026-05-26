@@ -48,6 +48,7 @@ from app.data.market_data import DataFetchError, get_price_history
 from app.data.news_data import get_recent_news
 from app.data.storage import StorageError, save_json_result, save_markdown_report, save_text_report
 from app.models.rating import Rating
+from app.utils.helpers import safe_float
 from app.reports.report_generator import build_stock_report, generate_plain_text_report
 from app.reports.templates import format_report_markdown, format_watchlist_markdown
 
@@ -93,12 +94,16 @@ def analyze_ticker(ticker: str) -> Rating:
     risk_signals      = analyze_risk_conditions(price_data, beta=fundamentals.beta)
     news_signals      = analyze_news(news_items)
 
-    return score_signals(
+    rating = score_signals(
         ticker=ticker,
         signals=tech_signals + fund_signals + risk_signals + news_signals,
         data_timestamp=datetime.now(tz=timezone.utc),
         data_sources_used=["yfinance"],
     )
+    return rating.model_copy(update={
+        "company_name": fundamentals.company_name,
+        "current_price": safe_float(price_data["close"].iloc[-1]),
+    })
 
 
 # ---------------------------------------------------------------------------

@@ -179,6 +179,36 @@ class TestBuildOptionalParams:
         result = build_stock_report(_make_rating(), current_price=182.50)
         assert result.current_price == pytest.approx(182.50)
 
+    def test_company_name_falls_back_to_rating_field(self):
+        rating = _make_rating()
+        rating = rating.model_copy(update={"company_name": "Apple Inc."})
+        result = build_stock_report(rating)
+        assert result.company_name == "Apple Inc."
+
+    def test_current_price_falls_back_to_rating_field(self):
+        rating = _make_rating()
+        rating = rating.model_copy(update={"current_price": 175.50})
+        result = build_stock_report(rating)
+        assert result.current_price == pytest.approx(175.50)
+
+    def test_explicit_company_name_overrides_rating_field(self):
+        rating = _make_rating()
+        rating = rating.model_copy(update={"company_name": "Rating Name"})
+        result = build_stock_report(rating, company_name="Explicit Name")
+        assert result.company_name == "Explicit Name"
+
+    def test_explicit_current_price_overrides_rating_field(self):
+        rating = _make_rating()
+        rating = rating.model_copy(update={"current_price": 100.0})
+        result = build_stock_report(rating, current_price=200.0)
+        assert result.current_price == pytest.approx(200.0)
+
+    def test_rating_company_name_none_and_no_explicit_gives_none(self):
+        rating = _make_rating()
+        assert rating.company_name is None
+        result = build_stock_report(rating)
+        assert result.company_name is None
+
 
 # ---------------------------------------------------------------------------
 # build_stock_report — signal partitioning

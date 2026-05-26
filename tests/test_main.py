@@ -75,9 +75,13 @@ def _make_rating(
     )
 
 
-def _make_mock_fundamentals(beta: float | None = 1.1) -> MagicMock:
+def _make_mock_fundamentals(
+    beta: float | None = 1.1,
+    company_name: str | None = None,
+) -> MagicMock:
     m = MagicMock()
     m.beta = beta
+    m.company_name = company_name
     return m
 
 
@@ -323,6 +327,46 @@ class TestAnalyzeTicker:
             analyze_ticker("AAPL")
         call_kwargs = mock_risk.call_args.kwargs
         assert call_kwargs.get("beta") is None
+
+    def test_company_name_from_fundamentals_attached_to_rating(self):
+        fund_mock = _make_mock_fundamentals(company_name="Apple Inc.")
+        with (
+            patch(_FETCH,        return_value=MagicMock()),
+            patch(_FETCH_FUND,   return_value=fund_mock),
+            patch(_FETCH_NEWS,   return_value=[]),
+            patch(_CALC,         return_value=MagicMock()),
+            patch(_SUMM,         return_value=MagicMock()),
+            patch(_BUILD_TECH,   return_value=[_make_signal()]),
+            patch(_BUILD_FUND,   return_value=[]),
+            patch(_RISK,         return_value=[]),
+            patch(_ANALYZE_NEWS, return_value=[]),
+            patch(_SCORE,        return_value=_make_rating()),
+        ):
+            result = analyze_ticker("AAPL")
+        assert result.company_name == "Apple Inc."
+
+    def test_current_price_attached_to_rating(self):
+        price_mock = MagicMock()
+        price_mock.__getitem__.return_value.iloc.__getitem__.return_value = 185.50
+        with (
+            patch(_FETCH,        return_value=price_mock),
+            patch(_FETCH_FUND,   return_value=_make_mock_fundamentals()),
+            patch(_FETCH_NEWS,   return_value=[]),
+            patch(_CALC,         return_value=MagicMock()),
+            patch(_SUMM,         return_value=MagicMock()),
+            patch(_BUILD_TECH,   return_value=[_make_signal()]),
+            patch(_BUILD_FUND,   return_value=[]),
+            patch(_RISK,         return_value=[]),
+            patch(_ANALYZE_NEWS, return_value=[]),
+            patch(_SCORE,        return_value=_make_rating()),
+        ):
+            result = analyze_ticker("AAPL")
+        assert result.current_price == pytest.approx(185.50)
+
+    def test_none_company_name_from_fundamentals_stays_none(self):
+        with _mock_pipeline():
+            result = analyze_ticker("AAPL")
+        assert result.company_name is None
 
 # ---------------------------------------------------------------------------
 # analyze_ticker() — news fetch behaviour
