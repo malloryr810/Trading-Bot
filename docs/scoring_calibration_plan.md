@@ -174,7 +174,9 @@ highest risk of unintended side effects.
 - **Category thresholds** — the score cutoffs that determine which `RatingCategory`
   a score maps to. Low coupling; easy to reason about.
 - **Confidence calculation** — the logic in `scoring.py` that assigns
-  `ConfidenceLevel.LOW / MEDIUM / HIGH`. Affects explanatory output only.
+  `ConfidenceLevel.LOW / MEDIUM / HIGH`. Affects explanatory output only. A
+  calibration gap has been identified and documented in
+  `docs/confidence_calibration_design.md`.
 - **Individual technical signal score_impact values** — the per-signal contribution
   weights in `technicals.py`. Medium coupling; change one at a time.
 - **Individual fundamental signal score_impact values** — same as above for
@@ -208,6 +210,11 @@ highest risk of unintended side effects.
 
 These are candidate follow-on steps, not commitments.
 
+- **Confidence calibration** — the confidence output is structurally compressed
+  to MEDIUM for all real tickers under the current signal confidence assignments
+  and HIGH threshold (≥0.70). The problem, evidence, and proposed options are
+  documented in `docs/confidence_calibration_design.md`. No code change should
+  happen without clearing the decision gate defined there.
 - **Calibration worksheet template** — available at `docs/scoring_calibration_worksheet.md`.
   Contains a ticker review table, pattern-tracking table, and decision rules.
 - **Add a CLI command to export calibration rows** — a `--calibration-export` flag

@@ -1,5 +1,42 @@
 # Development Log
 
+## 2026-05-26 — Confidence calibration design document created; docs updated
+
+**`docs/confidence_calibration_design.md`** (new file)
+
+Created a design document for the confidence compression problem identified during
+calibration. The document covers:
+
+- Current behavior: `_map_confidence()` in `scoring.py` averages all signal
+  confidences and maps to HIGH (≥0.70) / MEDIUM (≥0.45) / LOW (<0.45).
+- Evidence: all 19 tickers across three calibration runs returned MEDIUM; zero
+  returned HIGH or LOW. KO with 14 bullish / 0 bearish signals estimated at
+  avg ~0.57 — still below the 0.70 HIGH threshold.
+- Problem statement: MEDIUM band is structurally inevitable because neutral
+  signals (news, volume, RSI neutral) pull the average below 0.70 for every
+  real ticker. Confidence adds no information to the output.
+- Four options: A (lower HIGH threshold), B (raise signal-level confidence
+  values), C (distribution-aware formula), D (add explanation text, no code
+  change).
+- Recommended next step: audit all four analysis modules to inventory current
+  per-signal confidence values before choosing an option.
+- Decision gate: five conditions that must be met before any code change.
+
+No Python code was changed. No scoring behavior was modified.
+
+**`docs/scoring_calibration_plan.md`** (updated)
+
+Added a note under "Confidence calculation" in "What Can Be Tuned Later" pointing
+to the new design document. Added a "Confidence calibration" bullet in "Future
+Implementation Ideas" summarizing the gap and referencing the decision gate.
+
+**`docs/calibration_review_notes.md`** (updated)
+
+Added a short cross-reference at the end of the Individual Ticker Review Pass
+Decision section linking to `docs/confidence_calibration_design.md`.
+
+---
+
 ## 2026-05-26 — Individual ticker calibration review; calibration_review_notes.md updated
 
 **`docs/calibration_review_notes.md`** (extended)

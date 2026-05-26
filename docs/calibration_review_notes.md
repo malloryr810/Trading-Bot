@@ -423,3 +423,9 @@ The individual reports confirm:
 **Category thresholds and scoring weights should not be changed yet.**
 
 The next step is to collect more individual ticker reports, fill in the calibration worksheet, and accumulate enough cases to determine whether the technical/fundamental weighting ratio warrants adjustment.
+
+The confidence compression issue identified here is now fully documented in
+`docs/confidence_calibration_design.md`, which contains: the current formula,
+the full evidence table, four possible fix options, the recommended next step
+(signal confidence audit), and the decision gate that must be cleared before any
+code change.
