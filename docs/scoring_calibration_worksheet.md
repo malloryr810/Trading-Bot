@@ -19,6 +19,23 @@ decision gate, and list of tunable levers.
 
 ---
 
+## Calibration Sample Watchlist
+
+A ready-made evaluation set is available at `watchlists/calibration_sample.txt`.
+It contains 14 tickers spread across large-cap tech, high-growth, financial,
+healthcare, consumer, industrial, energy, and a broad-market ETF reference. Run it
+with:
+
+```
+python -m app.main --watchlist watchlists/calibration_sample.txt --save-markdown --save-json
+```
+
+The saved Markdown reports in `outputs/reports/` and JSON results in
+`outputs/results/` can then be opened one by one to fill out the ticker review
+table below. The file is a calibration aid only — it is not a recommendation list.
+
+---
+
 ## How to Use This Worksheet
 
 1. **Run a single-ticker report** using the CLI:
@@ -27,7 +44,7 @@ decision gate, and list of tunable levers.
    ```
    Or for a watchlist:
    ```
-   python -m app.main --watchlist watchlists/default.txt --save-markdown --save-json
+   python -m app.main --watchlist watchlists/calibration_sample.txt --save-markdown --save-json
    ```
 
 2. **Open the saved Markdown report** from `outputs/reports/`. It is the most

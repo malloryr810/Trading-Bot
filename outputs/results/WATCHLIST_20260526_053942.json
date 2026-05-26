@@ -1,0 +1,144 @@
+{
+  "results": [
+    {
+      "company_name": null,
+      "confidence_level": "medium",
+      "current_price": null,
+      "error_message": null,
+      "final_category": "Buy Candidate",
+      "score": 77.5,
+      "succeeded": true,
+      "ticker": "KO"
+    },
+    {
+      "company_name": null,
+      "confidence_level": "medium",
+      "current_price": null,
+      "error_message": null,
+      "final_category": "Buy Candidate",
+      "score": 72.75,
+      "succeeded": true,
+      "ticker": "JNJ"
+    },
+    {
+      "company_name": null,
+      "confidence_level": "medium",
+      "current_price": null,
+      "error_message": null,
+      "final_category": "Buy Candidate",
+      "score": 72.625,
+      "succeeded": true,
+      "ticker": "XOM"
+    },
+    {
+      "company_name": null,
+      "confidence_level": "medium",
+      "current_price": null,
+      "error_message": null,
+      "final_category": "Buy Candidate",
+      "score": 72.125,
+      "succeeded": true,
+      "ticker": "NVDA"
+    },
+    {
+      "company_name": null,
+      "confidence_level": "medium",
+      "current_price": null,
+      "error_message": null,
+      "final_category": "Watchlist",
+      "score": 68.0,
+      "succeeded": true,
+      "ticker": "JPM"
+    },
+    {
+      "company_name": null,
+      "confidence_level": "medium",
+      "current_price": null,
+      "error_message": null,
+      "final_category": "Watchlist",
+      "score": 65.625,
+      "succeeded": true,
+      "ticker": "PFE"
+    },
+    {
+      "company_name": null,
+      "confidence_level": "medium",
+      "current_price": null,
+      "error_message": null,
+      "final_category": "Watchlist",
+      "score": 65.0,
+      "succeeded": true,
+      "ticker": "MSFT"
+    },
+    {
+      "company_name": null,
+      "confidence_level": "medium",
+      "current_price": null,
+      "error_message": null,
+      "final_category": "Watchlist",
+      "score": 60.375,
+      "succeeded": true,
+      "ticker": "TSLA"
+    },
+    {
+      "company_name": null,
+      "confidence_level": "medium",
+      "current_price": null,
+      "error_message": null,
+      "final_category": "Watchlist",
+      "score": 59.75,
+      "succeeded": true,
+      "ticker": "SPY"
+    },
+    {
+      "company_name": null,
+      "confidence_level": "medium",
+      "current_price": null,
+      "error_message": null,
+      "final_category": "Watchlist",
+      "score": 59.125,
+      "succeeded": true,
+      "ticker": "CAT"
+    },
+    {
+      "company_name": null,
+      "confidence_level": "medium",
+      "current_price": null,
+      "error_message": null,
+      "final_category": "Watchlist",
+      "score": 58.875,
+      "succeeded": true,
+      "ticker": "AMZN"
+    },
+    {
+      "company_name": null,
+      "confidence_level": "medium",
+      "current_price": null,
+      "error_message": null,
+      "final_category": "Hold",
+      "score": 54.125,
+      "succeeded": true,
+      "ticker": "WMT"
+    },
+    {
+      "company_name": null,
+      "confidence_level": "medium",
+      "current_price": null,
+      "error_message": null,
+      "final_category": "Hold",
+      "score": 53.5,
+      "succeeded": true,
+      "ticker": "INTC"
+    },
+    {
+      "company_name": null,
+      "confidence_level": "medium",
+      "current_price": null,
+      "error_message": null,
+      "final_category": "Hold",
+      "score": 50.75,
+      "succeeded": true,
+      "ticker": "MCD"
+    }
+  ]
+}

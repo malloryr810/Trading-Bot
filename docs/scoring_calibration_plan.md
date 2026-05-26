@@ -106,8 +106,11 @@ in a single session.
 This is the intended workflow for evaluating current scoring behavior before
 proposing changes.
 
-1. **Run single-ticker reports.**  
-   `python -m app.main TICKER --save-report --save-json --save-markdown`
+1. **Run single-ticker reports, or use the calibration sample watchlist.**  
+   Single ticker: `python -m app.main TICKER --save-markdown --save-json`  
+   Sample set: `python -m app.main --watchlist watchlists/calibration_sample.txt --save-markdown --save-json`  
+   `watchlists/calibration_sample.txt` contains 14 tickers across varied sectors and
+   market conditions; it is a calibration aid, not a recommendation list.
 
 2. **Export Markdown and JSON reports.**  
    Save to `outputs/reports/` and `outputs/results/` using the standard CLI

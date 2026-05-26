@@ -1,5 +1,49 @@
 # Development Log
 
+## 2026-05-26 — First calibration review notes
+
+**`docs/calibration_review_notes.md`** (new)
+
+Ran the calibration sample watchlist (`watchlists/calibration_sample.txt`) and
+recorded a first manual review snapshot. All 14 tickers succeeded with no
+failures. Key observations: company names and current prices are not populated
+in watchlist-level output (data gap in the pipeline, no code change made); all
+14 tickers received `confidence_level: medium` despite a 27-point score spread
+(flagged as a calibration candidate); score range was 50.8–77.5 with no tickers
+reaching Strong Buy Candidate or below Hold. Identified five priority tickers for
+individual follow-up review (KO, MSFT, PFE, MCD, NVDA). Decision: no scoring code
+changes to be made yet.
+
+Generated output files (`outputs/reports/WATCHLIST_20260526_053942.md` and
+`outputs/results/WATCHLIST_20260526_053942.json`) were inspected but not committed.
+
+---
+
+## 2026-05-26 — Add sample calibration watchlist
+
+**`watchlists/calibration_sample.txt`** (new)
+
+Added a 14-ticker calibration sample watchlist for use with the scoring
+calibration worksheet. Tickers were chosen to cover a range of scoring
+conditions: large-cap tech (MSFT, NVDA), high-growth/volatile (AMZN, TSLA),
+financial (JPM), healthcare — one stronger, one challenged (JNJ, PFE), consumer
+staples/dividend (KO, MCD), retail (WMT), industrial/cyclical (CAT), energy
+(XOM), a challenged tech example for lower-score categories (INTC), and a
+broad-market ETF reference (SPY). The file contains comment headers explaining
+it is a calibration aid only, not a recommendation list.
+
+**`docs/scoring_calibration_worksheet.md`** (minor update)
+
+Added a "Calibration Sample Watchlist" section near the top with the ready-to-run
+command and a pointer to the generated output directories.
+
+**`docs/scoring_calibration_plan.md`** (minor update)
+
+Updated step 1 of the Manual Review Workflow to include the sample watchlist
+command alongside the single-ticker command.
+
+---
+
 ## 2026-05-26 — Add scoring calibration worksheet template
 
 **`docs/scoring_calibration_worksheet.md`** (new)

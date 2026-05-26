@@ -1,0 +1,40 @@
+# Calibration sample watchlist
+# For scoring calibration review only. These tickers are not recommendations.
+# This file does not imply any buy or sell decision.
+# Goal: provide a varied set of examples for manually reviewing scoring behavior
+# before changing any scoring weights, thresholds, or signal logic.
+# See docs/scoring_calibration_plan.md and docs/scoring_calibration_worksheet.md.
+
+# Large-cap technology
+MSFT
+NVDA
+
+# High-growth / volatile
+AMZN
+TSLA
+
+# Financial
+JPM
+
+# Healthcare — one stronger, one challenged
+JNJ
+PFE
+
+# Consumer staples / mature dividend
+KO
+MCD
+
+# Retail
+WMT
+
+# Industrial / cyclical
+CAT
+
+# Energy
+XOM
+
+# Technology — currently challenged (useful for testing lower-score categories)
+INTC
+
+# Broad-market ETF — reference point only
+SPY
