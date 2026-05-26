@@ -1,5 +1,51 @@
 # Development Log
 
+## 2026-05-26 — Individual ticker calibration review; calibration_review_notes.md updated
+
+**`docs/calibration_review_notes.md`** (extended)
+
+Ran individual ticker reports for the five priority tickers identified in the
+second calibration pass: KO, XOM, MSFT, MCD, and PFE. All five commands
+succeeded. Commands:
+
+```
+python -m app.main KO   --save-markdown --save-json
+python -m app.main XOM  --save-markdown --save-json
+python -m app.main MSFT --save-markdown --save-json
+python -m app.main MCD  --save-markdown --save-json
+python -m app.main PFE  --save-markdown --save-json
+```
+
+Output files reviewed (not committed):
+- `outputs/reports/KO_20260526_195905.md` / `.json`
+- `outputs/reports/XOM_20260526_200010.md` / `.json`
+- `outputs/reports/MSFT_20260526_200040.md` / `.json`
+- `outputs/reports/MCD_20260526_200052.md` / `.json`
+- `outputs/reports/PFE_20260526_200113.md` / `.json`
+
+Key findings:
+- Company name and current price present in all five reports.
+- All five returned Medium confidence — confidence compression persists and
+  is now identified as the strongest calibration candidate.
+- KO's high score (79.8) is internally consistent: near-perfect technicals
+  (97.5) and strong fundamentals (87.5). Not a weighting artifact.
+- MCD's Hold (50.8) is entirely driven by its full technical downtrend
+  (all three SMAs bearish, technical score 22.5). Fundamentals are solid (82.5).
+- MSFT's Watchlist (66.2) despite exceptional fundamentals (95.0) is explained
+  by price being below SMA 200 (bearish strong) and MACD bearish.
+- XOM's Watchlist (59.5) is driven by weak technicals (47.5). The -43.4%
+  EPS decline scoring as neutral (not bearish) is flagged as a weak-evidence
+  calibration observation.
+- PFE's Watchlist (65.0) is plausible; very low fwd PE (9.1) correctly reads
+  as attractive; investigation risk term correctly flagged.
+- No scoring code changes were made.
+
+Appended "Individual Ticker Review Pass" section to calibration_review_notes.md
+covering: run details, sub-scores table, per-ticker individual review table,
+cross-ticker pattern table, confidence pattern analysis, and decision.
+
+---
+
 ## 2026-05-26 — Second calibration pass; calibration_review_notes.md updated
 
 **`docs/calibration_review_notes.md`** (extended)

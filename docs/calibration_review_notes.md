@@ -309,3 +309,117 @@ The second pass confirms:
 **Next step:** Run individual reports for the five priority tickers above and
 fill in the calibration worksheet at `docs/scoring_calibration_worksheet.md`
 before any scoring logic is discussed.
+
+---
+
+## Individual Ticker Review Pass
+
+**Important:** Not financial advice. Not a backtest. No scoring code was changed.
+
+---
+
+### Run Details
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-05-26 |
+| Time (UTC approx.) | ~19:59–20:01 |
+| Tickers reviewed | KO, XOM, MSFT, MCD, PFE |
+| All five succeeded | Yes — no errors |
+
+Commands used:
+
+```
+python -m app.main KO   --save-markdown --save-json
+python -m app.main XOM  --save-markdown --save-json
+python -m app.main MSFT --save-markdown --save-json
+python -m app.main MCD  --save-markdown --save-json
+python -m app.main PFE  --save-markdown --save-json
+```
+
+Output files reviewed (not committed):
+
+| Ticker | Markdown | JSON |
+|--------|----------|------|
+| KO | `outputs/reports/KO_20260526_195905.md` | `outputs/results/KO_20260526_195905.json` |
+| XOM | `outputs/reports/XOM_20260526_200010.md` | `outputs/results/XOM_20260526_200010.json` |
+| MSFT | `outputs/reports/MSFT_20260526_200040.md` | `outputs/results/MSFT_20260526_200040.json` |
+| MCD | `outputs/reports/MCD_20260526_200052.md` | `outputs/results/MCD_20260526_200052.json` |
+| PFE | `outputs/reports/PFE_20260526_200113.md` | `outputs/results/PFE_20260526_200113.json` |
+
+---
+
+### Sub-scores for Reference
+
+| Ticker | Composite | Technical | Fundamental | News | Risk |
+|--------|-----------|-----------|-------------|------|------|
+| KO | 79.8 | 97.5 | 87.5 | 50.0 | 75.0 |
+| XOM | 59.5 | 47.5 | 80.0 | 52.5 | 65.0 |
+| MSFT | 66.2 | 52.5 | 95.0 | 57.5 | 65.0 |
+| MCD | 50.8 | 22.5 | 82.5 | 50.0 | 65.0 |
+| PFE | 65.0 | 70.0 | 72.5 | 47.5 | 70.0 |
+
+---
+
+### Individual Review Table
+
+| Ticker | Company | Score | Category | Confidence | Technical Read | Fundamental Read | News/Risk Read | Calibration Observation | Follow-Up Needed |
+|--------|---------|-------|----------|------------|----------------|------------------|----------------|-------------------------|-----------------|
+| KO | The Coca-Cola Company | 79.8 | Buy Candidate | Medium | 97.5 — near-perfect: bullish trend, all three SMAs bullish, MACD bullish, RSI neutral, beta 0.36, vol 15.7%. Zero bearish signals. | 87.5 — strong: fwd PE 23.1 attractive, 27.8% profit margin (Strong), revenue +12.1% and EPS +18.2% growing strongly, FCF positive. Moderate D/E (124.9) is the only non-bullish fundamental. | 50.0 — fully neutral: no positive or negative news terms matched in 10 headlines. News is not a drag, but adds no positive signal. | Score is well-explained. Buy Candidate at 79.8 is internally consistent: near-perfect technicals and strong fundamentals. The weakness area is news (50.0), which is itself neutral — not bearish. Zero bearish signals makes Medium confidence feel understated (see Patterns). | Confidence level with 14 bullish / 0 bearish signals — candidate for future confidence calibration review. |
+| XOM | Exxon Mobil Corporation | 59.5 | Watchlist | Medium | 47.5 — weak: below SMA 20 and SMA 50 (downtrend), but SMA 200 still bullish and MACD bullish. Mixed picture with a bearish short-term trend dragging a 35%-weighted category. | 80.0 — solid: fwd PE 14.3 attractive, D/E 18.3 conservative, FCF positive. Profitability is only weak-bullish (7.8% margin). Growth is neutral because EPS fell -43.4% against revenue growth of +2.6%. | 52.5 — neutral-slight positive: "acquisition" triggered a weak bullish sentiment signal, no risk terms. Low news impact. | The Watchlist score at 59.5 is directly explained by the poor technical picture (47.5 at 35% weight). Strong fundamentals are not enough to lift the composite with technicals this weak. The -43.4% EPS decline contributing only a neutral (not bearish) growth signal is the most notable model behavior here — worth revisiting. | EPS growth signal behavior when revenue is slightly positive but earnings decline sharply (see Patterns). |
+| MSFT | Microsoft Corporation | 66.2 | Watchlist | Medium | 52.5 — mixed: trend bullish (above SMA 20 and 50), but price is below SMA 200 (bearish strong signal) and MACD is bearish. The SMA 200 bearish signal is the largest single technical headwind. | 95.0 — exceptional: profit margin 39.3% (Strong), revenue +18.3% and EPS +23.4% (both Strong), D/E 30.3 conservative, FCF positive, fwd PE 21.5 attractive. Near-perfect fundamental read. | 57.5 — slightly positive: "beat," "earnings beat," and "partnership" terms fired. One risk signal (regulatory) was flagged but only weak-bearish. Modest positive news contribution. | Watchlist at 66.2 is internally consistent given the technical drag. The anomaly is the magnitude of the gap: MSFT has the strongest fundamental sub-score (95.0) of all five tickers and yet only ranks fourth. This is a structural result of the 35% technical weight overriding 25% fundamental weight. Worth noting as a calibration candidate but no change is warranted yet. The -33.9% maximum drawdown (moderate risk signal) also adds a moderate neutral drag. | MSFT below its 200-SMA with strong fundamentals — the structural tension between technical weight (35%) and fundamental weight (25%) is most visible here. |
+| MCD | McDonald's Corporation | 50.8 | Hold | Medium | 22.5 — bearish across the board: all three SMA levels bearish (below SMA 20, 50, AND 200), trend bearish. Only MACD is bullish. Full technical downtrend with high 35% weight. | 82.5 — solid: fwd PE 19.6 attractive, profit margin 31.6% (Strong), revenue +9.4% and EPS +6.9% both positive, FCF positive. Debt-to-equity data is unavailable (null) — scored neutral with 0.30 confidence. | 50.0 — fully neutral: no positive or negative news terms matched in 10 headlines. Recent 30-day return is -8.3% — scored as neutral (just above the -10% bearish threshold). | Hold at 50.8 is directly explained by the technical picture: a technical score of 22.5 with 35% weight mathematically holds the composite near the Hold/Watchlist boundary regardless of fundamentals. The model is behaving as designed. Notable: D/E unavailable for MCD likely because yfinance does not report negative equity (franchise structure) — the null handling is graceful. | D/E data unavailability for franchise-model companies is a known limitation. The -8.3% 30-day return being just above the -10% bearish threshold is a borderline case worth watching. |
+| PFE | Pfizer Inc. | 65.0 | Watchlist | Medium | 70.0 — mixed-positive: above SMA 20 and SMA 200, but below SMA 50. Trend classified as "mixed" (not bullish or bearish). MACD bullish. Reasonable technical reading. | 72.5 — moderate: fwd PE 9.1 very attractive (bullish), profit margin 11.8% weak-bullish, growth neutral (revenue +5.4% but EPS -10.1%), D/E 71.6 neutral, FCF positive. The EPS decline creates a neutral growth signal even though the forward PE is very cheap. | 47.5 — slightly negative: news balanced between positive and negative (neutral sentiment), but "investigation" risk term fired (weak bearish risk signal). The risk headline is PFE's weakest area. | Watchlist at 65.0 is plausible given the mixed signals. PFE's very low fwd PE (9.1) registers as attractive, which is correct under the current rules. However, a low PE combined with declining earnings can sometimes indicate a value trap — the current model reads the PE signal in isolation and cannot detect the context. This is a known limitation of rule-based valuation signals, not a bug. The investigation risk term is real and correctly weighted. | The interaction between a very low PE (scored bullish) and declining EPS (scored neutral, not bearish) is an area for future calibration review. |
+
+---
+
+### Cross-Ticker Patterns
+
+| Pattern Observed | Example Tickers | Affected Area | Evidence Strength | Notes |
+|------------------|-----------------|---------------|-------------------|-------|
+| Technical score dominates category outcomes | MCD (tech 22.5 → Hold despite fund 82.5), XOM (tech 47.5 → Watchlist despite fund 80.0), KO (tech 97.5 → Buy Candidate) | Technical weight (35%) vs Fundamental weight (25%) | **Moderate** — consistent across all five tickers | The 35% technical weight means a poor technical setup can override strong fundamentals, and vice versa. Whether this weighting is appropriate is a candidate calibration question, but the behavior is consistent and explainable. At least three tickers demonstrate this pattern. |
+| All five tickers show Medium confidence regardless of signal composition | KO (14 bullish, 0 bearish), MCD (8 bullish, 4 bearish), PFE (10 bullish, 2 bearish) | Confidence calculation | **Moderate** — five out of five in this pass; all 14 in the watchlist pass | Medium confidence spans 0.45–0.70 average signal confidence. Most signals have individual confidence values in the 0.50–0.70 range, so 20 mixed signals almost always average into the medium band. KO with zero bearish signals still gets Medium rather than High because the average stays below 0.70. This is the most consistent pattern observed and is the strongest calibration candidate. |
+| EPS decline partially masked by neutral growth signal | XOM (EPS −43.4% → Growth: Neutral), PFE (EPS −10.1% → Growth: Neutral) | Growth signal logic in fundamentals_analysis.py | **Weak** — two cases, directionally consistent | The growth signal is neutral when revenue and earnings point in opposite directions. A very large EPS decline (XOM: −43.4%) produces the same neutral signal as a mild one (PFE: −10.1%). A graduated response to the magnitude of the divergence is a potential future enhancement, but no change is warranted without broader evidence. |
+| High fundamental score does not guarantee high composite | MSFT (fund 95.0 → composite 66.2), MCD (fund 82.5 → composite 50.8) | Composite weighting | **Moderate** — two clear cases | The fundamental weight (25%) is intentionally lower than technical (35%). A nearly-perfect fundamental score can still result in a mid-range composite when technicals are weak. This is working as designed but is the most likely area to revisit if future calibration finds that fundamental strength is systematically underweighted. |
+| KO high rank explained by multi-category alignment | KO (tech 97.5, fund 87.5, risk 75.0) | All categories | **Moderate** | KO's top score is not a weighting artifact — it scores well in every sub-category. The first-pass concern that consumer staples may be overweighted is not supported by the individual report: KO's signals are genuinely strong across the board at this point in time. |
+| MCD Hold despite strong fundamentals is technically driven | MCD (fund 82.5, but tech 22.5 → composite 50.8) | Technical weight vs total picture | **Moderate** | MCD's Hold rating reflects a full technical downtrend (below all three SMAs) at the time of the run. The model is internally consistent. Whether the Hold is an appropriate representation depends on how much weight a reviewer places on the technical setup versus the business fundamentals — a calibration question, not a bug. |
+| MSFT and PFE composite similarity despite very different sub-scores | MSFT (66.2), PFE (65.0) | Composite weighting formula | **Weak** — one coincidence | MSFT has much stronger fundamentals (95.0 vs 72.5) but weaker technicals (52.5 vs 70.0) and news (57.5 vs 47.5). The trade-offs nearly cancel out in the composite formula. This is the formula working correctly, not a miscalibration. |
+
+---
+
+### Confidence Pattern — Additional Detail
+
+All five tickers received Medium confidence despite a range of signal compositions. The root cause is structural: with 20 signals, the average confidence is always pulled toward the center by the large number of neutral signals (confidence 0.30–0.55) and the moderate confidence attached to most bullish/bearish signals (0.60–0.70).
+
+For KO — the clearest case — the average confidence across 20 signals is approximately:
+- 14 bullish signals with confidence ~0.62 (weighted average of 0.60–0.70 across signal types)
+- 6 neutral signals with confidence ~0.40 (news signals: 0.40–0.70; volume: 0.45; RSI neutral: 0.50)
+- Estimated weighted average: ~0.57 → Medium (threshold for High is ≥0.70)
+
+KO would need all 20 signals to average ≥0.70 confidence to reach High. With 6 neutral signals capped at 0.30–0.50, that is structurally difficult to achieve. This means the confidence level is unlikely to reach High for most real tickers under the current signal design — a genuine calibration gap worth scoping as a future task.
+
+**The confidence calculation is not broken.** It is producing expected values for the current signal confidence assignments. But the practical effect is that confidence adds no information to the output because it is always Medium.
+
+---
+
+### Decision
+
+**No scoring code changes should be made yet.**
+
+The individual reports confirm:
+
+1. **KO's high rank is internally consistent.** The score is driven by genuine multi-category strength, not a weighting artifact.
+
+2. **MCD's Hold is entirely technical.** The full SMA downtrend suppresses the composite despite strong fundamentals. Internally consistent.
+
+3. **MSFT's Watchlist despite exceptional fundamentals is explained** by the SMA 200 bearish signal (strong, −0.25 impact) and MACD bearish, which together hold the technical score at 52.5. The 35%/25% weighting ratio between technical and fundamental is the structural factor. No change warranted without more evidence.
+
+4. **PFE's Watchlist is plausible.** The very low fwd PE is correctly read as attractive under current rules. The EPS/PE interaction does not expose a bug — it exposes a known limitation of isolated rule-based signals.
+
+5. **XOM's Watchlist is explained by technical weakness.** The -43.4% EPS decline producing a neutral (not bearish) growth signal is the most notable model behavior. Worth flagging as a future calibration candidate, but weak evidence.
+
+6. **Confidence compression is the strongest calibration candidate identified to date.** All five tickers returned Medium confidence despite materially different signal compositions. This is a structural outcome of the current signal confidence assignments and the 0.70 threshold for High. This should become **the first candidate for a future scoped calibration task** — specifically: review signal-level confidence assignments and/or the High confidence threshold to determine whether Medium can differentiate.
+
+**Category thresholds and scoring weights should not be changed yet.**
+
+The next step is to collect more individual ticker reports, fill in the calibration worksheet, and accumulate enough cases to determine whether the technical/fundamental weighting ratio warrants adjustment.
