@@ -136,8 +136,9 @@ proposing changes.
 
 ## Calibration Worksheet Fields
 
-Track observations in a spreadsheet or Markdown table with these fields. This
-is not yet implemented as a command; it is a manual artifact for now.
+Track observations in the worksheet template at `docs/scoring_calibration_worksheet.md`.
+The fields defined there are listed below for reference. The worksheet also includes
+a pattern-tracking table and decision rules for when to act on findings.
 
 | Field                     | Notes                                           |
 |---------------------------|-------------------------------------------------|
@@ -204,8 +205,8 @@ highest risk of unintended side effects.
 
 These are candidate follow-on steps, not commitments.
 
-- **Add a calibration worksheet template** — a Markdown file or CSV template in
-  `docs/` that reviewers can copy when evaluating new tickers.
+- **Calibration worksheet template** — available at `docs/scoring_calibration_worksheet.md`.
+  Contains a ticker review table, pattern-tracking table, and decision rules.
 - **Add a CLI command to export calibration rows** — a `--calibration-export` flag
   that prints or saves the worksheet fields for a given ticker in CSV or JSON.
 - **Update `docs/scoring_rules.md`** — after calibration decisions are made and

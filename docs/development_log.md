@@ -1,5 +1,26 @@
 # Development Log
 
+## 2026-05-26 — Add scoring calibration worksheet template
+
+**`docs/scoring_calibration_worksheet.md`** (new)
+
+Added a reusable worksheet template for manually recording observations from
+generated stock reports before making any scoring changes. The document includes:
+a purpose statement clarifying it is not financial advice, not a backtest, and
+does not change scoring behavior; a step-by-step usage workflow with example CLI
+commands; a ticker review table with columns for all report fields plus manual
+judgment; a pattern-tracking table for finding repeated issues across multiple
+tickers with an evidence-strength guide; and decision rules for when and how to
+act on findings.
+
+**`docs/scoring_calibration_plan.md`** (minor update)
+
+Updated the "Calibration Worksheet Fields" section to reference the new
+worksheet file, and updated the "Future Implementation Ideas" bullet to mark the
+worksheet template as complete.
+
+---
+
 ## 2026-05-26 — Add scoring calibration plan document
 
 **`docs/scoring_calibration_plan.md`** (new)
