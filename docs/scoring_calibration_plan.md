@@ -213,8 +213,10 @@ These are candidate follow-on steps, not commitments.
 - **Confidence calibration** — the confidence output is structurally compressed
   to MEDIUM for all real tickers under the current signal confidence assignments
   and HIGH threshold (≥0.70). The problem, evidence, and proposed options are
-  documented in `docs/confidence_calibration_design.md`. No code change should
-  happen without clearing the decision gate defined there.
+  documented in `docs/confidence_calibration_design.md`. A complete signal-level
+  confidence inventory and mathematical proof that HIGH is unreachable are in
+  `docs/signal_confidence_audit.md`. No code change should happen without
+  clearing the decision gate defined in the design document.
 - **Calibration worksheet template** — available at `docs/scoring_calibration_worksheet.md`.
   Contains a ticker review table, pattern-tracking table, and decision rules.
 - **Add a CLI command to export calibration rows** — a `--calibration-export` flag

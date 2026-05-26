@@ -1,5 +1,49 @@
 # Development Log
 
+## 2026-05-26 — Signal confidence audit completed; docs/signal_confidence_audit.md created
+
+**`docs/signal_confidence_audit.md`** (new file)
+
+Audited all four analysis modules and the scoring engine to document where signal
+confidence values come from and why final confidence is always Medium.
+
+Key findings:
+- Every `Signal(confidence=...)` call site was located across `technicals.py`,
+  `fundamentals_analysis.py`, `news_analysis.py`, and `risk_analysis.py`.
+- The HIGH threshold in `_map_confidence()` is 0.70 (average of all signals).
+- The mathematical maximum average confidence for any real ticker with all data
+  present and all signals bullish is approximately 0.643 — 0.057 below the HIGH
+  threshold. HIGH is unreachable, not just unlikely.
+- Five signals structurally depress the average in almost every real run: RSI
+  Neutral (0.50), MACD Neutral (0.50), Volume Bullish (0.50), Volume Neutral
+  (0.45), and Recent Trend Neutral (0.55).
+- Risk signals are asymmetric: worst-case outcomes (high volatility, severe
+  drawdown) receive 0.75 confidence, while best-case outcomes (mild drawdown,
+  high liquidity) receive 0.60.
+- Bullish and bearish versions of most signals share identical confidence values,
+  so signal direction balance does not affect the confidence average.
+- News confidence caps at 0.70 (8+ articles) — equal to the HIGH threshold —
+  so news signals alone cannot push the overall average to HIGH.
+- No measure of signal agreement or direction balance is used.
+
+Document includes: complete signal-level inventory table, compression findings,
+evidence alignment with calibration runs, specific fix targets, recommended next
+step (diagnostic breakdown before formula change), and a six-gate decision gate.
+
+**`docs/confidence_calibration_design.md`** (updated)
+
+Added cross-reference to `docs/signal_confidence_audit.md` in See Also section.
+
+**`docs/scoring_calibration_plan.md`** (updated)
+
+Expanded the "Confidence calibration" bullet in Future Implementation Ideas to
+reference the new audit document.
+
+No Python code was changed. No scoring or confidence behavior was modified.
+1210 tests pass.
+
+---
+
 ## 2026-05-26 — Confidence calibration design document created; docs updated
 
 **`docs/confidence_calibration_design.md`** (new file)

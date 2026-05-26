@@ -271,6 +271,8 @@ gates above being cleared.**
 ---
 
 *See also:*
+- `docs/signal_confidence_audit.md` — complete signal-level confidence inventory,
+  mathematical proof that HIGH is unreachable, and specific fix targets
 - `docs/scoring_calibration_plan.md` — calibration process and decision framework
 - `docs/calibration_review_notes.md` — evidence from all calibration runs to date
 - `docs/scoring_rules.md` — authoritative reference for scoring weights and thresholds
