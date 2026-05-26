@@ -15,6 +15,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.models.confidence_diagnostics import ConfidenceDiagnostics
 from app.models.signal import Signal
 
 
@@ -65,6 +66,9 @@ class Rating(BaseModel):
     key_risks: list[str] = Field(default_factory=list)
     buy_trigger: str | None = None
     sell_or_avoid_trigger: str | None = None
+
+    # Confidence diagnostics (read-only; does not affect label)
+    confidence_diagnostics: ConfidenceDiagnostics | None = None
 
     # Provenance / metadata
     company_name: str | None = None

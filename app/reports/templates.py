@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import date
 from typing import TYPE_CHECKING
 
+from app.models.confidence_diagnostics import ConfidenceDiagnostics
 from app.models.signal import Signal, SignalCategory, SignalDirection
 from app.models.stock_report import StockReport
 
@@ -235,6 +236,7 @@ def format_report_markdown(report: StockReport) -> str:
     parts = [
         _md_header(report),
         _md_recommendation(report),
+        _md_confidence_diagnostics(report.confidence_diagnostics),
         _md_analysis_summaries(report),
         _md_key_strengths(report),
         _md_key_risks(report),
@@ -276,6 +278,36 @@ def _md_recommendation(report: StockReport) -> str:
         f"| Rating | {report.final_category.value} |",
         f"| Score | {report.score:.1f} / 100 |",
         f"| Confidence | {report.confidence_level.value.capitalize()} |",
+    ]
+    return "\n".join(lines)
+
+
+def _md_confidence_diagnostics(diag: ConfidenceDiagnostics | None) -> str:
+    if diag is None or diag.signal_count == 0:
+        return ""
+
+    def _fmt(val: float | None) -> str:
+        return f"{val:.3f}" if val is not None else "—"
+
+    direction_str = (
+        f"{diag.bullish_count} bullish / "
+        f"{diag.bearish_count} bearish / "
+        f"{diag.neutral_count} neutral"
+    )
+    lines = [
+        "## Confidence Diagnostics",
+        "",
+        "| Field | Value |",
+        "|-------|-------|",
+        f"| Signals | {diag.signal_count} |",
+        f"| Avg confidence | {_fmt(diag.average_signal_confidence)} |",
+        f"| Min / Max | {_fmt(diag.min_signal_confidence)} / {_fmt(diag.max_signal_confidence)} |",
+        f"| Direction | {direction_str} |",
+        f"| Missing-data signals | {diag.missing_count} |",
+        f"| Technical avg | {_fmt(diag.technical_average_confidence)} |",
+        f"| Fundamental avg | {_fmt(diag.fundamental_average_confidence)} |",
+        f"| News avg | {_fmt(diag.news_average_confidence)} |",
+        f"| Risk avg | {_fmt(diag.risk_average_confidence)} |",
     ]
     return "\n".join(lines)
 

@@ -54,6 +54,7 @@ def build_stock_report(
         sell_or_avoid_trigger=rating.sell_or_avoid_trigger,
         data_timestamp=rating.data_timestamp,
         data_sources_used=list(rating.data_sources_used),
+        confidence_diagnostics=rating.confidence_diagnostics,
         technical_signals=[s for s in signals if s.category == SignalCategory.TECHNICAL],
         fundamental_signals=[s for s in signals if s.category == SignalCategory.FUNDAMENTAL],
         news_signals=[s for s in signals if s.category == SignalCategory.NEWS],

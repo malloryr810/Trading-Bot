@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from app.models.confidence_diagnostics import ConfidenceDiagnostics
 from app.models.rating import ConfidenceLevel, Rating, RatingCategory
 from app.models.signal import Signal, SignalCategory, SignalDirection, SignalStrength
 
@@ -111,6 +112,7 @@ def score_signals(
 
     category = _map_score_to_category(composite_score)
     confidence = _map_confidence(signals)
+    confidence_diag = _build_confidence_diagnostics(signals)
     positive_factors = _build_positive_factors(signals)
     risk_factors = _build_risk_factors(signals)
 
@@ -181,6 +183,7 @@ def score_signals(
         final_category=category,
         score=composite_score,
         confidence=confidence,
+        confidence_diagnostics=confidence_diag,
         explanation=explanation,
         technical_score=technical_score,
         fundamental_score=fundamental_score,
@@ -231,6 +234,7 @@ def score_technical_signals(
     technical_score = _calculate_technical_score(signals)
     category = _map_score_to_category(technical_score)
     confidence = _map_confidence(signals)
+    confidence_diag = _build_confidence_diagnostics(signals)
 
     positive_factors = _build_positive_factors(signals)
     risk_factors = _build_risk_factors(signals)
@@ -257,6 +261,7 @@ def score_technical_signals(
         final_category=category,
         score=technical_score,
         confidence=confidence,
+        confidence_diagnostics=confidence_diag,
         explanation=explanation,
         technical_score=technical_score,
         fundamental_score=0.0,
@@ -342,6 +347,42 @@ def _map_confidence(signals: list[Signal]) -> ConfidenceLevel:
     if avg >= 0.45:
         return ConfidenceLevel.MEDIUM
     return ConfidenceLevel.LOW
+
+
+def _build_confidence_diagnostics(signals: list[Signal]) -> ConfidenceDiagnostics:
+    """Compute a read-only breakdown of the confidence inputs for a scoring run.
+
+    Captures the per-signal confidence values, direction counts, and per-area
+    averages so they can be inspected without re-running analysis. Does not
+    alter the final confidence label or any score.
+
+    Signals with confidence <= 0.30 are counted as missing_count: all four
+    analysis modules assign exactly 0.30 when a required data field is None.
+    """
+    if not signals:
+        return ConfidenceDiagnostics()
+
+    confs = [s.confidence for s in signals]
+    avg = sum(confs) / len(confs)
+
+    def _area_avg(cat: SignalCategory) -> float | None:
+        area = [s.confidence for s in signals if s.category == cat]
+        return round(sum(area) / len(area), 4) if area else None
+
+    return ConfidenceDiagnostics(
+        signal_count=len(signals),
+        average_signal_confidence=round(avg, 4),
+        min_signal_confidence=round(min(confs), 4),
+        max_signal_confidence=round(max(confs), 4),
+        bullish_count=sum(1 for s in signals if s.direction == SignalDirection.BULLISH),
+        bearish_count=sum(1 for s in signals if s.direction == SignalDirection.BEARISH),
+        neutral_count=sum(1 for s in signals if s.direction == SignalDirection.NEUTRAL),
+        missing_count=sum(1 for s in signals if s.confidence <= 0.30),
+        technical_average_confidence=_area_avg(SignalCategory.TECHNICAL),
+        fundamental_average_confidence=_area_avg(SignalCategory.FUNDAMENTAL),
+        news_average_confidence=_area_avg(SignalCategory.NEWS),
+        risk_average_confidence=_area_avg(SignalCategory.RISK),
+    )
 
 
 def _build_positive_factors(signals: list[Signal]) -> list[str]:

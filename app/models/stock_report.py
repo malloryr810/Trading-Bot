@@ -12,6 +12,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.models.confidence_diagnostics import ConfidenceDiagnostics
 from app.models.rating import ConfidenceLevel, RatingCategory
 from app.models.signal import Signal
 
@@ -40,6 +41,9 @@ class StockReport(BaseModel):
     key_risks: list[str] = Field(default_factory=list)
     buy_trigger: str | None = None
     sell_or_avoid_trigger: str | None = None
+
+    # Confidence diagnostics (diagnostic only; does not affect score or label)
+    confidence_diagnostics: ConfidenceDiagnostics | None = None
 
     # Provenance
     data_timestamp: datetime | None = None

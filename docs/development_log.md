@@ -1,5 +1,62 @@
 # Development Log
 
+## 2026-05-26 — Confidence diagnostics added; no confidence formula changes made
+
+**New: `app/models/confidence_diagnostics.py`**
+
+Added `ConfidenceDiagnostics` Pydantic model with fields: `signal_count`,
+`average_signal_confidence`, `min_signal_confidence`, `max_signal_confidence`,
+`bullish_count`, `bearish_count`, `neutral_count`, `missing_count`,
+`technical_average_confidence`, `fundamental_average_confidence`,
+`news_average_confidence`, `risk_average_confidence`.
+
+**Updated: `app/analysis/scoring.py`**
+
+Added private `_build_confidence_diagnostics(signals)` helper alongside
+`_map_confidence()`. Called in both `score_signals()` and
+`score_technical_signals()`. Result attached to `Rating` as
+`confidence_diagnostics`. No scoring formula, confidence threshold, or
+score_impact values were changed.
+
+**Updated: `app/models/rating.py`**
+
+Added optional `confidence_diagnostics: ConfidenceDiagnostics | None = None`
+field. Existing fields and validators unchanged.
+
+**Updated: `app/models/stock_report.py`**
+
+Added optional `confidence_diagnostics: ConfidenceDiagnostics | None = None`
+field. Existing fields unchanged.
+
+**Updated: `app/reports/report_generator.py`**
+
+`build_stock_report()` now passes `rating.confidence_diagnostics` through to
+`StockReport`. No other changes.
+
+**Updated: `app/reports/templates.py`**
+
+Added `_md_confidence_diagnostics()` builder and included it in
+`format_report_markdown()`. Renders a "## Confidence Diagnostics" table showing
+signal count, avg confidence, min/max, direction counts, missing count, and
+per-area sub-averages. Section is omitted when `confidence_diagnostics is None`.
+Plain-text reports unchanged.
+
+**New: `tests/test_confidence_diagnostics.py`**
+
+70 deterministic unit and integration tests covering: empty input, signal count,
+average/min/max confidence, direction counts, missing count, per-area averages,
+`score_signals` integration, `build_stock_report` pass-through, JSON
+serialization (including `save_json_result`), and Markdown template output.
+No live API calls.
+
+**Updated: `docs/signal_confidence_audit.md`** and
+**`docs/confidence_calibration_design.md`** — short notes that the diagnostic
+breakdown is now available.
+
+1280 tests pass.
+
+---
+
 ## 2026-05-26 — Signal confidence audit completed; docs/signal_confidence_audit.md created
 
 **`docs/signal_confidence_audit.md`** (new file)

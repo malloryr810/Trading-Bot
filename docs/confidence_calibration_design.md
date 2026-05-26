@@ -209,6 +209,14 @@ not as a final resolution.
 
 ## Recommended Next Step
 
+**Diagnostic breakdown is now available.** `ConfidenceDiagnostics` is computed
+alongside `_map_confidence()` in `app/analysis/scoring.py` and is exposed in JSON
+export and Markdown reports. Use the per-run diagnostic values (average confidence,
+per-area sub-averages, direction counts) as the evidence base for any future
+threshold or signal-value change — rather than the estimates in this document.
+
+**Before choosing between Options A–D, first:**
+
 **Audit signal-level confidence assignments before choosing between options.**
 
 Before selecting Option A, B, C, or D, build an inventory of what confidence

@@ -429,8 +429,20 @@ These are observation-based candidates. No values are changed in this document.
 
 ## Recommended Next Step
 
-**Add a diagnostic-only confidence breakdown to report output before changing
-the formula or thresholds.**
+**A diagnostic confidence breakdown has been added to the pipeline.**
+
+`ConfidenceDiagnostics` (in `app/models/confidence_diagnostics.py`) is now
+computed by `_build_confidence_diagnostics()` in `app/analysis/scoring.py`
+alongside `_map_confidence()`. It is attached to `Rating.confidence_diagnostics`
+and passed through to `StockReport.confidence_diagnostics`. JSON export includes
+it automatically. Markdown reports include a "Confidence Diagnostics" table.
+
+The fields exposed are: signal count, average/min/max confidence, bullish/
+bearish/neutral counts, missing-data signal count, and per-area (technical /
+fundamental / news / risk) confidence sub-averages. No scoring behavior was
+changed.
+
+**Before changing the formula or thresholds:**
 
 The breakdown should expose, per run:
 
