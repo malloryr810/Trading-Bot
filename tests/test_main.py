@@ -85,17 +85,19 @@ def _make_mock_fundamentals(
     return m
 
 
-# Patch targets
-_FETCH        = "app.main.get_price_history"
-_FETCH_FUND   = "app.main.get_company_fundamentals"
-_FETCH_NEWS   = "app.main.get_recent_news"
-_ANALYZE_NEWS = "app.main.analyze_news"
-_CALC         = "app.main.calculate_technical_indicators"
-_SUMM         = "app.main.summarize_technical_signals"
-_BUILD_TECH   = "app.main.build_technical_signals"
-_BUILD_FUND   = "app.main.build_fundamental_signals"
-_RISK         = "app.main.analyze_risk_conditions"
-_SCORE        = "app.main.score_signals"
+# Patch targets — pipeline functions live in the service module.
+_SVC          = "app.services.stock_analysis_service"
+_FETCH        = f"{_SVC}.get_price_history"
+_FETCH_FUND   = f"{_SVC}.get_company_fundamentals"
+_FETCH_NEWS   = f"{_SVC}.get_recent_news"
+_ANALYZE_NEWS = f"{_SVC}.analyze_news"
+_CALC         = f"{_SVC}.calculate_technical_indicators"
+_SUMM         = f"{_SVC}.summarize_technical_signals"
+_BUILD_TECH   = f"{_SVC}.build_technical_signals"
+_BUILD_FUND   = f"{_SVC}.build_fundamental_signals"
+_RISK         = f"{_SVC}.analyze_risk_conditions"
+_SCORE        = f"{_SVC}.score_signals"
+
 _SAVE_REPORT  = "app.main.save_text_report"
 _SAVE_JSON    = "app.main.save_json_result"
 
@@ -166,84 +168,43 @@ class TestMainSuccess:
 
 class TestMainErrors:
     def test_data_fetch_error_returns_1(self, capsys):
-        with patch(_FETCH, side_effect=DataFetchError("bad ticker")):
+        with patch("app.main.analyze_ticker", side_effect=DataFetchError("bad ticker")):
             result = main(["INVALID"])
         assert result == 1
         assert "Error fetching" in capsys.readouterr().err
 
     def test_fundamental_fetch_error_returns_1(self, capsys):
-        with (
-            patch(_FETCH, return_value=MagicMock()),
-            patch(_FETCH_FUND, side_effect=FundamentalDataFetchError("no data")),
-        ):
+        with patch("app.main.analyze_ticker", side_effect=FundamentalDataFetchError("no data")):
             result = main(["AAPL"])
         assert result == 1
         assert "fundamental" in capsys.readouterr().err.lower()
 
     def test_technical_analysis_error_returns_1(self, capsys):
-        with (
-            patch(_FETCH,      return_value=MagicMock()),
-            patch(_FETCH_FUND, return_value=_make_mock_fundamentals()),
-            patch(_CALC, side_effect=TechnicalAnalysisError("bad data")),
-        ):
+        with patch("app.main.analyze_ticker", side_effect=TechnicalAnalysisError("bad data")):
             result = main(["AAPL"])
         assert result == 1
         assert "technical analysis" in capsys.readouterr().err.lower()
 
     def test_fundamental_analysis_error_returns_1(self, capsys):
-        with (
-            patch(_FETCH,      return_value=MagicMock()),
-            patch(_FETCH_FUND, return_value=_make_mock_fundamentals()),
-            patch(_CALC,       return_value=MagicMock()),
-            patch(_SUMM,       return_value=MagicMock()),
-            patch(_BUILD_TECH, return_value=[_make_signal()]),
-            patch(_BUILD_FUND, side_effect=FundamentalAnalysisError("bad fundamentals")),
-        ):
+        with patch("app.main.analyze_ticker", side_effect=FundamentalAnalysisError("bad fundamentals")):
             result = main(["AAPL"])
         assert result == 1
         assert "fundamental analysis" in capsys.readouterr().err.lower()
 
     def test_risk_analysis_error_returns_1(self, capsys):
-        with (
-            patch(_FETCH,      return_value=MagicMock()),
-            patch(_FETCH_FUND, return_value=_make_mock_fundamentals()),
-            patch(_CALC,       return_value=MagicMock()),
-            patch(_SUMM,       return_value=MagicMock()),
-            patch(_BUILD_TECH, return_value=[_make_signal()]),
-            patch(_BUILD_FUND, return_value=[_make_signal(category=SignalCategory.FUNDAMENTAL)]),
-            patch(_RISK,       side_effect=RiskAnalysisError("bad risk")),
-        ):
+        with patch("app.main.analyze_ticker", side_effect=RiskAnalysisError("bad risk")):
             result = main(["AAPL"])
         assert result == 1
         assert "risk analysis" in capsys.readouterr().err.lower()
 
     def test_news_analysis_error_returns_1(self, capsys):
-        with (
-            patch(_FETCH,        return_value=MagicMock()),
-            patch(_FETCH_FUND,   return_value=_make_mock_fundamentals()),
-            patch(_FETCH_NEWS,   return_value=[]),
-            patch(_CALC,         return_value=MagicMock()),
-            patch(_SUMM,         return_value=MagicMock()),
-            patch(_BUILD_TECH,   return_value=[_make_signal()]),
-            patch(_BUILD_FUND,   return_value=[_make_signal(category=SignalCategory.FUNDAMENTAL)]),
-            patch(_RISK,         return_value=[_make_signal(category=SignalCategory.RISK)]),
-            patch(_ANALYZE_NEWS, side_effect=NewsAnalysisError("bad news input")),
-        ):
+        with patch("app.main.analyze_ticker", side_effect=NewsAnalysisError("bad news input")):
             result = main(["AAPL"])
         assert result == 1
         assert "news analysis" in capsys.readouterr().err.lower()
 
     def test_scoring_error_returns_1(self, capsys):
-        with (
-            patch(_FETCH,      return_value=MagicMock()),
-            patch(_FETCH_FUND, return_value=_make_mock_fundamentals()),
-            patch(_CALC,       return_value=MagicMock()),
-            patch(_SUMM,       return_value=MagicMock()),
-            patch(_BUILD_TECH, return_value=[_make_signal()]),
-            patch(_BUILD_FUND, return_value=[_make_signal(category=SignalCategory.FUNDAMENTAL)]),
-            patch(_RISK,       return_value=[_make_signal(category=SignalCategory.RISK)]),
-            patch(_SCORE,      side_effect=ScoringError("bad signals")),
-        ):
+        with patch("app.main.analyze_ticker", side_effect=ScoringError("bad signals")):
             result = main(["AAPL"])
         assert result == 1
         assert "scoring" in capsys.readouterr().err.lower()
@@ -857,10 +818,9 @@ class TestArgParserMarkdown:
 class TestWatchlistSaveMarkdown:
     """Tests for --save-markdown in watchlist mode.
 
-    load_watchlist / scan_watchlist / format_watchlist_summary are imported
-    locally inside _run_watchlist, so they must be patched at app.watchlist.*.
-    save_markdown_report is a module-level import in app.main, so it is patched
-    at app.main.save_markdown_report.
+    _run_watchlist now calls analyze_watchlist_file (from the service layer)
+    for the scan step, so tests patch app.main.analyze_watchlist_file.
+    save_markdown_report is a module-level import in app.main, patched there.
     """
 
     def _make_watchlist_file(self, tmp_path) -> str:
@@ -882,8 +842,7 @@ class TestWatchlistSaveMarkdown:
                 else {"return_value": fake_path}
             )
             with (
-                patch("app.watchlist.load_watchlist", return_value=["AAPL"]),
-                patch("app.watchlist.scan_watchlist", return_value=[]),
+                patch("app.main.analyze_watchlist_file", return_value=[]),
                 patch("app.watchlist.format_watchlist_summary", return_value="WATCHLIST SUMMARY"),
                 patch("app.main.save_markdown_report", **md_kwargs) as mock_md,
                 patch("app.main.save_text_report", return_value=Path("outputs/reports/WATCHLIST.txt")),
@@ -947,8 +906,7 @@ class TestWatchlistSaveMarkdown:
         wl = self._make_watchlist_file(tmp_path)
         fake_path = Path("outputs/reports/WATCHLIST.md")
         with (
-            patch("app.watchlist.load_watchlist", return_value=["AAPL"]),
-            patch("app.watchlist.scan_watchlist", return_value=[]),
+            patch("app.main.analyze_watchlist_file", return_value=[]),
             patch("app.watchlist.format_watchlist_summary", return_value="PLAIN TEXT SUMMARY"),
             patch(_PATCH_WL_MD_FORMATTER, return_value="# WL MARKDOWN") as mock_formatter,
             patch("app.main.save_markdown_report", return_value=fake_path) as mock_save,
@@ -965,8 +923,7 @@ class TestWatchlistSaveMarkdown:
         wl = self._make_watchlist_file(tmp_path)
         fake_path = Path("outputs/reports/WATCHLIST.md")
         with (
-            patch("app.watchlist.load_watchlist", return_value=["AAPL"]),
-            patch("app.watchlist.scan_watchlist", return_value=[]),
+            patch("app.main.analyze_watchlist_file", return_value=[]),
             patch("app.watchlist.format_watchlist_summary", return_value="PLAIN TEXT SUMMARY"),
             patch("app.main.save_markdown_report", return_value=fake_path) as mock_save,
         ):
@@ -980,8 +937,7 @@ class TestWatchlistSaveMarkdown:
         wl = self._make_watchlist_file(tmp_path)
         fake_path = Path("outputs/reports/WATCHLIST.txt")
         with (
-            patch("app.watchlist.load_watchlist", return_value=["AAPL"]),
-            patch("app.watchlist.scan_watchlist", return_value=[]),
+            patch("app.main.analyze_watchlist_file", return_value=[]),
             patch("app.watchlist.format_watchlist_summary", return_value="PLAIN TEXT SUMMARY"),
             patch("app.main.save_text_report", return_value=fake_path) as mock_save,
         ):

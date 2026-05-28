@@ -1,5 +1,25 @@
 # Development Log
 
+## 2026-05-26 — Service layer added for UI readiness
+
+Added `app/services/stock_analysis_service.py` and `app/services/__init__.py` as a
+reusable service layer that sits between the CLI and the analysis pipeline. The
+service exposes three public functions:
+
+- `analyze_ticker(ticker) -> Rating` — the full pipeline (moved from `app/main.py`)
+- `analyze_stock(ticker) -> StockReport` — pipeline + report assembly; intended for
+  UI callers that want a ready-to-render object
+- `analyze_watchlist_file(path) -> list[WatchlistResult]` — loads a watchlist file
+  and runs the scan; intended for UI callers
+
+`app/main.py` now imports `analyze_ticker` and `analyze_watchlist_file` from the
+service; `_run_watchlist` delegates the scan step to `analyze_watchlist_file`. All
+existing CLI behavior, output file locations, and JSON export formats are preserved.
+
+Added `tests/test_stock_analysis_service.py` (57 new tests). Updated patch targets
+in `tests/test_main.py` and `tests/test_watchlist.py` to reflect the pipeline's new
+location in the service module. Full suite: 1330/1330 passing.
+
 ## 2026-05-26 — Post-confidence-recalibration validation pass completed
 
 Reran the 14-ticker calibration watchlist and five individual ticker reports

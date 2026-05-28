@@ -74,6 +74,21 @@ def _write_watchlist(tmp_path: Path, content: str) -> Path:
     return p
 
 
+def _make_watchlist_result(
+    ticker: str = "AAPL",
+    score: float = 60.0,
+    category: RatingCategory = RatingCategory.WATCHLIST,
+    confidence: ConfidenceLevel = ConfidenceLevel.MEDIUM,
+) -> WatchlistResult:
+    """Build a minimal successful WatchlistResult for use in CLI tests."""
+    return WatchlistResult(
+        ticker=ticker,
+        score=score,
+        final_category=category,
+        confidence_level=confidence,
+    )
+
+
 # ---------------------------------------------------------------------------
 # load_watchlist — happy path
 # ---------------------------------------------------------------------------
@@ -441,6 +456,10 @@ class TestFormatWatchlistSummary:
 
 # ---------------------------------------------------------------------------
 # CLI integration — watchlist mode in main()
+#
+# _run_watchlist now calls analyze_watchlist_file (the service function) for
+# the scan step.  CLI integration tests patch app.main.analyze_watchlist_file
+# and supply pre-built WatchlistResult lists so no pipeline runs.
 # ---------------------------------------------------------------------------
 
 class TestMainWatchlistCLI:
@@ -489,8 +508,8 @@ class TestMainWatchlistCLI:
     def test_watchlist_success_prints_output(self, tmp_path, capsys):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with patch(
-            "app.main.analyze_ticker",
-            return_value=_make_mock_rating("AAPL"),
+            "app.main.analyze_watchlist_file",
+            return_value=[_make_watchlist_result("AAPL")],
         ):
             result = main(["--watchlist", str(p)])
         out = capsys.readouterr().out
@@ -499,24 +518,11 @@ class TestMainWatchlistCLI:
 
     def test_watchlist_partial_failure_still_returns_0(self, tmp_path, capsys):
         p = _write_watchlist(tmp_path, "AAPL\nBAD\n")
-
-        def _fake_pipeline(ticker: str):
-            if ticker == "BAD":
-                raise RuntimeError("bad ticker")
-            from app.models.rating import ConfidenceLevel, Rating, RatingCategory
-            from app.models.signal import Signal, SignalCategory, SignalDirection, SignalStrength
-            sig = Signal(
-                name="T", category=SignalCategory.TECHNICAL,
-                direction=SignalDirection.NEUTRAL, strength=SignalStrength.MODERATE,
-                description="desc.", score_impact=0.0, confidence=0.5,
-            )
-            return Rating(
-                ticker=ticker, final_category=RatingCategory.WATCHLIST, score=60.0,
-                confidence=ConfidenceLevel.MEDIUM, explanation="ok",
-                technical_score=60.0, signals_used=[sig], data_sources_used=["yfinance"],
-            )
-
-        with patch("app.main.analyze_ticker", side_effect=_fake_pipeline):
+        mock_results = [
+            _make_watchlist_result("AAPL"),
+            WatchlistResult(ticker="BAD", error_message="bad ticker"),
+        ]
+        with patch("app.main.analyze_watchlist_file", return_value=mock_results):
             result = main(["--watchlist", str(p)])
         assert result == 0
 
@@ -561,7 +567,7 @@ class TestWatchlistSaveReport:
     def test_save_report_calls_save_text_report(self, tmp_path):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_watchlist_file", return_value=[_make_watchlist_result("AAPL")]),
             patch(_PATCH_SAVE_TEXT, return_value=_FAKE_REPORT_PATH) as mock_save,
         ):
             main(["--watchlist", str(p), "--save-report"])
@@ -570,7 +576,7 @@ class TestWatchlistSaveReport:
     def test_save_report_receives_summary_text(self, tmp_path):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_watchlist_file", return_value=[_make_watchlist_result("AAPL")]),
             patch(_PATCH_SAVE_TEXT, return_value=_FAKE_REPORT_PATH) as mock_save,
         ):
             main(["--watchlist", str(p), "--save-report"])
@@ -581,7 +587,7 @@ class TestWatchlistSaveReport:
     def test_save_report_uses_watchlist_label(self, tmp_path):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_watchlist_file", return_value=[_make_watchlist_result("AAPL")]),
             patch(_PATCH_SAVE_TEXT, return_value=_FAKE_REPORT_PATH) as mock_save,
         ):
             main(["--watchlist", str(p), "--save-report"])
@@ -591,7 +597,7 @@ class TestWatchlistSaveReport:
     def test_save_report_confirmation_printed(self, tmp_path, capsys):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_watchlist_file", return_value=[_make_watchlist_result("AAPL")]),
             patch(_PATCH_SAVE_TEXT, return_value=_FAKE_REPORT_PATH),
         ):
             main(["--watchlist", str(p), "--save-report"])
@@ -602,7 +608,7 @@ class TestWatchlistSaveReport:
     def test_save_report_text_same_as_printed_summary(self, tmp_path, capsys):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_watchlist_file", return_value=[_make_watchlist_result("AAPL")]),
             patch(_PATCH_SAVE_TEXT, return_value=_FAKE_REPORT_PATH) as mock_save,
         ):
             main(["--watchlist", str(p), "--save-report"])
@@ -614,7 +620,7 @@ class TestWatchlistSaveReport:
         from app.data.storage import StorageError
         p = _write_watchlist(tmp_path, "AAPL\n")
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_watchlist_file", return_value=[_make_watchlist_result("AAPL")]),
             patch(_PATCH_SAVE_TEXT, side_effect=StorageError("disk full")),
         ):
             result = main(["--watchlist", str(p), "--save-report"])
@@ -624,7 +630,7 @@ class TestWatchlistSaveReport:
     def test_no_save_report_without_flag(self, tmp_path):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_watchlist_file", return_value=[_make_watchlist_result("AAPL")]),
             patch(_PATCH_SAVE_TEXT) as mock_save,
         ):
             main(["--watchlist", str(p)])
@@ -633,7 +639,7 @@ class TestWatchlistSaveReport:
     def test_summary_still_printed_with_save_report(self, tmp_path, capsys):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_watchlist_file", return_value=[_make_watchlist_result("AAPL")]),
             patch(_PATCH_SAVE_TEXT, return_value=_FAKE_REPORT_PATH),
         ):
             main(["--watchlist", str(p), "--save-report"])
@@ -648,7 +654,7 @@ class TestWatchlistSaveJson:
     def test_save_json_calls_save_json_result(self, tmp_path):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_watchlist_file", return_value=[_make_watchlist_result("AAPL")]),
             patch(_PATCH_SAVE_JSON, return_value=_FAKE_JSON_PATH) as mock_save,
         ):
             main(["--watchlist", str(p), "--save-json"])
@@ -657,7 +663,7 @@ class TestWatchlistSaveJson:
     def test_save_json_uses_watchlist_label(self, tmp_path):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_watchlist_file", return_value=[_make_watchlist_result("AAPL")]),
             patch(_PATCH_SAVE_JSON, return_value=_FAKE_JSON_PATH) as mock_save,
         ):
             main(["--watchlist", str(p), "--save-json"])
@@ -667,7 +673,7 @@ class TestWatchlistSaveJson:
     def test_save_json_data_contains_results_key(self, tmp_path):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_watchlist_file", return_value=[_make_watchlist_result("AAPL")]),
             patch(_PATCH_SAVE_JSON, return_value=_FAKE_JSON_PATH) as mock_save,
         ):
             main(["--watchlist", str(p), "--save-json"])
@@ -677,7 +683,7 @@ class TestWatchlistSaveJson:
     def test_save_json_includes_successful_results(self, tmp_path):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_watchlist_file", return_value=[_make_watchlist_result("AAPL")]),
             patch(_PATCH_SAVE_JSON, return_value=_FAKE_JSON_PATH) as mock_save,
         ):
             main(["--watchlist", str(p), "--save-json"])
@@ -686,14 +692,12 @@ class TestWatchlistSaveJson:
 
     def test_save_json_includes_failed_results(self, tmp_path):
         p = _write_watchlist(tmp_path, "AAPL\nBAD\n")
-
-        def _pipeline(ticker: str):
-            if ticker == "BAD":
-                raise RuntimeError("bad ticker")
-            return _make_mock_rating(ticker)
-
+        mock_results = [
+            _make_watchlist_result("AAPL"),
+            WatchlistResult(ticker="BAD", error_message="bad ticker"),
+        ]
         with (
-            patch("app.main.analyze_ticker", side_effect=_pipeline),
+            patch("app.main.analyze_watchlist_file", return_value=mock_results),
             patch(_PATCH_SAVE_JSON, return_value=_FAKE_JSON_PATH) as mock_save,
         ):
             main(["--watchlist", str(p), "--save-json"])
@@ -704,7 +708,7 @@ class TestWatchlistSaveJson:
     def test_save_json_confirmation_printed(self, tmp_path, capsys):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_watchlist_file", return_value=[_make_watchlist_result("AAPL")]),
             patch(_PATCH_SAVE_JSON, return_value=_FAKE_JSON_PATH),
         ):
             main(["--watchlist", str(p), "--save-json"])
@@ -716,7 +720,7 @@ class TestWatchlistSaveJson:
         from app.data.storage import StorageError
         p = _write_watchlist(tmp_path, "AAPL\n")
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_watchlist_file", return_value=[_make_watchlist_result("AAPL")]),
             patch(_PATCH_SAVE_JSON, side_effect=StorageError("no space")),
         ):
             result = main(["--watchlist", str(p), "--save-json"])
@@ -726,7 +730,7 @@ class TestWatchlistSaveJson:
     def test_no_save_json_without_flag(self, tmp_path):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_watchlist_file", return_value=[_make_watchlist_result("AAPL")]),
             patch(_PATCH_SAVE_JSON) as mock_save,
         ):
             main(["--watchlist", str(p)])
@@ -735,7 +739,7 @@ class TestWatchlistSaveJson:
     def test_summary_still_printed_with_save_json(self, tmp_path, capsys):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_watchlist_file", return_value=[_make_watchlist_result("AAPL")]),
             patch(_PATCH_SAVE_JSON, return_value=_FAKE_JSON_PATH),
         ):
             main(["--watchlist", str(p), "--save-json"])
@@ -750,7 +754,7 @@ class TestWatchlistBothSaveFlags:
     def test_both_flags_call_both_save_functions(self, tmp_path):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_watchlist_file", return_value=[_make_watchlist_result("AAPL")]),
             patch(_PATCH_SAVE_TEXT, return_value=_FAKE_REPORT_PATH) as mock_txt,
             patch(_PATCH_SAVE_JSON, return_value=_FAKE_JSON_PATH) as mock_json,
         ):
@@ -762,7 +766,7 @@ class TestWatchlistBothSaveFlags:
     def test_both_flags_print_both_confirmations(self, tmp_path, capsys):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_watchlist_file", return_value=[_make_watchlist_result("AAPL")]),
             patch(_PATCH_SAVE_TEXT, return_value=_FAKE_REPORT_PATH),
             patch(_PATCH_SAVE_JSON, return_value=_FAKE_JSON_PATH),
         ):
@@ -775,7 +779,7 @@ class TestWatchlistBothSaveFlags:
         from app.data.storage import StorageError
         p = _write_watchlist(tmp_path, "AAPL\n")
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_watchlist_file", return_value=[_make_watchlist_result("AAPL")]),
             patch(_PATCH_SAVE_TEXT, return_value=_FAKE_REPORT_PATH) as mock_txt,
             patch(_PATCH_SAVE_JSON, side_effect=StorageError("no space")),
         ):
@@ -786,7 +790,7 @@ class TestWatchlistBothSaveFlags:
     def test_returns_0_with_both_flags(self, tmp_path):
         p = _write_watchlist(tmp_path, "AAPL\n")
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_watchlist_file", return_value=[_make_watchlist_result("AAPL")]),
             patch(_PATCH_SAVE_TEXT, return_value=_FAKE_REPORT_PATH),
             patch(_PATCH_SAVE_JSON, return_value=_FAKE_JSON_PATH),
         ):
