@@ -120,6 +120,34 @@ AMZN
 
 ---
 
+## Running the API Server
+
+```bash
+source .venv/bin/activate
+uvicorn app.api.main:app --reload
+```
+
+The server starts at `http://127.0.0.1:8000`. Interactive API docs are available at `http://127.0.0.1:8000/docs`.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/health` | Liveness check |
+| `POST` | `/api/analyze` | Analyze a ticker; returns a `StockReport` as JSON |
+
+**Example request:**
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"ticker": "AAPL"}'
+```
+
+The API delegates to the same `analyze_stock` service function used by the CLI. It does not execute trades.
+
+---
+
 ## Running Tests
 
 ```bash
@@ -133,7 +161,7 @@ All tests are deterministic — no live API calls.
 ## Architecture
 
 ```
-app/data/ → app/analysis/ → app/analysis/scoring.py → app/reports/
+app/data/ → app/analysis/ → app/analysis/scoring.py → app/reports/ → app/services/ → CLI / API
 ```
 
 | Layer | Responsibility |
@@ -141,12 +169,15 @@ app/data/ → app/analysis/ → app/analysis/scoring.py → app/reports/
 | `app/data/` | Fetch and validate raw data; return typed models or DataFrames |
 | `app/analysis/` | Compute independent signal lists from data |
 | `app/analysis/scoring.py` | Aggregate signals into a composite Rating |
-| `app/reports/` | Format a Rating into a human-readable report |
+| `app/reports/` | Format a Rating into a human-readable StockReport |
+| `app/services/` | Public service boundary — `analyze_stock` is the single entry point for callers |
 | `app/watchlist.py` | Orchestrate the pipeline across multiple tickers |
-| `app/main.py` | argparse CLI entry point |
+| `app/main.py` | Thin argparse CLI shell; delegates to `app/services/` |
+| `app/api/` | Thin FastAPI layer; delegates to `app/services/` |
 
 Each layer has one job. Analysis modules do not call each other. Scoring is not
-done inside analysis modules. Reports do not re-run analysis.
+done inside analysis modules. Reports do not re-run analysis. API routes and CLI
+both call the service layer — neither duplicates pipeline logic.
 
 ## Scoring
 
@@ -180,9 +211,18 @@ Score-to-category thresholds:
 
 ```
 app/
-  main.py                          # argparse CLI entry point
+  main.py                          # Thin argparse CLI shell
   config.py                        # Env-var settings via python-dotenv
   watchlist.py                     # Watchlist scanning and formatting
+  api/
+    main.py                        # FastAPI app factory (uvicorn entry point)
+    routes/
+      health.py                    # GET /api/health
+      analysis.py                  # POST /api/analyze
+    schemas/
+      analysis.py                  # AnalyzeRequest Pydantic schema
+  services/
+    stock_analysis_service.py      # analyze_stock — public entry point for CLI and API
   data/
     market_data.py                 # OHLCV price history
     fundamentals.py                # Company fundamentals
@@ -220,6 +260,8 @@ outputs/
 
 The single-ticker and watchlist analysis pipelines are complete. The tool
 produces scored reports with technical, fundamental, news, and risk signals.
+A FastAPI backend (`app/api/`) exposes the same analysis through `POST /api/analyze`,
+backed by the same service layer used by the CLI.
 
 ## Planned Future Work
 

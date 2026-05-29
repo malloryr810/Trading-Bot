@@ -1,5 +1,34 @@
 # Development Log
 
+## 2026-05-28 — Post-FastAPI code review and documentation cleanup
+
+**Goal:** review and clean up the repo after the FastAPI milestone; no new
+product features added.
+
+**`tests/test_api.py`** — removed `test_does_not_call_internal_analyze_ticker`:
+it claimed to verify `_analyze_ticker` is not called directly but only asserted
+`mock_analyze_stock.assert_called_once()`, which is strictly weaker than the
+existing `test_calls_analyze_stock_with_ticker`. 26 API tests remain; all pass.
+
+**`README.md`** — added "Running the API Server" section (uvicorn command,
+endpoints table, example curl request); updated Architecture table to include
+`app/services/` and `app/api/`; updated Project Structure listing; updated
+Current Status paragraph.
+
+**`CLAUDE.md`** — added `uvicorn` server command; added `app/services/` and
+`app/api/` entries to "Currently Implemented"; expanded Architecture section
+to show full `data → analysis → scoring → reports → services → CLI/API` flow;
+added API route and CLI-preservation rules to Layer Rules; fixed stale note
+attributing non-fatal news fetch to `main.py` (it is in `_analyze_ticker` in
+the service layer); added Phase Status table; added Non-Negotiable Guardrails
+section; added `full_stack_product_architecture.md` to Key Docs.
+
+**No code changes to `app/`.** No new dependencies. No scoring or CLI changes.
+
+**pytest:** 1354 passed.
+
+---
+
 ## 2026-05-28 — FastAPI backend milestone 1
 
 **Goal:** expose the analysis engine through a minimal FastAPI backend without

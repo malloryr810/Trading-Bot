@@ -96,13 +96,6 @@ class TestAnalyzeSuccess:
         data = client.post("/api/analyze", json={"ticker": "AAPL"}).json()
         assert data["confidence_level"] == ConfidenceLevel.MEDIUM.value
 
-    def test_does_not_call_internal_analyze_ticker(self, client, mock_analyze_stock):
-        # Confirms the route boundary: analyze_stock (public) is called, not
-        # _analyze_ticker (internal). Verified by patching at the route import
-        # boundary and asserting it is the function invoked.
-        client.post("/api/analyze", json={"ticker": "AAPL"})
-        mock_analyze_stock.assert_called_once()
-
 
 # ---------------------------------------------------------------------------
 # POST /api/analyze — ticker normalization

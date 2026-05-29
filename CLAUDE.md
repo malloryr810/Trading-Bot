@@ -28,6 +28,9 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
+# Run the FastAPI server (http://127.0.0.1:8000, docs at /docs)
+uvicorn app.api.main:app --reload
+
 # Single-ticker analysis (print report to terminal)
 python -m app.main AAPL
 
@@ -81,14 +84,19 @@ python -m py_compile app/analysis/scoring.py
 | `app/reports/templates.py` | Three public formatters: `format_plain_text_report()` (terminal), `format_report_markdown()` (single-ticker Markdown), `format_watchlist_markdown()` (watchlist Markdown) |
 | `app/watchlist.py` | Loads watchlist files, scans multiple tickers, formats ranked summary tables, and serializes results |
 | `app/utils/helpers.py` | Shared low-level helpers: `safe_float` and `normalize_ticker` |
-| `app/main.py` | argparse-based CLI entry point — orchestrates the full pipeline for single tickers and watchlists |
+| `app/services/stock_analysis_service.py` | `analyze_stock` — public entry point for all callers (CLI and API); `_analyze_ticker` is internal |
+| `app/api/main.py` | FastAPI app factory; `uvicorn app.api.main:app` entry point |
+| `app/api/routes/health.py` | `GET /api/health` |
+| `app/api/routes/analysis.py` | `POST /api/analyze` — calls `analyze_stock`, maps known errors to 422, unexpected to 500 |
+| `app/api/schemas/analysis.py` | `AnalyzeRequest` — validates and normalizes ticker at the API boundary |
+| `app/main.py` | Thin argparse CLI shell — delegates entirely to `app/services/` |
 
 ## Architecture
 
-Data flows in one direction through four layers:
+Data flows in one direction through five layers:
 
 ```
-data/ → analysis/ → scoring.py → reports/
+data/ → analysis/ → scoring.py → reports/ → services/ → CLI / API
 ```
 
 | Layer | Package | Responsibility |
@@ -96,10 +104,12 @@ data/ → analysis/ → scoring.py → reports/
 | Data | `app/data/` | Fetch and validate raw data; return typed models or DataFrames |
 | Analysis | `app/analysis/` | Compute signals from data; modules stay independent of each other |
 | Scoring | `app/analysis/scoring.py` | Aggregate signals into a composite Rating using weighted formula |
-| Reports | `app/reports/` | Format a Rating and its Signals into a human-readable report |
+| Reports | `app/reports/` | Format a Rating and its Signals into a human-readable StockReport |
+| Services | `app/services/` | Orchestrate the full pipeline; `analyze_stock` is the single public entry point |
+| CLI | `app/main.py` | Thin argparse shell; calls `analyze_stock` from services |
+| API | `app/api/` | Thin FastAPI layer; calls `analyze_stock` from services |
 
 `app/watchlist.py` orchestrates the single-stock pipeline across multiple tickers.
-`app/main.py` handles CLI argument parsing and dispatches to the pipeline or watchlist mode.
 
 ## Layer Rules
 
@@ -109,6 +119,8 @@ data/ → analysis/ → scoring.py → reports/
 - **Scoring** stays in `scoring.py`. Analysis modules produce signals; they do not score them.
 - **Reports** consume scoring outputs. Report modules do not run analysis or scoring.
 - **Watchlist** reuses the single-stock pipeline; it adds no analysis logic of its own.
+- **API route handlers** must stay thin — call `analyze_stock`, handle errors, return the result. No pipeline logic in routes.
+- **CLI** must remain functional. Adding API or frontend layers must not break `python -m app.main`.
 
 ## Scoring Weights
 
@@ -127,8 +139,8 @@ Each analysis module follows the same pattern:
 - Accepts a validated input (DataFrame, typed model, or list of NewsItem)
 - Returns a `list[Signal]` using `SignalCategory.TECHNICAL`, `FUNDAMENTAL`, `NEWS`, or `RISK`
 - Never raises on missing data fields — produces a neutral `Signal` with `confidence=0.30` instead
-- Has its own exception class (e.g. `TechnicalAnalysisError`, `NewsAnalysisError`, `RiskAnalysisError`) that `main.py` catches
-- News fetch failures in `main.py` are non-fatal: the pipeline continues with `analyze_news([])`
+- Has its own exception class (e.g. `TechnicalAnalysisError`, `NewsAnalysisError`, `RiskAnalysisError`) that callers catch
+- News fetch failures are non-fatal in `_analyze_ticker` (service layer): the pipeline continues with `analyze_news([])`
 
 ## Development Standards
 
@@ -140,10 +152,40 @@ Each analysis module follows the same pattern:
 - All API keys and secrets live in `.env` (never committed). Access them only through `app/config.py`.
 - Review diffs before committing.
 
+## Phase Status
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Architecture and technical design doc | Done |
+| 2 | FastAPI backend — `GET /api/health`, `POST /api/analyze` | Done |
+| 3 | SQLite persistence — save StockReport snapshots, report history endpoints | **Next — not started** |
+| 4 | Next.js frontend foundation | Not started |
+| 5 | Watchlist management (frontend + backend routes) | Not started |
+| 6 | Research notes and report history UI | Not started |
+| 7 | Mock trading simulation (`app/simulation/`) | Not started |
+| 8 | ML research layer (`app/ml/`) | Not started |
+| 9 | Deployment and hardening | Not started |
+
+See `docs/full_stack_product_architecture.md` for full scope of each phase.
+
+## Non-Negotiable Guardrails
+
+These apply to every phase and every task:
+
+- **No live trading** — never connect to a broker or execute a real order
+- **No broker APIs** — no Alpaca, Robinhood, IBKR, or any brokerage integration
+- **No order execution** — no scheduled or triggered buy/sell of any kind
+- **No options or margin** — equities only; no derivatives or leveraged positions
+- **No route-handler logic** — API routes call services; they never contain pipeline logic
+- **No CLI regression** — `python -m app.main` must always work after any change
+- **No premature ML** — do not add `app/ml/` until Phase 8 is explicitly scoped
+- **No premature simulation** — do not add `app/simulation/` until Phase 7 is explicitly scoped
+
 ## Key Docs
 
 - `docs/project_plan.md` — version roadmap
 - `docs/architecture.md` — full layer diagram
+- `docs/full_stack_product_architecture.md` — full-stack product plan and phase roadmap
 - `docs/scoring_rules.md` — score weights and rating thresholds
 - `docs/data_sources.md` — provider options and selection criteria
 - `docs/development_log.md` — append an entry for each meaningful change
