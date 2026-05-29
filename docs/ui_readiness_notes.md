@@ -14,7 +14,8 @@ FastAPI + React  ← optional, later
 
 The service layer is the stable contract. All future UI work should call the
 service functions directly. Neither a Streamlit app nor a FastAPI backend should
-import from `app/main.py`.
+import from `app/main.py`. The internal function `_analyze_ticker` (returns a
+`Rating`) is not part of this contract — UI code should call `analyze_stock`.
 
 ---
 
@@ -134,10 +135,6 @@ partitioned signal lists instead of `signals_used`).
 
 ## Known Future Cleanup Items
 
-- `test_main.py` contains a `TestAnalyzeTicker` class that exercises the service
-  function via a re-export. These tests are redundant with
-  `test_stock_analysis_service.py` and should be consolidated into the service
-  test file in a future pass.
-- The `analyze_ticker` (→ `Rating`) function is lower-level than most UI callers
-  need. Consider deprecating it as a public API once no callers outside the
-  service itself need it.
+- The `_analyze_ticker` (→ `Rating`) function is internal to the service. It
+  exists as a composable building block for `analyze_stock`; no callers outside
+  the service module should reference it.

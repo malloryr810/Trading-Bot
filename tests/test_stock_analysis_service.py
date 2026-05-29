@@ -23,8 +23,8 @@ from app.models.rating import ConfidenceLevel, Rating, RatingCategory
 from app.models.signal import Signal, SignalCategory, SignalDirection, SignalStrength
 from app.models.stock_report import StockReport
 from app.services.stock_analysis_service import (
+    _analyze_ticker,
     analyze_stock,
-    analyze_ticker,
     analyze_watchlist_file,
 )
 from app.watchlist import WatchlistLoadError, WatchlistResult
@@ -110,12 +110,12 @@ def _mock_pipeline(rating: Rating | None = None):
 class TestAnalyzeTicker:
     def test_returns_rating(self):
         with _mock_pipeline():
-            result = analyze_ticker("AAPL")
+            result = _analyze_ticker("AAPL")
         assert isinstance(result, Rating)
 
     def test_ticker_normalized_to_uppercase(self):
         with _mock_pipeline():
-            result = analyze_ticker("aapl")
+            result = _analyze_ticker("aapl")
         assert result.ticker == "AAPL"
 
     def test_company_name_attached_from_fundamentals(self):
@@ -132,7 +132,7 @@ class TestAnalyzeTicker:
             patch(f"{_SVC}.analyze_news",                   return_value=[]),
             patch(f"{_SVC}.score_signals",                  return_value=_make_rating()),
         ):
-            result = analyze_ticker("AAPL")
+            result = _analyze_ticker("AAPL")
         assert result.company_name == "Apple Inc."
 
     def test_current_price_attached_from_price_data(self):
@@ -150,7 +150,7 @@ class TestAnalyzeTicker:
             patch(f"{_SVC}.analyze_news",                   return_value=[]),
             patch(f"{_SVC}.score_signals",                  return_value=_make_rating()),
         ):
-            result = analyze_ticker("AAPL")
+            result = _analyze_ticker("AAPL")
         assert result.current_price == pytest.approx(185.50)
 
     def test_passes_beta_to_risk_analysis(self):
@@ -167,7 +167,7 @@ class TestAnalyzeTicker:
             patch(f"{_SVC}.analyze_news",                   return_value=[]),
             patch(f"{_SVC}.score_signals",                  return_value=_make_rating()),
         ):
-            analyze_ticker("AAPL")
+            _analyze_ticker("AAPL")
         assert mock_risk.call_args.kwargs.get("beta") == pytest.approx(1.5)
 
     def test_passes_yfinance_as_data_source(self):
@@ -183,7 +183,7 @@ class TestAnalyzeTicker:
             patch(f"{_SVC}.analyze_news",                   return_value=[]),
             patch(f"{_SVC}.score_signals",                  return_value=_make_rating()) as mock_score,
         ):
-            analyze_ticker("AAPL")
+            _analyze_ticker("AAPL")
         assert "yfinance" in mock_score.call_args.kwargs["data_sources_used"]
 
     def test_news_fetch_failure_is_non_fatal(self):
@@ -199,7 +199,7 @@ class TestAnalyzeTicker:
             patch(f"{_SVC}.analyze_news",                   return_value=[]),
             patch(f"{_SVC}.score_signals",                  return_value=_make_rating()),
         ):
-            result = analyze_ticker("AAPL")
+            result = _analyze_ticker("AAPL")
         assert isinstance(result, Rating)
 
     def test_news_failure_falls_back_to_empty_analysis(self):
@@ -215,13 +215,13 @@ class TestAnalyzeTicker:
             patch(f"{_SVC}.analyze_news",                   return_value=[]) as mock_analyze_news,
             patch(f"{_SVC}.score_signals",                  return_value=_make_rating()),
         ):
-            analyze_ticker("AAPL")
+            _analyze_ticker("AAPL")
         mock_analyze_news.assert_called_once_with([])
 
     def test_data_fetch_error_propagates(self):
         with patch(f"{_SVC}.get_price_history", side_effect=DataFetchError("bad ticker")):
             with pytest.raises(DataFetchError):
-                analyze_ticker("INVALID")
+                _analyze_ticker("INVALID")
 
     def test_fundamental_fetch_error_propagates(self):
         with (
@@ -229,7 +229,7 @@ class TestAnalyzeTicker:
             patch(f"{_SVC}.get_company_fundamentals", side_effect=FundamentalDataFetchError("no data")),
         ):
             with pytest.raises(FundamentalDataFetchError):
-                analyze_ticker("AAPL")
+                _analyze_ticker("AAPL")
 
     def test_technical_analysis_error_propagates(self):
         with (
@@ -239,7 +239,7 @@ class TestAnalyzeTicker:
             patch(f"{_SVC}.calculate_technical_indicators", side_effect=TechnicalAnalysisError("bad")),
         ):
             with pytest.raises(TechnicalAnalysisError):
-                analyze_ticker("AAPL")
+                _analyze_ticker("AAPL")
 
     def test_scoring_error_propagates(self):
         with (
@@ -255,7 +255,7 @@ class TestAnalyzeTicker:
             patch(f"{_SVC}.score_signals",                  side_effect=ScoringError("failed")),
         ):
             with pytest.raises(ScoringError):
-                analyze_ticker("AAPL")
+                _analyze_ticker("AAPL")
 
     def test_fundamental_analysis_error_propagates(self):
         with (
@@ -268,7 +268,7 @@ class TestAnalyzeTicker:
             patch(f"{_SVC}.build_fundamental_signals",      side_effect=FundamentalAnalysisError("bad")),
         ):
             with pytest.raises(FundamentalAnalysisError):
-                analyze_ticker("AAPL")
+                _analyze_ticker("AAPL")
 
     def test_risk_analysis_error_propagates(self):
         with (
@@ -282,7 +282,7 @@ class TestAnalyzeTicker:
             patch(f"{_SVC}.analyze_risk_conditions",        side_effect=RiskAnalysisError("bad")),
         ):
             with pytest.raises(RiskAnalysisError):
-                analyze_ticker("AAPL")
+                _analyze_ticker("AAPL")
 
     def test_news_analysis_error_propagates(self):
         with (
@@ -297,7 +297,70 @@ class TestAnalyzeTicker:
             patch(f"{_SVC}.analyze_news",                   side_effect=NewsAnalysisError("bad")),
         ):
             with pytest.raises(NewsAnalysisError):
-                analyze_ticker("AAPL")
+                _analyze_ticker("AAPL")
+
+    def test_calls_pipeline_in_order(self):
+        call_order: list[str] = []
+        fund_mock = _make_mock_fundamentals()
+        with (
+            patch(f"{_SVC}.get_price_history",              side_effect=lambda *a, **kw: call_order.append("fetch") or MagicMock()),
+            patch(f"{_SVC}.get_company_fundamentals",       side_effect=lambda *a, **kw: call_order.append("fetch_fund") or fund_mock),
+            patch(f"{_SVC}.get_recent_news",                side_effect=lambda *a, **kw: call_order.append("fetch_news") or []),
+            patch(f"{_SVC}.calculate_technical_indicators", side_effect=lambda *a, **kw: call_order.append("calc") or MagicMock()),
+            patch(f"{_SVC}.summarize_technical_signals",    side_effect=lambda *a, **kw: call_order.append("summ") or MagicMock()),
+            patch(f"{_SVC}.build_technical_signals",        side_effect=lambda *a, **kw: call_order.append("build_tech") or [_make_signal()]),
+            patch(f"{_SVC}.build_fundamental_signals",      side_effect=lambda *a, **kw: call_order.append("build_fund") or []),
+            patch(f"{_SVC}.analyze_risk_conditions",        side_effect=lambda *a, **kw: call_order.append("risk") or []),
+            patch(f"{_SVC}.analyze_news",                   side_effect=lambda *a, **kw: call_order.append("analyze_news") or []),
+            patch(f"{_SVC}.score_signals",                  side_effect=lambda **kw: call_order.append("score") or _make_rating()),
+        ):
+            _analyze_ticker("AAPL")
+        assert call_order == [
+            "fetch", "fetch_fund", "fetch_news",
+            "calc", "summ",
+            "build_tech", "build_fund", "risk", "analyze_news",
+            "score",
+        ]
+
+    def test_passes_none_beta_when_fundamentals_has_no_beta(self):
+        fund_mock = _make_mock_fundamentals(beta=None)
+        with (
+            patch(f"{_SVC}.get_price_history",              return_value=MagicMock()),
+            patch(f"{_SVC}.get_company_fundamentals",       return_value=fund_mock),
+            patch(f"{_SVC}.get_recent_news",                return_value=[]),
+            patch(f"{_SVC}.calculate_technical_indicators", return_value=MagicMock()),
+            patch(f"{_SVC}.summarize_technical_signals",    return_value=MagicMock()),
+            patch(f"{_SVC}.build_technical_signals",        return_value=[_make_signal()]),
+            patch(f"{_SVC}.build_fundamental_signals",      return_value=[]),
+            patch(f"{_SVC}.analyze_risk_conditions",        return_value=[]) as mock_risk,
+            patch(f"{_SVC}.analyze_news",                   return_value=[]),
+            patch(f"{_SVC}.score_signals",                  return_value=_make_rating()),
+        ):
+            _analyze_ticker("AAPL")
+        assert mock_risk.call_args.kwargs.get("beta") is None
+
+    def test_none_company_name_from_fundamentals_stays_none(self):
+        with _mock_pipeline():
+            result = _analyze_ticker("AAPL")
+        assert result.company_name is None
+
+    def test_news_signals_included_in_score_call(self):
+        news_signals = [_make_signal(SignalCategory.NEWS)]
+        with (
+            patch(f"{_SVC}.get_price_history",              return_value=MagicMock()),
+            patch(f"{_SVC}.get_company_fundamentals",       return_value=_make_mock_fundamentals()),
+            patch(f"{_SVC}.get_recent_news",                return_value=[]),
+            patch(f"{_SVC}.calculate_technical_indicators", return_value=MagicMock()),
+            patch(f"{_SVC}.summarize_technical_signals",    return_value=MagicMock()),
+            patch(f"{_SVC}.build_technical_signals",        return_value=[_make_signal()]),
+            patch(f"{_SVC}.build_fundamental_signals",      return_value=[]),
+            patch(f"{_SVC}.analyze_risk_conditions",        return_value=[]),
+            patch(f"{_SVC}.analyze_news",                   return_value=news_signals),
+            patch(f"{_SVC}.score_signals",                  return_value=_make_rating()) as mock_score,
+        ):
+            _analyze_ticker("AAPL")
+        called_signals = mock_score.call_args.kwargs["signals"]
+        assert any(s.category == SignalCategory.NEWS for s in called_signals)
 
 
 # ---------------------------------------------------------------------------
@@ -338,7 +401,7 @@ class TestAnalyzeStock:
                or len(result.news_signals) > 0 or len(result.risk_signals) > 0
 
     def test_delegates_to_analyze_ticker(self):
-        with patch(f"{_SVC}.analyze_ticker", return_value=_make_rating()) as mock_ticker:
+        with patch(f"{_SVC}._analyze_ticker", return_value=_make_rating()) as mock_ticker:
             result = analyze_stock("AAPL")
         mock_ticker.assert_called_once_with("AAPL")
         assert isinstance(result, StockReport)

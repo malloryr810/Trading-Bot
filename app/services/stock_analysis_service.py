@@ -5,7 +5,7 @@ Provides reusable analysis functions that can be called by both the CLI
 (app/main.py) and a future UI without importing from app.main.
 
 Functions:
-    analyze_ticker  — run the full pipeline; return a Rating.
+    _analyze_ticker — internal; run the full pipeline; return a Rating.
     analyze_stock   — run the full pipeline; return a StockReport.
     analyze_watchlist_file — load a watchlist file and analyze all tickers.
 """
@@ -33,7 +33,7 @@ from app.utils.helpers import safe_float
 from app.watchlist import WatchlistResult, load_watchlist, scan_watchlist
 
 
-def analyze_ticker(ticker: str) -> Rating:
+def _analyze_ticker(ticker: str) -> Rating:
     """Run the full analysis pipeline for a single ticker.
 
     Fetches market data, company fundamentals, and recent news, then computes
@@ -95,9 +95,9 @@ def analyze_stock(ticker: str) -> StockReport:
         A fully populated StockReport ready for rendering.
 
     Raises:
-        Same exceptions as analyze_ticker.
+        Same exceptions as _analyze_ticker.
     """
-    rating = analyze_ticker(ticker)
+    rating = _analyze_ticker(ticker)
     return build_stock_report(rating)
 
 

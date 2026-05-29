@@ -1,5 +1,46 @@
 # Development Log
 
+## 2026-05-28 — Test boundary cleanup
+
+**Goal:** move service-behavior tests out of `tests/test_main.py` and into
+`tests/test_stock_analysis_service.py`, so each file tests only one layer.
+
+**`app/services/stock_analysis_service.py`** (updated)
+
+- Renamed `analyze_ticker` → `_analyze_ticker` to signal it is internal to
+  the service. Public callers should use `analyze_stock` (returns `StockReport`)
+  or `analyze_watchlist_file`. The function was never part of the documented
+  public API for UI callers; the rename makes that explicit.
+
+**`tests/test_stock_analysis_service.py`** (expanded)
+
+- Updated import and all call sites: `analyze_ticker` → `_analyze_ticker`.
+- Updated `test_delegates_to_analyze_ticker` patch path to
+  `app.services.stock_analysis_service._analyze_ticker`.
+- Added 4 tests migrated from `test_main.py:TestAnalyzeTicker`:
+  - `test_calls_pipeline_in_order` — asserts full step order
+  - `test_passes_none_beta_when_fundamentals_has_no_beta`
+  - `test_none_company_name_from_fundamentals_stays_none`
+  - `test_news_signals_included_in_score_call`
+
+**`tests/test_main.py`** (simplified)
+
+- Removed `TestAnalyzeTicker` (8 tests) — these were service tests, now owned
+  by `test_stock_analysis_service.py` or covered by the 4 migrated tests above.
+- Removed `TestNewsFetchInPipeline` (3 tests) — the news-fetch-failure behaviour
+  is covered in `test_stock_analysis_service.py`; the one unique assertion was
+  migrated.
+- Removed all now-unused imports, helpers (`_make_signal`, `_make_rating`,
+  `_make_mock_fundamentals`), and patch-target constants (`_SVC`, `_FETCH`,
+  `_FETCH_FUND`, etc.).
+- Simplified `_mock_pipeline` to patch `app.main.analyze_stock` directly at the
+  CLI boundary; added `_make_stock_report` helper.
+
+Net change: −11 tests removed, +4 migrated → 1327 tests total (was 1334).
+No CLI behaviour, scoring logic, or report formats changed.
+
+---
+
 ## 2026-05-28 — Service boundary cleanup / UI readiness pass
 
 **Goal:** make `app/services/stock_analysis_service.py` the single stable entry

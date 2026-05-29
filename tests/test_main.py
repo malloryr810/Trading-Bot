@@ -6,10 +6,8 @@ All pipeline functions are mocked — no network calls.
 
 from __future__ import annotations
 
-import sys
-from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -20,117 +18,42 @@ from app.analysis.scoring import ScoringError
 from app.analysis.technicals import TechnicalAnalysisError
 from app.data.fundamentals import FundamentalDataFetchError
 from app.data.market_data import DataFetchError
-from app.data.news_data import NewsFetchError
 from app.data.storage import StorageError
 from app.main import build_parser, main, parse_args
-from app.services.stock_analysis_service import analyze_ticker
-
-_SAVE_MARKDOWN        = "app.main.save_markdown_report"
-_FAKE_MD_PATH         = Path("outputs/reports/AAPL_20240601_000000.md")
-_PATCH_WL_MD_FORMATTER = "app.main.format_watchlist_markdown"
-from app.models.rating import ConfidenceLevel, Rating, RatingCategory
-from app.models.signal import Signal, SignalCategory, SignalDirection, SignalStrength
+from app.models.rating import ConfidenceLevel, RatingCategory
 from app.models.stock_report import StockReport
+
+_SAVE_REPORT           = "app.main.save_text_report"
+_SAVE_JSON             = "app.main.save_json_result"
+_SAVE_MARKDOWN         = "app.main.save_markdown_report"
+_PATCH_WL_MD_FORMATTER = "app.main.format_watchlist_markdown"
+
+_FAKE_REPORT_PATH = Path("outputs/reports/AAPL_20240601_000000.txt")
+_FAKE_JSON_PATH   = Path("outputs/results/AAPL_20240601_000000.json")
+_FAKE_MD_PATH     = Path("outputs/reports/AAPL_20240601_000000.md")
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_signal(
-    score_impact: float = 0.10,
-    direction: SignalDirection = SignalDirection.BULLISH,
-    category: SignalCategory = SignalCategory.TECHNICAL,
-) -> Signal:
-    return Signal(
-        name="Test Signal",
-        category=category,
-        direction=direction,
-        strength=SignalStrength.MODERATE,
-        description="A test signal.",
-        score_impact=score_impact,
-        confidence=0.65,
+def _make_stock_report(ticker: str = "AAPL") -> StockReport:
+    return StockReport(
+        ticker=ticker,
+        final_category=RatingCategory.WATCHLIST,
+        score=60.0,
+        confidence_level=ConfidenceLevel.MEDIUM,
     )
 
 
-def _make_rating(
-    category: RatingCategory = RatingCategory.WATCHLIST,
-    score: float = 60.0,
-    positives: list[str] | None = None,
-    risks: list[str] | None = None,
-) -> Rating:
-    return Rating(
-        ticker="AAPL",
-        final_category=category,
-        score=score,
-        confidence=ConfidenceLevel.MEDIUM,
-        explanation="Composite rating for AAPL based on 7 technical and 5 fundamental and 4 risk signals.",
-        technical_score=score,
-        technical_summary="Technical score: 60.0/100 based on indicators.",
-        key_positive_factors=positives or [],
-        key_risks=risks or [],
-        buy_trigger="Consider after fundamentals confirm.",
-        sell_or_avoid_trigger="Reassess if score falls below 45.",
-        data_timestamp=datetime(2024, 6, 1, tzinfo=timezone.utc),
-        data_sources_used=["yfinance"],
-        signals_used=[_make_signal()],
-    )
-
-
-def _make_mock_fundamentals(
-    beta: float | None = 1.1,
-    company_name: str | None = None,
-) -> MagicMock:
-    m = MagicMock()
-    m.beta = beta
-    m.company_name = company_name
-    return m
-
-
-# Patch targets — pipeline functions live in the service module.
-_SVC          = "app.services.stock_analysis_service"
-_FETCH        = f"{_SVC}.get_price_history"
-_FETCH_FUND   = f"{_SVC}.get_company_fundamentals"
-_FETCH_NEWS   = f"{_SVC}.get_recent_news"
-_ANALYZE_NEWS = f"{_SVC}.analyze_news"
-_CALC         = f"{_SVC}.calculate_technical_indicators"
-_SUMM         = f"{_SVC}.summarize_technical_signals"
-_BUILD_TECH   = f"{_SVC}.build_technical_signals"
-_BUILD_FUND   = f"{_SVC}.build_fundamental_signals"
-_RISK         = f"{_SVC}.analyze_risk_conditions"
-_SCORE        = f"{_SVC}.score_signals"
-
-_SAVE_REPORT  = "app.main.save_text_report"
-_SAVE_JSON    = "app.main.save_json_result"
-
-_FAKE_REPORT_PATH = Path("outputs/reports/AAPL_20240601_000000.txt")
-_FAKE_JSON_PATH   = Path("outputs/results/AAPL_20240601_000000.json")
-
-
-def _mock_pipeline(rating: Rating | None = None):
-    """Context manager that patches the entire analysis pipeline."""
+def _mock_pipeline(stock_report: StockReport | None = None):
+    """Patches analyze_stock at the CLI boundary."""
     import contextlib
 
     @contextlib.contextmanager
     def _ctx():
-        with (
-            patch(_FETCH,        return_value=MagicMock()) as mock_fetch,
-            patch(_FETCH_FUND,   return_value=_make_mock_fundamentals()) as mock_fetch_fund,
-            patch(_FETCH_NEWS,   return_value=[]) as mock_fetch_news,
-            patch(_ANALYZE_NEWS, return_value=[_make_signal(category=SignalCategory.NEWS)]) as mock_analyze_news,
-            patch(_CALC,         return_value=MagicMock()) as mock_calc,
-            patch(_SUMM,         return_value=MagicMock()) as mock_summ,
-            patch(_BUILD_TECH,   return_value=[_make_signal()]) as mock_build_tech,
-            patch(_BUILD_FUND,   return_value=[_make_signal(category=SignalCategory.FUNDAMENTAL)]) as mock_build_fund,
-            patch(_RISK,         return_value=[_make_signal(category=SignalCategory.RISK)]) as mock_risk,
-            patch(_SCORE,        return_value=rating or _make_rating()) as mock_score,
-        ):
-            yield (
-                mock_fetch, mock_fetch_fund, mock_fetch_news, mock_analyze_news,
-                mock_calc, mock_summ,
-                mock_build_tech, mock_build_fund, mock_risk,
-                mock_score,
-            )
+        with patch("app.main.analyze_stock", return_value=stock_report or _make_stock_report()):
+            yield
 
     return _ctx()
 
@@ -210,181 +133,6 @@ class TestMainErrors:
             result = main(["AAPL"])
         assert result == 1
         assert "scoring" in capsys.readouterr().err.lower()
-
-
-# ---------------------------------------------------------------------------
-# analyze_ticker()
-# ---------------------------------------------------------------------------
-
-class TestAnalyzeTicker:
-    def test_returns_rating(self):
-        with _mock_pipeline() as mocks:
-            result = analyze_ticker("AAPL")
-        assert isinstance(result, Rating)
-
-    def test_calls_pipeline_in_order(self):
-        call_order: list[str] = []
-
-        fund_mock = _make_mock_fundamentals()
-
-        with (
-            patch(_FETCH,        side_effect=lambda *a, **kw: call_order.append("fetch") or MagicMock()),
-            patch(_FETCH_FUND,   side_effect=lambda *a, **kw: call_order.append("fetch_fund") or fund_mock),
-            patch(_FETCH_NEWS,   side_effect=lambda *a, **kw: call_order.append("fetch_news") or []),
-            patch(_CALC,         side_effect=lambda *a, **kw: call_order.append("calc") or MagicMock()),
-            patch(_SUMM,         side_effect=lambda *a, **kw: call_order.append("summ") or MagicMock()),
-            patch(_BUILD_TECH,   side_effect=lambda *a, **kw: call_order.append("build_tech") or [_make_signal()]),
-            patch(_BUILD_FUND,   side_effect=lambda *a, **kw: call_order.append("build_fund") or []),
-            patch(_RISK,         side_effect=lambda *a, **kw: call_order.append("risk") or []),
-            patch(_ANALYZE_NEWS, side_effect=lambda *a, **kw: call_order.append("analyze_news") or []),
-            patch(_SCORE,        side_effect=lambda **kw: call_order.append("score") or _make_rating()),
-        ):
-            analyze_ticker("AAPL")
-
-        assert call_order == [
-            "fetch", "fetch_fund", "fetch_news",
-            "calc", "summ",
-            "build_tech", "build_fund", "risk", "analyze_news",
-            "score",
-        ]
-
-    def test_passes_yfinance_as_data_source(self):
-        with _mock_pipeline() as mocks:
-            analyze_ticker("AAPL")
-        mock_score = mocks[-1]
-        call_kwargs = mock_score.call_args.kwargs
-        assert "yfinance" in call_kwargs["data_sources_used"]
-
-    def test_passes_beta_from_fundamentals_to_risk(self):
-        fund_mock = _make_mock_fundamentals(beta=1.3)
-        with (
-            patch(_FETCH,        return_value=MagicMock()),
-            patch(_FETCH_FUND,   return_value=fund_mock),
-            patch(_FETCH_NEWS,   return_value=[]),
-            patch(_CALC,         return_value=MagicMock()),
-            patch(_SUMM,         return_value=MagicMock()),
-            patch(_BUILD_TECH,   return_value=[_make_signal()]),
-            patch(_BUILD_FUND,   return_value=[]),
-            patch(_RISK,         return_value=[]) as mock_risk,
-            patch(_ANALYZE_NEWS, return_value=[]),
-            patch(_SCORE,        return_value=_make_rating()),
-        ):
-            analyze_ticker("AAPL")
-        call_kwargs = mock_risk.call_args.kwargs
-        assert call_kwargs.get("beta") == pytest.approx(1.3)
-
-    def test_passes_none_beta_when_fundamentals_has_no_beta(self):
-        fund_mock = _make_mock_fundamentals(beta=None)
-        with (
-            patch(_FETCH,        return_value=MagicMock()),
-            patch(_FETCH_FUND,   return_value=fund_mock),
-            patch(_FETCH_NEWS,   return_value=[]),
-            patch(_CALC,         return_value=MagicMock()),
-            patch(_SUMM,         return_value=MagicMock()),
-            patch(_BUILD_TECH,   return_value=[_make_signal()]),
-            patch(_BUILD_FUND,   return_value=[]),
-            patch(_RISK,         return_value=[]) as mock_risk,
-            patch(_ANALYZE_NEWS, return_value=[]),
-            patch(_SCORE,        return_value=_make_rating()),
-        ):
-            analyze_ticker("AAPL")
-        call_kwargs = mock_risk.call_args.kwargs
-        assert call_kwargs.get("beta") is None
-
-    def test_company_name_from_fundamentals_attached_to_rating(self):
-        fund_mock = _make_mock_fundamentals(company_name="Apple Inc.")
-        with (
-            patch(_FETCH,        return_value=MagicMock()),
-            patch(_FETCH_FUND,   return_value=fund_mock),
-            patch(_FETCH_NEWS,   return_value=[]),
-            patch(_CALC,         return_value=MagicMock()),
-            patch(_SUMM,         return_value=MagicMock()),
-            patch(_BUILD_TECH,   return_value=[_make_signal()]),
-            patch(_BUILD_FUND,   return_value=[]),
-            patch(_RISK,         return_value=[]),
-            patch(_ANALYZE_NEWS, return_value=[]),
-            patch(_SCORE,        return_value=_make_rating()),
-        ):
-            result = analyze_ticker("AAPL")
-        assert result.company_name == "Apple Inc."
-
-    def test_current_price_attached_to_rating(self):
-        price_mock = MagicMock()
-        price_mock.__getitem__.return_value.iloc.__getitem__.return_value = 185.50
-        with (
-            patch(_FETCH,        return_value=price_mock),
-            patch(_FETCH_FUND,   return_value=_make_mock_fundamentals()),
-            patch(_FETCH_NEWS,   return_value=[]),
-            patch(_CALC,         return_value=MagicMock()),
-            patch(_SUMM,         return_value=MagicMock()),
-            patch(_BUILD_TECH,   return_value=[_make_signal()]),
-            patch(_BUILD_FUND,   return_value=[]),
-            patch(_RISK,         return_value=[]),
-            patch(_ANALYZE_NEWS, return_value=[]),
-            patch(_SCORE,        return_value=_make_rating()),
-        ):
-            result = analyze_ticker("AAPL")
-        assert result.current_price == pytest.approx(185.50)
-
-    def test_none_company_name_from_fundamentals_stays_none(self):
-        with _mock_pipeline():
-            result = analyze_ticker("AAPL")
-        assert result.company_name is None
-
-# ---------------------------------------------------------------------------
-# analyze_ticker() — news fetch behaviour
-# ---------------------------------------------------------------------------
-
-class TestNewsFetchInPipeline:
-    def test_news_fetch_failure_does_not_abort(self):
-        with (
-            patch(_FETCH,        return_value=MagicMock()),
-            patch(_FETCH_FUND,   return_value=_make_mock_fundamentals()),
-            patch(_FETCH_NEWS,   side_effect=Exception("news down")),
-            patch(_CALC,         return_value=MagicMock()),
-            patch(_SUMM,         return_value=MagicMock()),
-            patch(_BUILD_TECH,   return_value=[_make_signal()]),
-            patch(_BUILD_FUND,   return_value=[_make_signal(category=SignalCategory.FUNDAMENTAL)]),
-            patch(_RISK,         return_value=[]),
-            patch(_ANALYZE_NEWS, return_value=[]),
-            patch(_SCORE,        return_value=_make_rating()),
-        ):
-            result = main(["AAPL"])
-        assert result == 0
-
-    def test_news_failure_falls_back_to_empty_analysis(self):
-        with (
-            patch(_FETCH,        return_value=MagicMock()),
-            patch(_FETCH_FUND,   return_value=_make_mock_fundamentals()),
-            patch(_FETCH_NEWS,   side_effect=NewsFetchError("timeout")),
-            patch(_CALC,         return_value=MagicMock()),
-            patch(_SUMM,         return_value=MagicMock()),
-            patch(_BUILD_TECH,   return_value=[_make_signal()]),
-            patch(_BUILD_FUND,   return_value=[]),
-            patch(_RISK,         return_value=[]),
-            patch(_ANALYZE_NEWS, return_value=[]) as mock_analyze,
-            patch(_SCORE,        return_value=_make_rating()),
-        ):
-            analyze_ticker("AAPL")
-        mock_analyze.assert_called_once_with([])
-
-    def test_news_signals_included_in_score_call(self):
-        news_signals = [_make_signal(category=SignalCategory.NEWS)]
-        with (
-            patch(_FETCH,        return_value=MagicMock()),
-            patch(_FETCH_FUND,   return_value=_make_mock_fundamentals()),
-            patch(_FETCH_NEWS,   return_value=[]),
-            patch(_CALC,         return_value=MagicMock()),
-            patch(_SUMM,         return_value=MagicMock()),
-            patch(_BUILD_TECH,   return_value=[_make_signal()]),
-            patch(_BUILD_FUND,   return_value=[]),
-            patch(_RISK,         return_value=[]),
-            patch(_ANALYZE_NEWS, return_value=news_signals),
-            patch(_SCORE,        return_value=_make_rating()) as mock_score,
-        ):
-            analyze_ticker("AAPL")
-        called_signals = mock_score.call_args.kwargs["signals"]
-        assert any(s.category == SignalCategory.NEWS for s in called_signals)
 
 
 # ---------------------------------------------------------------------------
