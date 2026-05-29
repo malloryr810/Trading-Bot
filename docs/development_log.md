@@ -1,5 +1,40 @@
 # Development Log
 
+## 2026-05-28 — Full-stack product architecture plan
+
+**Goal:** establish a clear technical direction for evolving the CLI tool into a
+full-stack personal investment research platform.
+
+**`docs/full_stack_product_architecture.md`** — new document covering:
+
+- Product vision (decision-support tool; not a trading system)
+- Current architecture baseline and service boundary
+- Target stack: FastAPI backend, Next.js + React + TypeScript frontend,
+  Tailwind CSS + shadcn/ui, SQLite → PostgreSQL, Recharts/lightweight-charts
+- Proposed future repository structure including `app/api/`, `app/db/`,
+  `app/ml/` (future), `app/simulation/` (future), and `frontend/`
+- Backend API design guidelines and initial routes
+- Frontend guidelines and initial screens
+- Database/persistence approach (SQLite-first, JSON snapshot for StockReports)
+- ML upgrade guidelines (later phase; explainable; must not silently override
+  rule-based scoring)
+- Mock trading simulation guidelines (later phase; paper-trading only; no broker)
+- Safety guardrails (no live trading, no broker API, no route-handler logic,
+  no CLI regression)
+- Phased implementation roadmap (Phases 1–9)
+
+**Direction change:** a quick single-page dashboard approach (e.g. Streamlit)
+was intentionally not adopted. The project moves directly toward a proper
+FastAPI + Next.js architecture with a staged rollout.
+
+**Immediate next step:** FastAPI Backend Phase 2 — expose `analyze_stock`
+through `POST /api/analyze` and a health endpoint. No frontend, database, ML,
+or mock trading yet.
+
+No code or dependencies were added in this entry.
+
+---
+
 ## 2026-05-28 — Test boundary cleanup
 
 **Goal:** move service-behavior tests out of `tests/test_main.py` and into
