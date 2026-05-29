@@ -37,9 +37,9 @@ from app.analysis.technicals import TechnicalAnalysisError
 from app.data.fundamentals import FundamentalDataFetchError
 from app.data.market_data import DataFetchError
 from app.data.storage import StorageError, save_json_result, save_markdown_report, save_text_report
-from app.reports.report_generator import build_stock_report, generate_plain_text_report
+from app.reports.report_generator import generate_plain_text_report
 from app.reports.templates import format_report_markdown, format_watchlist_markdown
-from app.services.stock_analysis_service import analyze_ticker, analyze_watchlist_file
+from app.services.stock_analysis_service import analyze_stock, analyze_watchlist_file
 
 
 # ---------------------------------------------------------------------------
@@ -198,7 +198,7 @@ def main(argv: list[str] | None = None) -> int:
     ticker = args.ticker
 
     try:
-        rating = analyze_ticker(ticker)
+        stock_report = analyze_stock(ticker)
     except DataFetchError as exc:
         print(f"Error fetching market data: {exc}", file=sys.stderr)
         return 1
@@ -221,13 +221,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error scoring signals: {exc}", file=sys.stderr)
         return 1
 
-    stock_report = build_stock_report(rating)
     report = generate_plain_text_report(stock_report)
     print(report)
 
     if args.save_report:
         try:
-            path = save_text_report(report, rating.ticker)
+            path = save_text_report(report, stock_report.ticker)
             print(f"Saved text report to: {path}")
         except StorageError as exc:
             print(f"Warning: failed to save text report: {exc}", file=sys.stderr)
@@ -235,14 +234,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.save_markdown:
         try:
             md_text = format_report_markdown(stock_report)
-            path = save_markdown_report(md_text, rating.ticker)
+            path = save_markdown_report(md_text, stock_report.ticker)
             print(f"Saved Markdown report to: {path}")
         except StorageError as exc:
             print(f"Warning: failed to save Markdown report: {exc}", file=sys.stderr)
 
     if args.save_json:
         try:
-            path = save_json_result(rating, rating.ticker)
+            path = save_json_result(stock_report, stock_report.ticker)
             print(f"Saved JSON result to: {path}")
         except StorageError as exc:
             print(f"Warning: failed to save JSON result: {exc}", file=sys.stderr)

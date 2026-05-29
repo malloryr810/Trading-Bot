@@ -257,6 +257,48 @@ class TestAnalyzeTicker:
             with pytest.raises(ScoringError):
                 analyze_ticker("AAPL")
 
+    def test_fundamental_analysis_error_propagates(self):
+        with (
+            patch(f"{_SVC}.get_price_history",              return_value=MagicMock()),
+            patch(f"{_SVC}.get_company_fundamentals",       return_value=_make_mock_fundamentals()),
+            patch(f"{_SVC}.get_recent_news",                return_value=[]),
+            patch(f"{_SVC}.calculate_technical_indicators", return_value=MagicMock()),
+            patch(f"{_SVC}.summarize_technical_signals",    return_value=MagicMock()),
+            patch(f"{_SVC}.build_technical_signals",        return_value=[_make_signal()]),
+            patch(f"{_SVC}.build_fundamental_signals",      side_effect=FundamentalAnalysisError("bad")),
+        ):
+            with pytest.raises(FundamentalAnalysisError):
+                analyze_ticker("AAPL")
+
+    def test_risk_analysis_error_propagates(self):
+        with (
+            patch(f"{_SVC}.get_price_history",              return_value=MagicMock()),
+            patch(f"{_SVC}.get_company_fundamentals",       return_value=_make_mock_fundamentals()),
+            patch(f"{_SVC}.get_recent_news",                return_value=[]),
+            patch(f"{_SVC}.calculate_technical_indicators", return_value=MagicMock()),
+            patch(f"{_SVC}.summarize_technical_signals",    return_value=MagicMock()),
+            patch(f"{_SVC}.build_technical_signals",        return_value=[_make_signal()]),
+            patch(f"{_SVC}.build_fundamental_signals",      return_value=[]),
+            patch(f"{_SVC}.analyze_risk_conditions",        side_effect=RiskAnalysisError("bad")),
+        ):
+            with pytest.raises(RiskAnalysisError):
+                analyze_ticker("AAPL")
+
+    def test_news_analysis_error_propagates(self):
+        with (
+            patch(f"{_SVC}.get_price_history",              return_value=MagicMock()),
+            patch(f"{_SVC}.get_company_fundamentals",       return_value=_make_mock_fundamentals()),
+            patch(f"{_SVC}.get_recent_news",                return_value=[]),
+            patch(f"{_SVC}.calculate_technical_indicators", return_value=MagicMock()),
+            patch(f"{_SVC}.summarize_technical_signals",    return_value=MagicMock()),
+            patch(f"{_SVC}.build_technical_signals",        return_value=[_make_signal()]),
+            patch(f"{_SVC}.build_fundamental_signals",      return_value=[]),
+            patch(f"{_SVC}.analyze_risk_conditions",        return_value=[]),
+            patch(f"{_SVC}.analyze_news",                   side_effect=NewsAnalysisError("bad")),
+        ):
+            with pytest.raises(NewsAnalysisError):
+                analyze_ticker("AAPL")
+
 
 # ---------------------------------------------------------------------------
 # analyze_stock
@@ -321,6 +363,13 @@ class TestAnalyzeStock:
         ):
             with pytest.raises(ScoringError):
                 analyze_stock("AAPL")
+
+    def test_stock_report_is_json_serializable(self):
+        with _mock_pipeline():
+            result = analyze_stock("AAPL")
+        json_str = result.model_dump_json()
+        assert isinstance(json_str, str)
+        assert len(json_str) > 0
 
 
 # ---------------------------------------------------------------------------

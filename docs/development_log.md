@@ -1,5 +1,57 @@
 # Development Log
 
+## 2026-05-28 — Service boundary cleanup / UI readiness pass
+
+**Goal:** make `app/services/stock_analysis_service.py` the single stable entry
+point for both the CLI and any future UI, with no analysis orchestration
+remaining in `app/main.py`.
+
+**`app/main.py`** (updated)
+
+- Replaced `analyze_ticker(ticker)` + `build_stock_report(rating)` call chain
+  with a single `analyze_stock(ticker)` call. `main()` no longer imports
+  `analyze_ticker` or `build_stock_report` directly.
+- `--save-json` now exports a `StockReport` model instead of the lower-level
+  `Rating` model. `StockReport` is richer (partitioned signal lists, summaries,
+  `confidence_level` field) and is the natural object for a UI to consume.
+  **Breaking change:** JSON output schema has changed — any script that relied on
+  `Rating`-specific fields (`explanation`, `technical_score`, `fundamental_score`,
+  `news_score`, `risk_score`, `signals_used`) will need to be updated.
+
+**`tests/test_main.py`** (updated)
+
+- `TestMainErrors`: updated 7 patch targets from `app.main.analyze_ticker` to
+  `app.main.analyze_stock` — tests now cover the actual function `main()` calls.
+- `test_save_json_receives_rating_and_ticker` renamed and updated to
+  `test_save_json_receives_stock_report_and_ticker` checking for `StockReport`.
+- `test_save_json_rating_has_score` updated to `test_save_json_stock_report_has_score_and_category`.
+- Added `StockReport` import.
+- `analyze_ticker` import moved from `app.main` to `app.services.stock_analysis_service`
+  (the correct home).
+
+**`tests/test_stock_analysis_service.py`** (expanded)
+
+Added 4 new tests covering previously untested error propagation paths:
+- `test_fundamental_analysis_error_propagates` — `FundamentalAnalysisError` raised
+  by `build_fundamental_signals` bubbles out of `analyze_ticker`.
+- `test_risk_analysis_error_propagates` — `RiskAnalysisError` raised by
+  `analyze_risk_conditions` bubbles out of `analyze_ticker`.
+- `test_news_analysis_error_propagates` — `NewsAnalysisError` raised by
+  `analyze_news` bubbles out of `analyze_ticker`.
+- `test_stock_report_is_json_serializable` — `analyze_stock` result can be
+  serialized with `model_dump_json()`; confirms the service is UI-ready.
+
+**`docs/ui_readiness_notes.md`** (new)
+
+Created a UI readiness reference document covering: intended CLI → service →
+Streamlit → FastAPI path; public service API table; `StockReport` and
+`WatchlistResult` field inventories; error handling contract; what NOT to build
+yet (trading, broker APIs, ML/LLM, live polling); JSON export format change
+note; known future cleanup items.
+
+No scoring logic, weights, thresholds, analysis modules, or report formats
+changed. Full suite: all tests pass.
+
 ## 2026-05-26 — Service layer added for UI readiness
 
 Added `app/services/stock_analysis_service.py` and `app/services/__init__.py` as a

@@ -528,19 +528,7 @@ class TestMainWatchlistCLI:
 
     def test_single_ticker_still_works_with_watchlist_code_present(self):
         """Existing single-ticker path is unaffected by watchlist additions."""
-        from app.models.rating import ConfidenceLevel, Rating, RatingCategory
-        from app.models.signal import Signal, SignalCategory, SignalDirection, SignalStrength
-        sig = Signal(
-            name="T", category=SignalCategory.TECHNICAL,
-            direction=SignalDirection.NEUTRAL, strength=SignalStrength.MODERATE,
-            description="desc.", score_impact=0.1, confidence=0.6,
-        )
-        rating = Rating(
-            ticker="AAPL", final_category=RatingCategory.WATCHLIST, score=60.0,
-            confidence=ConfidenceLevel.MEDIUM, explanation="ok",
-            technical_score=60.0, signals_used=[sig], data_sources_used=["yfinance"],
-        )
-        with patch("app.main.analyze_ticker", return_value=rating):
+        with patch("app.main.analyze_stock", return_value=_make_mock_stock_report("AAPL")):
             result = main(["AAPL"])
         assert result == 0
 
@@ -923,7 +911,7 @@ class TestSingleTickerSaveUnchanged:
 
     def test_save_report_flag_still_works_for_single_ticker(self, tmp_path):
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_stock", return_value=_make_mock_stock_report("AAPL")),
             patch(_PATCH_SAVE_TEXT, return_value=self._FAKE_SINGLE_TXT) as mock_save,
         ):
             result = main(["AAPL", "--save-report"])
@@ -931,22 +919,21 @@ class TestSingleTickerSaveUnchanged:
         mock_save.assert_called_once()
 
     def test_save_json_flag_still_works_for_single_ticker(self, tmp_path):
-        from app.models.rating import Rating
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_stock", return_value=_make_mock_stock_report("AAPL")),
             patch(_PATCH_SAVE_JSON, return_value=self._FAKE_SINGLE_JSON) as mock_save,
         ):
             result = main(["AAPL", "--save-json"])
         assert result == 0
         mock_save.assert_called_once()
-        # Single-ticker JSON receives a Rating model, not a dict
+        # Single-ticker JSON now receives a StockReport model
+        from app.models.stock_report import StockReport
         data_arg = mock_save.call_args.args[0]
-        from app.models.rating import Rating
-        assert isinstance(data_arg, Rating)
+        assert isinstance(data_arg, StockReport)
 
     def test_single_ticker_save_does_not_call_watchlist_save(self, tmp_path):
         with (
-            patch("app.main.analyze_ticker", return_value=_make_mock_rating("AAPL")),
+            patch("app.main.analyze_stock", return_value=_make_mock_stock_report("AAPL")),
             patch(_PATCH_SAVE_TEXT, return_value=self._FAKE_SINGLE_TXT),
             patch("app.main._run_watchlist") as mock_watchlist,
         ):
@@ -975,4 +962,15 @@ def _make_mock_rating(ticker: str):
         technical_score=60.0,
         signals_used=[sig],
         data_sources_used=["yfinance"],
+    )
+
+
+def _make_mock_stock_report(ticker: str):
+    from app.models.rating import ConfidenceLevel, RatingCategory
+    from app.models.stock_report import StockReport
+    return StockReport(
+        ticker=ticker,
+        final_category=RatingCategory.WATCHLIST,
+        score=60.0,
+        confidence_level=ConfidenceLevel.MEDIUM,
     )

@@ -22,13 +22,15 @@ from app.data.fundamentals import FundamentalDataFetchError
 from app.data.market_data import DataFetchError
 from app.data.news_data import NewsFetchError
 from app.data.storage import StorageError
-from app.main import analyze_ticker, build_parser, main, parse_args
+from app.main import build_parser, main, parse_args
+from app.services.stock_analysis_service import analyze_ticker
 
 _SAVE_MARKDOWN        = "app.main.save_markdown_report"
 _FAKE_MD_PATH         = Path("outputs/reports/AAPL_20240601_000000.md")
 _PATCH_WL_MD_FORMATTER = "app.main.format_watchlist_markdown"
 from app.models.rating import ConfidenceLevel, Rating, RatingCategory
 from app.models.signal import Signal, SignalCategory, SignalDirection, SignalStrength
+from app.models.stock_report import StockReport
 
 
 # ---------------------------------------------------------------------------
@@ -168,43 +170,43 @@ class TestMainSuccess:
 
 class TestMainErrors:
     def test_data_fetch_error_returns_1(self, capsys):
-        with patch("app.main.analyze_ticker", side_effect=DataFetchError("bad ticker")):
+        with patch("app.main.analyze_stock", side_effect=DataFetchError("bad ticker")):
             result = main(["INVALID"])
         assert result == 1
         assert "Error fetching" in capsys.readouterr().err
 
     def test_fundamental_fetch_error_returns_1(self, capsys):
-        with patch("app.main.analyze_ticker", side_effect=FundamentalDataFetchError("no data")):
+        with patch("app.main.analyze_stock", side_effect=FundamentalDataFetchError("no data")):
             result = main(["AAPL"])
         assert result == 1
         assert "fundamental" in capsys.readouterr().err.lower()
 
     def test_technical_analysis_error_returns_1(self, capsys):
-        with patch("app.main.analyze_ticker", side_effect=TechnicalAnalysisError("bad data")):
+        with patch("app.main.analyze_stock", side_effect=TechnicalAnalysisError("bad data")):
             result = main(["AAPL"])
         assert result == 1
         assert "technical analysis" in capsys.readouterr().err.lower()
 
     def test_fundamental_analysis_error_returns_1(self, capsys):
-        with patch("app.main.analyze_ticker", side_effect=FundamentalAnalysisError("bad fundamentals")):
+        with patch("app.main.analyze_stock", side_effect=FundamentalAnalysisError("bad fundamentals")):
             result = main(["AAPL"])
         assert result == 1
         assert "fundamental analysis" in capsys.readouterr().err.lower()
 
     def test_risk_analysis_error_returns_1(self, capsys):
-        with patch("app.main.analyze_ticker", side_effect=RiskAnalysisError("bad risk")):
+        with patch("app.main.analyze_stock", side_effect=RiskAnalysisError("bad risk")):
             result = main(["AAPL"])
         assert result == 1
         assert "risk analysis" in capsys.readouterr().err.lower()
 
     def test_news_analysis_error_returns_1(self, capsys):
-        with patch("app.main.analyze_ticker", side_effect=NewsAnalysisError("bad news input")):
+        with patch("app.main.analyze_stock", side_effect=NewsAnalysisError("bad news input")):
             result = main(["AAPL"])
         assert result == 1
         assert "news analysis" in capsys.readouterr().err.lower()
 
     def test_scoring_error_returns_1(self, capsys):
-        with patch("app.main.analyze_ticker", side_effect=ScoringError("bad signals")):
+        with patch("app.main.analyze_stock", side_effect=ScoringError("bad signals")):
             result = main(["AAPL"])
         assert result == 1
         assert "scoring" in capsys.readouterr().err.lower()
@@ -442,22 +444,22 @@ class TestSaveFlags:
         # The same text printed to stdout is passed to save_text_report
         assert saved_text in printed
 
-    def test_save_json_receives_rating_and_ticker(self):
+    def test_save_json_receives_stock_report_and_ticker(self):
         with _mock_pipeline():
             with patch(_SAVE_JSON, return_value=_FAKE_JSON_PATH) as mock_save:
                 main(["AAPL", "--save-json"])
         call_args = mock_save.call_args.args
-        assert isinstance(call_args[0], Rating)  # result is the Rating model
+        assert isinstance(call_args[0], StockReport)  # result is the StockReport model
         assert call_args[0].ticker == "AAPL"
-        assert call_args[1] == "AAPL"            # ticker
+        assert call_args[1] == "AAPL"                 # ticker
 
-    def test_save_json_rating_has_score(self):
+    def test_save_json_stock_report_has_score_and_category(self):
         with _mock_pipeline():
             with patch(_SAVE_JSON, return_value=_FAKE_JSON_PATH) as mock_save:
                 main(["AAPL", "--save-json"])
-        rating_arg = mock_save.call_args.args[0]
-        assert hasattr(rating_arg, "score")
-        assert hasattr(rating_arg, "final_category")
+        report_arg = mock_save.call_args.args[0]
+        assert hasattr(report_arg, "score")
+        assert hasattr(report_arg, "final_category")
 
     def test_save_report_confirmation_printed(self, capsys):
         with _mock_pipeline():
