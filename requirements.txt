@@ -5,3 +5,6 @@ yfinance
 pydantic
 python-dotenv
 pytest
+fastapi
+uvicorn
+httpx

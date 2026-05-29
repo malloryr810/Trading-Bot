@@ -1,5 +1,44 @@
 # Development Log
 
+## 2026-05-28 — FastAPI backend milestone 1
+
+**Goal:** expose the analysis engine through a minimal FastAPI backend without
+touching existing CLI behaviour, service logic, or scoring.
+
+**`requirements.txt`** — added `fastapi`, `uvicorn`, `httpx2`.
+
+**`app/api/__init__.py`** — new package init.
+
+**`app/api/main.py`** — FastAPI app factory (`create_app`) plus module-level
+`app` instance for uvicorn. Routers mounted under the `/api` prefix.
+
+**`app/api/routes/health.py`** — `GET /api/health` → `{"status": "ok", "service": "investment-bot-api"}`.
+
+**`app/api/routes/analysis.py`** — `POST /api/analyze` → calls
+`analyze_stock(ticker)` from the service layer; never calls `_analyze_ticker`
+directly. Known project errors map to HTTP 422; unexpected errors map to HTTP
+500. Response model is `StockReport`.
+
+**`app/api/schemas/analysis.py`** — `AnalyzeRequest` Pydantic model: strips
+whitespace and uppercases the ticker at the API boundary.
+
+**`tests/test_api.py`** — 27 tests across five groups:
+- `GET /api/health` (3 tests)
+- Success path: returns 200, calls `analyze_stock`, serializes `StockReport` (7 tests)
+- Ticker normalization: lowercase, mixed case, whitespace (4 tests)
+- Invalid input → 422: empty ticker, whitespace, missing field, non-string (4 tests)
+- Known errors → 422: all six project error types (7 tests)
+- Unexpected errors → 500: `RuntimeError`, `ValueError` (2 tests)
+
+**CLI unchanged.** `python -m app.main` still works exactly as before.
+
+Run the API server:
+```
+uvicorn app.api.main:app --reload
+```
+
+---
+
 ## 2026-05-28 — Full-stack product architecture plan
 
 **Goal:** establish a clear technical direction for evolving the CLI tool into a

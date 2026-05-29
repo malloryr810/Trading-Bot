@@ -301,8 +301,8 @@ These constraints apply to all phases and all contributors:
 
 | Phase | Milestone | Scope |
 |---|---|---|
-| **1** | Architecture alignment | This document. No code changes. |
-| **2** | FastAPI backend — core | `app/api/`, `GET /api/health`, `POST /api/analyze`; wraps `analyze_stock`; no database yet |
+| **1** | Architecture alignment | This document. No code changes. ✓ Done |
+| **2** | FastAPI backend — core | `app/api/`, `GET /api/health`, `POST /api/analyze`; wraps `analyze_stock`; no database yet. ✓ Done |
 | **3** | Database persistence | `app/db/`, SQLite, save `StockReport` snapshots, `GET /api/reports/history` |
 | **4** | Next.js frontend foundation | Project scaffold, API client, Dashboard page, Stock Analysis page |
 | **5** | Watchlist management | Backend routes + frontend Watchlist page; scan and display ranked results |
@@ -317,17 +317,13 @@ Each phase must be completable independently. A phase is not started until the p
 
 ## 12. Immediate Next Step
 
-The next code milestone after this document is **FastAPI Backend — Phase 2**.
+~~FastAPI Backend — Phase 2 is complete.~~ The next code milestone is **Database Persistence — Phase 3**.
 
 Scope:
-- Create `app/api/` package with a FastAPI app factory.
-- Implement `GET /api/health` returning `{"status": "ok"}`.
-- Implement `POST /api/analyze` accepting `{"ticker": "..."}`, calling `analyze_stock`, and returning the `StockReport` as JSON.
-- Handle known pipeline errors (`DataFetchError`, `FundamentalDataFetchError`, etc.) with appropriate HTTP status codes and error bodies.
-- Add an `uvicorn` dev server entry point.
-- Add FastAPI and uvicorn to `requirements.txt`.
-- Add integration tests for the two routes.
+- Create `app/db/` package with SQLite session management and ORM models.
+- Save `StockReport` snapshots to an `analysis_reports` table on every `POST /api/analyze` call.
+- Implement `GET /api/reports/history` returning a paginated list of saved reports.
+- Implement `GET /api/reports/{id}` returning a single saved report.
+- Use SQLite for local development. No migration to PostgreSQL yet.
 
-**Do not add** in Phase 2: database, frontend, ML, simulation, authentication, watchlist endpoints, or any other route beyond health and analyze.
-
-The CLI (`python -m app.main`) must continue to work without modification after Phase 2.
+**Do not add** in Phase 3: frontend, ML, simulation, authentication, watchlist endpoints, or mock trading.
