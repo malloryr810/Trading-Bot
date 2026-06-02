@@ -20,7 +20,11 @@ export function DashboardPage() {
         Personal stock research and decision-support tool.
       </p>
 
-      <div className={`health-indicator health-${healthStatus}`}>
+      <div
+        className={`health-indicator health-${healthStatus}`}
+        role="status"
+        aria-live="polite"
+      >
         {healthStatus === 'checking' && 'Checking backend…'}
         {healthStatus === 'ok' && '✓ Backend connected'}
         {healthStatus === 'unavailable' &&

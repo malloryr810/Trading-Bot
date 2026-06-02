@@ -85,6 +85,7 @@ export function AnalyzePage() {
         />
         <div className="analyze-actions">
           <button
+            type="button"
             className="btn btn-primary"
             onClick={handleAnalyzeOnly}
             disabled={loading}
@@ -92,6 +93,7 @@ export function AnalyzePage() {
             Analyze only
           </button>
           <button
+            type="button"
             className="btn btn-secondary"
             onClick={handleAnalyzeAndSave}
             disabled={loading}
