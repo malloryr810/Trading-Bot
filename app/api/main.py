@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from app.api.routes import analysis, health
+from app.api.routes import analysis, health, reports
 
 
 def create_app() -> FastAPI:
@@ -21,6 +21,7 @@ def create_app() -> FastAPI:
     )
     _app.include_router(health.router, prefix="/api")
     _app.include_router(analysis.router, prefix="/api")
+    _app.include_router(reports.router, prefix="/api")
     return _app
 
 

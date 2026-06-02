@@ -85,10 +85,14 @@ python -m py_compile app/analysis/scoring.py
 | `app/watchlist.py` | Loads watchlist files, scans multiple tickers, formats ranked summary tables, and serializes results |
 | `app/utils/helpers.py` | Shared low-level helpers: `safe_float` and `normalize_ticker` |
 | `app/services/stock_analysis_service.py` | `analyze_stock` — public entry point for all callers (CLI and API); `_analyze_ticker` is internal |
+| `app/services/report_persistence_service.py` | `save_stock_report`, `list_saved_reports`, `get_saved_report` — SQLite persistence boundary |
+| `app/data/database.py` | SQLAlchemy Core engine factory (`build_engine`) and `analysis_reports` table definition |
 | `app/api/main.py` | FastAPI app factory; `uvicorn app.api.main:app` entry point |
 | `app/api/routes/health.py` | `GET /api/health` |
-| `app/api/routes/analysis.py` | `POST /api/analyze` — calls `analyze_stock`, maps known errors to 422, unexpected to 500 |
+| `app/api/routes/analysis.py` | `POST /api/analyze` — analysis only; calls `analyze_stock`, does not save |
+| `app/api/routes/reports.py` | `POST /api/reports/analyze`, `GET /api/reports/history`, `GET /api/reports/{id}` |
 | `app/api/schemas/analysis.py` | `AnalyzeRequest` — validates and normalizes ticker at the API boundary |
+| `app/api/schemas/reports.py` | `SavedReportSummary`, `SavedReportDetail` — response schemas for persistence endpoints |
 | `app/main.py` | Thin argparse CLI shell — delegates entirely to `app/services/` |
 
 ## Architecture
@@ -102,12 +106,13 @@ data/ → analysis/ → scoring.py → reports/ → services/ → CLI / API
 | Layer | Package | Responsibility |
 |-------|---------|---------------|
 | Data | `app/data/` | Fetch and validate raw data; return typed models or DataFrames |
+| Database | `app/data/database.py` | SQLAlchemy Core engine and schema; no business logic |
 | Analysis | `app/analysis/` | Compute signals from data; modules stay independent of each other |
 | Scoring | `app/analysis/scoring.py` | Aggregate signals into a composite Rating using weighted formula |
 | Reports | `app/reports/` | Format a Rating and its Signals into a human-readable StockReport |
-| Services | `app/services/` | Orchestrate the full pipeline; `analyze_stock` is the single public entry point |
+| Services | `app/services/` | `analyze_stock` — analysis pipeline entry point; `report_persistence_service` — DB boundary |
 | CLI | `app/main.py` | Thin argparse shell; calls `analyze_stock` from services |
-| API | `app/api/` | Thin FastAPI layer; calls `analyze_stock` from services |
+| API | `app/api/` | Thin FastAPI layer; routes call service functions; no pipeline or DB logic in route handlers |
 
 `app/watchlist.py` orchestrates the single-stock pipeline across multiple tickers.
 
@@ -119,8 +124,12 @@ data/ → analysis/ → scoring.py → reports/ → services/ → CLI / API
 - **Scoring** stays in `scoring.py`. Analysis modules produce signals; they do not score them.
 - **Reports** consume scoring outputs. Report modules do not run analysis or scoring.
 - **Watchlist** reuses the single-stock pipeline; it adds no analysis logic of its own.
-- **API route handlers** must stay thin — call `analyze_stock`, handle errors, return the result. No pipeline logic in routes.
+- **API route handlers** must stay thin — call service functions, handle errors, return the result. No pipeline or persistence logic in route handlers.
+- **API persistence routes** (`/api/reports/*`) call `analyze_stock` from `stock_analysis_service` and the persistence functions from `report_persistence_service`. They never duplicate pipeline logic.
+- **`POST /api/analyze`** is analysis-only and must never save to the database. Saving is exclusively done via `POST /api/reports/analyze`.
 - **CLI** must remain functional. Adding API or frontend layers must not break `python -m app.main`.
+- **Database** uses SQLAlchemy Core (not ORM). The `analysis_reports` table stores full `StockReport` JSON snapshots alongside indexed summary columns. The database file lives at `data/investment_bot.db` (configurable via `DATABASE_PATH` env var).
+- **Persistence service functions** accept an optional `engine` keyword argument for test injection. Production callers omit it; a shared engine is lazily initialised on first call.
 
 ## Scoring Weights
 
@@ -158,7 +167,7 @@ Each analysis module follows the same pattern:
 |-------|-------------|--------|
 | 1 | Architecture and technical design doc | Done |
 | 2 | FastAPI backend — `GET /api/health`, `POST /api/analyze` | Done |
-| 3 | SQLite persistence — save StockReport snapshots, report history endpoints | **Next — not started** |
+| 3 | SQLite persistence — save StockReport snapshots, report history endpoints | **Milestone 1 complete** — `POST /api/reports/analyze`, `GET /api/reports/history`, `GET /api/reports/{id}` |
 | 4 | Next.js frontend foundation | Not started |
 | 5 | Watchlist management (frontend + backend routes) | Not started |
 | 6 | Research notes and report history UI | Not started |

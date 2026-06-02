@@ -28,6 +28,9 @@ data/reports/*
 !data/processed/.gitkeep
 !data/reports/.gitkeep
 
+# SQLite database
+data/*.db
+
 # Notebooks checkpoints
 .ipynb_checkpoints/
 

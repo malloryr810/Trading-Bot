@@ -44,7 +44,6 @@ This project intentionally does not implement:
 - Margin or options trading
 - Portfolio automation
 - ML/LLM sentiment models
-- Database or cloud storage
 - Backtesting (planned for a future phase)
 
 ---
@@ -134,9 +133,12 @@ The server starts at `http://127.0.0.1:8000`. Interactive API docs are available
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/health` | Liveness check |
-| `POST` | `/api/analyze` | Analyze a ticker; returns a `StockReport` as JSON |
+| `POST` | `/api/analyze` | Analyze a ticker; returns a `StockReport` — **analysis only, nothing is saved** |
+| `POST` | `/api/reports/analyze` | Analyze a ticker and **save** the snapshot; returns saved metadata + report |
+| `GET` | `/api/reports/history` | List saved report summaries (id, ticker, category, score, confidence, created_at) |
+| `GET` | `/api/reports/{id}` | Return one full saved `StockReport` snapshot by id |
 
-**Example request:**
+**Analysis only (no persistence):**
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/analyze \
@@ -144,7 +146,25 @@ curl -X POST http://127.0.0.1:8000/api/analyze \
   -d '{"ticker": "AAPL"}'
 ```
 
-The API delegates to the same `analyze_stock` service function used by the CLI. It does not execute trades.
+**Analyze and save:**
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/reports/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"ticker": "AAPL"}'
+```
+
+**Report history:**
+
+```bash
+curl http://127.0.0.1:8000/api/reports/history
+curl "http://127.0.0.1:8000/api/reports/history?limit=10"
+curl http://127.0.0.1:8000/api/reports/1
+```
+
+All routes delegate to the same `analyze_stock` service function used by the CLI.
+The database file is stored at `data/investment_bot.db` (configurable via the
+`DATABASE_PATH` environment variable). No trades are executed.
 
 ---
 
@@ -218,16 +238,20 @@ app/
     main.py                        # FastAPI app factory (uvicorn entry point)
     routes/
       health.py                    # GET /api/health
-      analysis.py                  # POST /api/analyze
+      analysis.py                  # POST /api/analyze (analysis only, no save)
+      reports.py                   # POST /api/reports/analyze, GET /api/reports/history, GET /api/reports/{id}
     schemas/
       analysis.py                  # AnalyzeRequest Pydantic schema
+      reports.py                   # SavedReportSummary, SavedReportDetail schemas
   services/
     stock_analysis_service.py      # analyze_stock — public entry point for CLI and API
+    report_persistence_service.py  # save_stock_report, list_saved_reports, get_saved_report
   data/
     market_data.py                 # OHLCV price history
     fundamentals.py                # Company fundamentals
     news_data.py                   # Recent news headlines
     storage.py                     # Saves reports and JSON results to disk
+    database.py                    # SQLAlchemy Core engine and analysis_reports table
   analysis/
     technicals.py                  # Technical indicators and signals
     fundamentals_analysis.py       # Fundamental signals
@@ -260,8 +284,11 @@ outputs/
 
 The single-ticker and watchlist analysis pipelines are complete. The tool
 produces scored reports with technical, fundamental, news, and risk signals.
-A FastAPI backend (`app/api/`) exposes the same analysis through `POST /api/analyze`,
-backed by the same service layer used by the CLI.
+A FastAPI backend (`app/api/`) exposes the analysis through `POST /api/analyze`
+(analysis only) and `POST /api/reports/analyze` (analyze and persist). A SQLite
+persistence layer stores StockReport JSON snapshots with a history and detail
+endpoint for retrieval. All routes are backed by the same service layer used by
+the CLI.
 
 ## Planned Future Work
 

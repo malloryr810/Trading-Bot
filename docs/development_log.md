@@ -1,5 +1,76 @@
 # Development Log
 
+## 2026-06-01 — Phase 3 Milestone 1: SQLite persistence for StockReport snapshots
+
+**Goal:** add a SQLite persistence layer so the API can save, list, and retrieve
+full StockReport snapshots — without touching the analysis pipeline, scoring,
+CLI behavior, or the existing `POST /api/analyze` endpoint (which remains
+analysis-only).
+
+**`requirements.txt`** — added `sqlalchemy`.
+
+**`app/config.py`** — added `DATABASE_PATH` (env var override; default
+`data/investment_bot.db`).
+
+**`app/data/database.py`** (new)
+
+SQLAlchemy Core engine factory and table definition. `build_engine(db_path)` creates
+a SQLite engine, ensures the parent directory exists, and calls `metadata.create_all`
+so the schema is always up to date. Accepts `":memory:"` for in-memory testing.
+Table: `analysis_reports` — `id` (PK autoincrement), `ticker`, `company_name`
+(nullable), `category`, `score`, `confidence`, `report_json` (full JSON text),
+`created_at`.  No ORM; all queries are SQLAlchemy Core.
+
+**`app/services/report_persistence_service.py`** (new)
+
+Public persistence boundary with three functions:
+- `save_stock_report(report, *, engine=None)` — inserts a row and returns summary + report dict.
+- `list_saved_reports(limit=50, *, engine=None)` — returns summary rows ordered by `id DESC` (newest first); excludes the full JSON blob.
+- `get_saved_report(report_id, *, engine=None)` — returns one full snapshot (round-tripped via `StockReport.model_validate_json`), or `None`.
+
+Each function accepts an optional keyword-only `engine` for test injection; production
+callers omit it and a shared engine is lazily initialised on first call.
+
+**`app/api/schemas/reports.py`** (new)
+
+`SavedReportSummary` (id, ticker, company_name, category, score, confidence, created_at)
+and `SavedReportDetail` (extends summary with `report: StockReport`).
+
+**`app/api/routes/reports.py`** (new)
+
+Three thin route handlers; all delegate to the service layer:
+- `POST /api/reports/analyze` — calls `analyze_stock`, then `save_stock_report`; returns `SavedReportDetail`.
+- `GET  /api/reports/history` — calls `list_saved_reports(limit=limit)`; returns `list[SavedReportSummary]`.
+- `GET  /api/reports/{report_id}` — calls `get_saved_report`; returns `SavedReportDetail` or 404.
+
+Known analysis errors map to 422; unexpected errors to 500; save is skipped on any error.
+
+**`app/api/main.py`** — registered the new `reports` router under `/api`.
+
+**`.gitignore`** — added `data/*.db` so the SQLite file is never committed.
+
+**`tests/test_persistence.py`** (new — 56 tests)
+
+All tests use a `tmp_path` SQLite engine; no writes to the real database.
+Covers: return types, sequential IDs, field values, company_name=None, created_at
+presence, ordering, limit enforcement, report JSON roundtrip, independent retrieval
+of two records, and None for missing IDs.
+
+**`tests/test_api_reports.py`** (new — 63 tests)
+
+`analyze_stock` and all three persistence functions are mocked at the route-import
+level; no network calls, no real database. Covers: success path, ticker normalization,
+invalid input (422), all six known service errors (422 + no-save assertion), unexpected
+errors (500 + no-save assertion), history list shape, custom limit, empty history,
+full-report retrieval, 404, non-integer id (422), and two assertions that confirm
+`POST /api/analyze` never touches the persistence layer.
+
+**No changes** to analysis modules, scoring, report formatters, or CLI behavior.
+
+**pytest:** 1472 passed (was 1354, +118 new tests).
+
+---
+
 ## 2026-05-28 — Post-FastAPI code review and documentation cleanup
 
 **Goal:** review and clean up the repo after the FastAPI milestone; no new

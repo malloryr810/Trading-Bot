@@ -18,3 +18,6 @@ NEWS_API_KEY: str = os.getenv("NEWS_API_KEY", "")
 # --- Runtime environment ---
 ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
 DEBUG: bool = ENVIRONMENT == "development"
+
+# --- Database ---
+DATABASE_PATH: str = os.getenv("DATABASE_PATH", "data/investment_bot.db")
