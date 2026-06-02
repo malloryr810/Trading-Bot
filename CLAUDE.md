@@ -93,6 +93,7 @@ python -m py_compile app/analysis/scoring.py
 | `app/api/routes/reports.py` | `POST /api/reports/analyze`, `GET /api/reports/history`, `GET /api/reports/{id}` |
 | `app/api/schemas/analysis.py` | `AnalyzeRequest` — validates and normalizes ticker at the API boundary |
 | `app/api/schemas/reports.py` | `SavedReportSummary`, `SavedReportDetail` — response schemas for persistence endpoints |
+| `app/api/errors.py` | `KNOWN_ANALYSIS_ERRORS` — shared tuple of pipeline error types used by both API routes for 422 mapping |
 | `app/main.py` | Thin argparse CLI shell — delegates entirely to `app/services/` |
 
 ## Architecture

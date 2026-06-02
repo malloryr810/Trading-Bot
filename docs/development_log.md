@@ -1,5 +1,52 @@
 # Development Log
 
+## 2026-06-01 — Review and cleanup pass after Phase 3 Milestone 1
+
+**Goal:** review the SQLite persistence implementation for correctness, maintainability,
+and architecture alignment; make only safe, narrow corrections — no new features.
+
+**Issues found and fixed:**
+
+**`app/services/report_persistence_service.py`** — added `_as_utc(value)` helper;
+applied in `_summary_from_row` and the `get_saved_report` return dict. SQLite drops
+timezone info on storage; without this fix, `list_saved_reports` and `get_saved_report`
+returned naive datetimes while `save_stock_report` returned UTC-aware datetimes, making
+`created_at` inconsistent across the three endpoints.
+
+**`app/api/errors.py`** (new) — `KNOWN_ANALYSIS_ERRORS` tuple consolidating the seven
+pipeline error types mapped to HTTP 422. Both route modules previously defined identical
+copies, creating a maintenance hazard.
+
+**`app/api/routes/analysis.py`** and **`app/api/routes/reports.py`** — replaced local
+`_KNOWN_ERRORS` tuples and seven individual error imports with a single import of
+`KNOWN_ANALYSIS_ERRORS` from `app.api.errors`.
+
+**`app/api/routes/reports.py`** — wrapped `save_stock_report(report)` in its own
+`try/except`. Previously a DB write failure would propagate as a raw unhandled exception;
+it now returns a clean HTTP 500 with `"Failed to save report"`.
+
+**`tests/test_persistence.py`** — removed a dead `from datetime import timezone as tz`
+import inside `test_list_created_at_is_utc`; the `tz` alias was never used in the test
+body and was left over from an earlier draft.
+
+**Tests added:**
+- `TestCreatedAtTimezone` (5 tests) — verify that datetimes read back from SQLite via
+  `list_saved_reports` and `get_saved_report` are UTC-aware, and that `save` and `list`
+  agree on the same moment.
+- `test_returns_none_for_negative_id` — persistence one-liner.
+- `test_save_failure_returns_500`, `test_save_failure_detail_is_clean`,
+  `test_save_failure_does_not_expose_internal_error` — cover the new save error-handling path.
+
+**Documentation:** updated `README.md` and `CLAUDE.md` to reflect the persistence layer
+(Architecture table, Project Structure, Currently Implemented).
+
+**No changes** to analysis modules, scoring engine, report formatters, CLI behavior, or
+the database schema.
+
+**pytest:** 1481 passed (was 1472 after Phase 3 Milestone 1, +9 new tests).
+
+---
+
 ## 2026-06-01 — Phase 3 Milestone 1: SQLite persistence for StockReport snapshots
 
 **Goal:** add a SQLite persistence layer so the API can save, list, and retrieve

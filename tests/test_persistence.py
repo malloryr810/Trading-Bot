@@ -352,7 +352,6 @@ class TestCreatedAtTimezone:
         assert result["created_at"].tzinfo is not None
 
     def test_list_created_at_is_utc(self, engine):
-        from datetime import timezone as tz
         save_stock_report(_make_report(), engine=engine)
         result = list_saved_reports(engine=engine)[0]
         assert result["created_at"].utcoffset().total_seconds() == 0

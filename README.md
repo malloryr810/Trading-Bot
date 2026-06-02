@@ -190,7 +190,8 @@ app/data/ → app/analysis/ → app/analysis/scoring.py → app/reports/ → app
 | `app/analysis/` | Compute independent signal lists from data |
 | `app/analysis/scoring.py` | Aggregate signals into a composite Rating |
 | `app/reports/` | Format a Rating into a human-readable StockReport |
-| `app/services/` | Public service boundary — `analyze_stock` is the single entry point for callers |
+| `app/services/` | Public service boundary — `analyze_stock` for analysis, `report_persistence_service` for saved snapshot I/O |
+| `app/data/database.py` | SQLAlchemy Core schema and engine factory; no business logic |
 | `app/watchlist.py` | Orchestrate the pipeline across multiple tickers |
 | `app/main.py` | Thin argparse CLI shell; delegates to `app/services/` |
 | `app/api/` | Thin FastAPI layer; delegates to `app/services/` |
@@ -236,6 +237,7 @@ app/
   watchlist.py                     # Watchlist scanning and formatting
   api/
     main.py                        # FastAPI app factory (uvicorn entry point)
+    errors.py                      # Shared KNOWN_ANALYSIS_ERRORS tuple used by both API routes
     routes/
       health.py                    # GET /api/health
       analysis.py                  # POST /api/analyze (analysis only, no save)
