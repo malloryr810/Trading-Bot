@@ -193,3 +193,35 @@ class TestAnalyzeUnexpectedErrors:
         with patch(_ANALYZE_STOCK, side_effect=ValueError("something broke")):
             response = client.post("/api/analyze", json={"ticker": "AAPL"})
         assert "detail" in response.json()
+
+
+# ---------------------------------------------------------------------------
+# CORS — local frontend origins
+# ---------------------------------------------------------------------------
+
+class TestCors:
+    def test_allowed_origin_gets_cors_header(self, client):
+        response = client.get(
+            "/api/health",
+            headers={"Origin": "http://localhost:5173"},
+        )
+        assert response.headers.get("access-control-allow-origin") == "http://localhost:5173"
+
+    def test_preflight_from_local_frontend_is_allowed(self, client):
+        response = client.options(
+            "/api/analyze",
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "Content-Type",
+            },
+        )
+        assert response.status_code == 200
+        assert response.headers.get("access-control-allow-origin") == "http://localhost:5173"
+
+    def test_unknown_origin_is_not_reflected(self, client):
+        response = client.get(
+            "/api/health",
+            headers={"Origin": "http://evil.com"},
+        )
+        assert response.headers.get("access-control-allow-origin") is None

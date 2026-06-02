@@ -1,0 +1,373 @@
+/* ── Design tokens ─────────────────────────────────────────────────── */
+:root {
+  --color-primary: #1a56db;
+  --color-primary-hover: #1e429f;
+  --color-success: #057a55;
+  --color-error: #e02424;
+  --color-bg: #f9fafb;
+  --color-surface: #ffffff;
+  --color-border: #d1d5db;
+  --color-text: #111827;
+  --color-text-muted: #6b7280;
+  --color-badge-bg: #e0e7ff;
+  --color-badge-text: #3730a3;
+  --radius: 6px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* ── Reset ─────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.6;
+}
+
+/* ── App shell ─────────────────────────────────────────────────────── */
+.app-header {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  height: 56px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: var(--shadow);
+}
+
+.app-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+  white-space: nowrap;
+}
+
+.app-header nav {
+  display: flex;
+  gap: 20px;
+}
+
+.app-header nav a {
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: 0.95rem;
+  padding: 4px 0;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.app-header nav a.active,
+.app-header nav a:hover {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.app-main {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+/* ── Page ──────────────────────────────────────────────────────────── */
+.page h1 {
+  margin: 0 0 6px;
+  font-size: 1.75rem;
+}
+
+.subtitle {
+  color: var(--color-text-muted);
+  margin: 0 0 24px;
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────── */
+.btn {
+  display: inline-block;
+  padding: 8px 20px;
+  border-radius: var(--radius);
+  border: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1.5;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.btn-secondary {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border: 1px solid var(--color-border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+/* ── Health indicator ──────────────────────────────────────────────── */
+.health-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  margin-bottom: 20px;
+}
+
+.health-checking {
+  background: #f3f4f6;
+  color: var(--color-text-muted);
+}
+
+.health-ok {
+  background: #d1fae5;
+  color: var(--color-success);
+}
+
+.health-unavailable {
+  background: #fee2e2;
+  color: var(--color-error);
+}
+
+/* ── Disclaimer ────────────────────────────────────────────────────── */
+.disclaimer {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  margin-bottom: 24px;
+  color: #92400e;
+}
+
+.dashboard-actions {
+  margin-bottom: 24px;
+}
+
+.milestone-note {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  margin-top: 32px;
+}
+
+/* ── Analyze form ──────────────────────────────────────────────────── */
+.analyze-form {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow);
+}
+
+.ticker-input {
+  display: block;
+  width: 100%;
+  max-width: 240px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  margin-bottom: 14px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.ticker-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.15);
+}
+
+.ticker-input:disabled {
+  opacity: 0.6;
+}
+
+.analyze-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.action-hint {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+/* ── Loading ───────────────────────────────────────────────────────── */
+.loading-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  color: var(--color-text-muted);
+}
+
+.loading-state p {
+  margin: 0;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Error ─────────────────────────────────────────────────────────── */
+.error-message {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  color: var(--color-error);
+  margin-bottom: 16px;
+}
+
+.error-message p {
+  margin: 0;
+}
+
+/* ── StockReportView ───────────────────────────────────────────────── */
+.report-view {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow);
+  margin-bottom: 24px;
+}
+
+.report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.report-ticker {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.1;
+}
+
+.report-company {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+
+.report-price {
+  margin: 6px 0 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.report-verdict {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.category-badge {
+  display: inline-block;
+  background: var(--color-badge-bg);
+  color: var(--color-badge-text);
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.report-score {
+  margin: 10px 0 2px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.report-confidence {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  text-transform: capitalize;
+}
+
+.saved-notice {
+  background: #d1fae5;
+  color: var(--color-success);
+  border-radius: var(--radius);
+  padding: 6px 14px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 20px;
+}
+
+.report-section {
+  border-top: 1px solid var(--color-border);
+  padding-top: 16px;
+  margin-bottom: 16px;
+}
+
+.section-title {
+  margin: 0 0 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.report-section p {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+
+.report-section ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.report-section li {
+  margin-bottom: 4px;
+  font-size: 0.95rem;
+}

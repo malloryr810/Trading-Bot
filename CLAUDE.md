@@ -95,6 +95,12 @@ python -m py_compile app/analysis/scoring.py
 | `app/api/schemas/reports.py` | `SavedReportSummary`, `SavedReportDetail` — response schemas for persistence endpoints |
 | `app/api/errors.py` | `KNOWN_ANALYSIS_ERRORS` — shared tuple of pipeline error types used by both API routes for 422 mapping |
 | `app/main.py` | Thin argparse CLI shell — delegates entirely to `app/services/` |
+| `frontend/` | React + Vite + TypeScript browser frontend (Milestone 1 complete) |
+| `frontend/src/api/client.ts` | Base fetch wrapper; `ApiError` class; `VITE_API_BASE_URL` env var |
+| `frontend/src/api/analysisApi.ts` | `checkHealth`, `analyzeOnly`, `analyzeAndSave` — one function per backend endpoint |
+| `frontend/src/components/` | `LoadingState`, `ErrorMessage`, `StockReportView` — presentational only |
+| `frontend/src/pages/` | `DashboardPage` (health check, disclaimer), `AnalyzePage` (analyze + display) |
+| `frontend/src/types/report.ts` | TypeScript interfaces mirroring `StockReport`, `SavedReportSummary`, `SavedReportDetail` |
 
 ## Architecture
 
@@ -114,6 +120,7 @@ data/ → analysis/ → scoring.py → reports/ → services/ → CLI / API
 | Services | `app/services/` | `analyze_stock` — analysis pipeline entry point; `report_persistence_service` — DB boundary |
 | CLI | `app/main.py` | Thin argparse shell; calls `analyze_stock` from services |
 | API | `app/api/` | Thin FastAPI layer; routes call service functions; no pipeline or DB logic in route handlers |
+| Frontend | `frontend/` | React + Vite display layer; calls API endpoints; never duplicates analysis or scoring logic |
 
 `app/watchlist.py` orchestrates the single-stock pipeline across multiple tickers.
 
@@ -169,7 +176,7 @@ Each analysis module follows the same pattern:
 | 1 | Architecture and technical design doc | Done |
 | 2 | FastAPI backend — `GET /api/health`, `POST /api/analyze` | Done |
 | 3 | SQLite persistence — save StockReport snapshots, report history endpoints | **Milestone 1 complete** — `POST /api/reports/analyze`, `GET /api/reports/history`, `GET /api/reports/{id}` |
-| 4 | React + Vite frontend — Milestone 1: shell with API connectivity | **Planned** — see `docs/frontend_plan.md`; no code written yet |
+| 4 | React + Vite frontend — Milestone 1: shell with API connectivity | **Complete** — Dashboard + Analyze pages, health check, analyze-only and analyze-and-save flows |
 | 5 | Watchlist management (frontend + backend routes) | Not started |
 | 6 | Research notes and report history UI | Not started |
 | 7 | Mock trading simulation (`app/simulation/`) | Not started |
@@ -190,7 +197,9 @@ These apply to every phase and every task:
 - **No CLI regression** — `python -m app.main` must always work after any change
 - **No premature ML** — do not add `app/ml/` until Phase 8 is explicitly scoped
 - **No premature simulation** — do not add `app/simulation/` until Phase 7 is explicitly scoped
-- **No frontend code without a plan** — frontend implementation has not started; all frontend work must follow `docs/frontend_plan.md`
+- **Frontend must not duplicate backend logic** — no scoring, signal calculation, category derivation, or persistence in frontend code; display only
+- **Frontend data ownership** — frontend formats dates/numbers for display; it must never recalculate ratings, categories, or weights; all analysis stays in the backend
+- **Frontend stack** — React + Vite + TypeScript; plain CSS; native fetch; React Router; see `docs/frontend_plan.md` for the full plan
 
 ## Key Docs
 

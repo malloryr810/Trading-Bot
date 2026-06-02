@@ -1,5 +1,65 @@
 # Development Log
 
+## 2026-06-02 — Frontend Milestone 1: React + Vite shell with API connectivity
+
+**Goal:** build the first working frontend following `docs/frontend_plan.md`.
+No backend analysis, scoring, persistence, or CLI behavior changed.
+
+**Backend change — CORS middleware (`app/api/main.py`)**
+
+Added `CORSMiddleware` to the FastAPI app factory. Allowed origins are limited to
+`http://localhost:5173` and `http://127.0.0.1:5173` (Vite dev server defaults).
+Allowed methods: GET and POST. Allowed headers: Content-Type. No wildcard origins.
+
+**New frontend app (`frontend/`)**
+
+Scaffolded with `npm create vite@latest -- --template react-ts` (Vite 8, React 19,
+TypeScript 6), then replaced all template source files with our own. Added
+`react-router-dom` v7 for routing.
+
+Key frontend files created:
+
+- **`frontend/src/types/report.ts`** — `StockReport`, `SavedReportSummary`,
+  `SavedReportDetail` TypeScript interfaces mirroring backend Pydantic schemas.
+  No analysis or scoring logic.
+- **`frontend/src/api/client.ts`** — base fetch wrapper; `ApiError` class with
+  status code; handles network errors (backend unreachable) and non-2xx responses
+  cleanly. Base URL from `VITE_API_BASE_URL` env var, defaults to `http://127.0.0.1:8000`.
+- **`frontend/src/api/analysisApi.ts`** — `checkHealth`, `analyzeOnly`,
+  `analyzeAndSave`; one function per backend endpoint.
+- **`frontend/src/components/LoadingState.tsx`** — spinner with `role="status"`.
+- **`frontend/src/components/ErrorMessage.tsx`** — error display with `role="alert"`.
+- **`frontend/src/components/StockReportView.tsx`** — defensive display of all
+  StockReport fields; no re-calculation of score, category, or summaries.
+- **`frontend/src/pages/DashboardPage.tsx`** — health check on mount, disclaimer,
+  link to Analyze page, Milestone 2 note.
+- **`frontend/src/pages/AnalyzePage.tsx`** — ticker input, Analyze-only button
+  (POST /api/analyze), Analyze-and-save button (POST /api/reports/analyze), loading
+  state, error display, StockReportView result.
+- **`frontend/src/App.tsx`** — BrowserRouter, sticky header with NavLink navigation,
+  route table (`/` → Dashboard, `/analyze` → Analyze).
+- **`frontend/src/styles.css`** — plain CSS with custom properties; no framework.
+- **`frontend/.env.example`** — `VITE_API_BASE_URL=http://127.0.0.1:8000`.
+
+**Backend tests — CORS (`tests/test_api.py`)**
+
+Added `TestCors` class (3 tests): allowed origin gets the CORS header, preflight
+OPTIONS request from the local frontend is accepted, unknown origin is not reflected.
+
+**`docs/frontend_plan.md`** — updated status from "planning only" to "Milestone 1 complete".
+
+**`README.md`** — added "Running the Frontend" section (env setup, dev server, build);
+updated Current Status; updated Project Structure to include `frontend/`.
+
+**`CLAUDE.md`** — added frontend entries to Currently Implemented and Architecture
+tables; updated Phase 4 status; added frontend data ownership guardrails.
+
+**npm run build:** passes (238 kB JS / 5 kB CSS gzipped, 0 TypeScript errors).
+**npm run lint:** clean (0 ESLint warnings or errors).
+**pytest:** 1484 passed (was 1481, +3 CORS tests).
+
+---
+
 ## 2026-06-01 — Frontend planning document
 
 **Goal:** define the frontend plan for Phase 4 before writing any frontend code, so that

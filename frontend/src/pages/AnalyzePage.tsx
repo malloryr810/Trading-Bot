@@ -1,0 +1,119 @@
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { analyzeAndSave, analyzeOnly } from '../api/analysisApi'
+import { ApiError } from '../api/client'
+import { ErrorMessage } from '../components/ErrorMessage'
+import { LoadingState } from '../components/LoadingState'
+import { StockReportView } from '../components/StockReportView'
+import type { StockReport } from '../types/report'
+
+export function AnalyzePage() {
+  const [ticker, setTicker] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [report, setReport] = useState<StockReport | null>(null)
+  const [savedId, setSavedId] = useState<number | null>(null)
+
+  function clearResult() {
+    setError(null)
+    setReport(null)
+    setSavedId(null)
+  }
+
+  async function handleAnalyzeOnly() {
+    const t = ticker.trim().toUpperCase()
+    if (!t) {
+      setError('Please enter a ticker symbol.')
+      return
+    }
+    setLoading(true)
+    clearResult()
+    try {
+      const result = await analyzeOnly(t)
+      setReport(result)
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'Analysis failed — please try again.',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleAnalyzeAndSave() {
+    const t = ticker.trim().toUpperCase()
+    if (!t) {
+      setError('Please enter a ticker symbol.')
+      return
+    }
+    setLoading(true)
+    clearResult()
+    try {
+      const result = await analyzeAndSave(t)
+      setReport(result.report)
+      setSavedId(result.id)
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'Analysis failed — please try again.',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="page">
+      <h1>Analyze a Ticker</h1>
+
+      <div className="analyze-form">
+        <input
+          type="text"
+          className="ticker-input"
+          placeholder="e.g. AAPL"
+          value={ticker}
+          onChange={(e) => setTicker(e.target.value.toUpperCase())}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleAnalyzeOnly()
+          }}
+          disabled={loading}
+          aria-label="Ticker symbol"
+          autoFocus
+        />
+        <div className="analyze-actions">
+          <button
+            className="btn btn-primary"
+            onClick={handleAnalyzeOnly}
+            disabled={loading}
+          >
+            Analyze only
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={handleAnalyzeAndSave}
+            disabled={loading}
+          >
+            Analyze and save
+          </button>
+        </div>
+        <p className="action-hint">
+          <em>Analyze only</em> returns results without saving.{' '}
+          <em>Analyze and save</em> persists the report to history.
+        </p>
+      </div>
+
+      {loading && <LoadingState />}
+      {error && <ErrorMessage message={error} />}
+      {report && (
+        <StockReportView report={report} savedId={savedId ?? undefined} />
+      )}
+
+      <p>
+        <Link to="/">← Back to Dashboard</Link>
+      </p>
+    </div>
+  )
+}

@@ -128,6 +128,9 @@ uvicorn app.api.main:app --reload
 
 The server starts at `http://127.0.0.1:8000`. Interactive API docs are available at `http://127.0.0.1:8000/docs`.
 
+CORS is configured to allow `http://localhost:5173` and `http://127.0.0.1:5173`
+(the Vite dev server defaults) so the frontend can call the backend during development.
+
 ### Endpoints
 
 | Method | Path | Description |
@@ -168,7 +171,47 @@ The database file is stored at `data/investment_bot.db` (configurable via the
 
 ---
 
-## Running Tests
+## Running the Frontend
+
+### Prerequisites
+
+The backend must be running before the frontend will work (the health check calls `/api/health` on load).
+
+### First-time setup
+
+```bash
+cd frontend
+cp .env.example .env        # copy the env template (edit if backend runs on a different port)
+npm install
+```
+
+### Start the dev server
+
+```bash
+cd frontend
+npm run dev
+```
+
+The app opens at `http://localhost:5173`.
+
+**Current Milestone 1 scope:**
+- Dashboard page — backend health status, disclaimer, link to Analyze
+- Analyze page — enter a ticker, choose "Analyze only" (POST /api/analyze) or "Analyze and save" (POST /api/reports/analyze), view the StockReport result
+
+**Planned in Milestone 2:** saved report history page and report detail page.
+
+### Build for production
+
+```bash
+cd frontend
+npm run build
+```
+
+Outputs to `frontend/dist/`.
+
+---
+
+## Running Backend Tests
 
 ```bash
 pytest
@@ -278,6 +321,24 @@ docs/                              # Architecture, scoring rules, data sources, 
 outputs/
   reports/                         # Saved plain-text reports (TICKER_YYYYMMDD_HHMMSS.txt)
   results/                         # Saved JSON results (TICKER_YYYYMMDD_HHMMSS.json)
+frontend/                          # React + Vite + TypeScript frontend (Milestone 1)
+  src/
+    api/
+      client.ts                    # Base fetch wrapper; base URL, ApiError class
+      analysisApi.ts               # checkHealth, analyzeOnly, analyzeAndSave
+    components/
+      LoadingState.tsx             # Spinner with accessible role/aria attributes
+      ErrorMessage.tsx             # Accessible error display
+      StockReportView.tsx          # Full StockReport result display
+    pages/
+      DashboardPage.tsx            # Health status, disclaimer, nav to Analyze
+      AnalyzePage.tsx              # Ticker input, analyze/save actions, report result
+    types/
+      report.ts                    # TypeScript interfaces mirroring backend schemas
+    App.tsx                        # BrowserRouter, NavLink header, route table
+    main.tsx                       # Vite entry point
+    styles.css                     # Plain CSS — no framework
+  .env.example                     # Copy to .env before running dev server
 ```
 
 ---
@@ -291,6 +352,11 @@ A FastAPI backend (`app/api/`) exposes the analysis through `POST /api/analyze`
 persistence layer stores StockReport JSON snapshots with a history and detail
 endpoint for retrieval. All routes are backed by the same service layer used by
 the CLI.
+
+A React + Vite frontend (`frontend/`) is in active development. Milestone 1 is
+complete: the Dashboard and Analyze pages are built and connected to the backend.
+The Analyze page supports both analyze-only and analyze-and-save flows. Report
+history and detail pages are planned for Milestone 2.
 
 ## Planned Future Work
 

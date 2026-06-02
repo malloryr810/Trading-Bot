@@ -1,7 +1,8 @@
 # Frontend Plan — Investment Bot
 
-> **Status:** Planning only. No frontend code has been written.
-> Implementation begins after this document is reviewed and the first milestone is approved.
+> **Status:** Milestone 1 complete — React + Vite shell with API connectivity is built and tested.
+> Dashboard page (health check, disclaimer) and Analyze page (analyze-only + analyze-and-save) are live.
+> Milestone 2 (report history + detail pages) is next.
 
 ---
 
