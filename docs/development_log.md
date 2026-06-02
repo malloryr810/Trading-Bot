@@ -1,5 +1,52 @@
 # Development Log
 
+## 2026-06-01 — Frontend planning document
+
+**Goal:** define the frontend plan for Phase 4 before writing any frontend code, so that
+when implementation begins the UI can consume the existing FastAPI backend cleanly.
+
+**`docs/frontend_plan.md`** (new)
+
+Twelve-section planning document covering:
+
+- **Purpose** — why the frontend exists (display, input, navigation); backend stays the
+  single source of truth for all analysis, scoring, and persistence.
+- **Non-goals** — explicit list of what the frontend must never implement (trading, broker
+  APIs, order execution, portfolio management, scoring logic duplication, ML).
+- **Stack recommendation** — React + Vite (TypeScript) for Milestone 1; rationale vs.
+  Next.js and Streamlit.
+- **App structure** — proposed `frontend/src/` layout: `api/`, `components/`, `pages/`,
+  `types/`, with purpose of each folder explained.
+- **Initial screens** — Dashboard, Analyze Ticker, Report History, Report Detail; API
+  calls, required fields, and empty/error states for each.
+- **API contract** — all five endpoints documented with method, path, request body,
+  response shape, and frontend behavior on success and on each error type.
+- **Loading and error states** — table covering backend unavailable, invalid ticker,
+  empty history, 404, slow analysis, save failure, and unexpected 500.
+- **Data ownership rules** — explicit table stating that backend owns analysis, scoring,
+  StockReport generation, and persistence; frontend only renders and submits.
+- **Milestone 1 scope** — React + Vite scaffold, API client, Analyze page connected to
+  `POST /api/analyze` and `POST /api/reports/analyze`; everything else deferred.
+- **Later milestones** — outline for Milestones 2–6 (history/detail, dashboard, charts,
+  watchlist UI, mock trading UI) with their backend dependencies noted.
+- **Open questions** — CORS config, styling approach, repo layout, env var for API base
+  URL, history pagination strategy.
+- **Recommended next step** — do not implement immediately; resolve open questions, then
+  open a narrow "Milestone 1" implementation task.
+
+**`README.md`** — added React + Vite frontend to Planned Future Work with a pointer to
+`docs/frontend_plan.md`.
+
+**`CLAUDE.md`** — updated Phase 4 status row; added a Non-Negotiable Guardrail noting
+that frontend code must follow `docs/frontend_plan.md`; added `docs/frontend_plan.md` to
+Key Docs.
+
+**No production code changed.** No tests added or removed.
+
+**pytest:** 1481 passed (unchanged).
+
+---
+
 ## 2026-06-01 — Review and cleanup pass after Phase 3 Milestone 1
 
 **Goal:** review the SQLite persistence implementation for correctness, maintainability,

@@ -169,7 +169,7 @@ Each analysis module follows the same pattern:
 | 1 | Architecture and technical design doc | Done |
 | 2 | FastAPI backend — `GET /api/health`, `POST /api/analyze` | Done |
 | 3 | SQLite persistence — save StockReport snapshots, report history endpoints | **Milestone 1 complete** — `POST /api/reports/analyze`, `GET /api/reports/history`, `GET /api/reports/{id}` |
-| 4 | Next.js frontend foundation | Not started |
+| 4 | React + Vite frontend — Milestone 1: shell with API connectivity | **Planned** — see `docs/frontend_plan.md`; no code written yet |
 | 5 | Watchlist management (frontend + backend routes) | Not started |
 | 6 | Research notes and report history UI | Not started |
 | 7 | Mock trading simulation (`app/simulation/`) | Not started |
@@ -190,12 +190,14 @@ These apply to every phase and every task:
 - **No CLI regression** — `python -m app.main` must always work after any change
 - **No premature ML** — do not add `app/ml/` until Phase 8 is explicitly scoped
 - **No premature simulation** — do not add `app/simulation/` until Phase 7 is explicitly scoped
+- **No frontend code without a plan** — frontend implementation has not started; all frontend work must follow `docs/frontend_plan.md`
 
 ## Key Docs
 
 - `docs/project_plan.md` — version roadmap
 - `docs/architecture.md` — full layer diagram
 - `docs/full_stack_product_architecture.md` — full-stack product plan and phase roadmap
+- `docs/frontend_plan.md` — frontend design and milestone plan (React + Vite; implementation not yet started)
 - `docs/scoring_rules.md` — score weights and rating thresholds
 - `docs/data_sources.md` — provider options and selection criteria
 - `docs/development_log.md` — append an entry for each meaningful change

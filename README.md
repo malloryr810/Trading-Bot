@@ -296,6 +296,7 @@ the CLI.
 
 These areas are on the roadmap but not yet built:
 
+- **React + Vite frontend** — browser UI for analysis and saved report history (see `docs/frontend_plan.md` for the full plan)
 - **Improved scoring calibration** — better-calibrated weights and thresholds (see `docs/scoring_calibration_plan.md`)
 - **Better data validation** — richer error messages for missing or stale data fields
 - **Backtesting** — validate signals against historical outcomes (requires careful design)
