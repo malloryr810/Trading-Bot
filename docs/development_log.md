@@ -1,5 +1,16 @@
 # Development Log
 
+## 2026-06-10 — Codebase review and documentation sync
+
+**Goal:** full code-quality review (clean/useful/no redundancy) plus a docs accuracy pass. Behavior-preserving only.
+
+- Reviewed the whole tree (`app/`, `frontend/src/`, tests, watchlists, prompts). No layer violations, dead imports, debug prints, or swallowed errors found; architecture and guardrails hold throughout.
+- `app/analysis/scoring.py`: removed `_calculate_technical_score`, an exact one-line duplicate of the generic `_signals_to_score`; call site now uses `_signals_to_score` directly.
+- `.env.example`: aligned with `app/config.py` — dropped `OPENAI_API_KEY` (contradicts the no-ML/LLM guardrail) and the stale `DATABASE_URL`; added `DATABASE_PATH`; documented the optional provider keys.
+- `CLAUDE.md`: added the implemented `app/models/confidence_diagnostics.py` to the module table (was missing).
+- Left as findings (intentional, not changed): stale placeholder prompts in `prompts/` for now-implemented modules; unused `MARKET_DATA_API_KEY`/`NEWS_API_KEY` config kept as documented provider scaffolding.
+- All 1484 tests pass; `python -m app.main` unaffected.
+
 ## 2026-06-02 — Frontend Milestone 1: React + Vite shell with API connectivity
 
 **Goal:** build the first working frontend following `docs/frontend_plan.md`.

@@ -231,7 +231,7 @@ def score_technical_signals(
     _validate_scoring_inputs(ticker, signals)
     sources = list(data_sources_used) if data_sources_used is not None else []
 
-    technical_score = _calculate_technical_score(signals)
+    technical_score = _signals_to_score(signals)
     category = _map_score_to_category(technical_score)
     confidence = _map_confidence(signals)
     confidence_diag = _build_confidence_diagnostics(signals)
@@ -320,10 +320,6 @@ def _signals_to_score(signals: list[Signal]) -> float:
     total_impact = sum(s.score_impact for s in signals)
     clamped = max(-1.0, min(1.0, total_impact))
     return round(50.0 + clamped * 50.0, 10)
-
-
-def _calculate_technical_score(signals: list[Signal]) -> float:
-    return _signals_to_score(signals)
 
 
 def _map_score_to_category(score: float) -> RatingCategory:

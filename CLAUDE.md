@@ -75,6 +75,7 @@ python -m py_compile app/analysis/scoring.py
 | `app/models/fundamentals.py` | Typed `CompanyFundamentals` Pydantic model; output of the fundamentals data layer |
 | `app/models/news.py` | Typed `NewsItem` Pydantic model; output of the news data layer |
 | `app/models/stock_report.py` | Typed `StockReport` Pydantic model; top-level output of a full analysis run |
+| `app/models/confidence_diagnostics.py` | Typed `ConfidenceDiagnostics` Pydantic model; read-only breakdown of confidence inputs (diagnostic only — never affects score or label) |
 | `app/analysis/technicals.py` | Computes SMA 20/50/200, RSI 14, MACD, volume SMA; builds 7 typed Signals |
 | `app/analysis/fundamentals_analysis.py` | Builds 5 typed Signals from valuation, profitability, growth, debt, and cash flow |
 | `app/analysis/risk_analysis.py` | Builds 4–5 typed Signals from volatility, drawdown, recent trend, liquidity, and beta |
