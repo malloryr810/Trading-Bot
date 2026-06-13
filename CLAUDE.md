@@ -73,6 +73,7 @@ npm install          # first-time setup (cp .env.example .env if needed)
 npm run dev          # Vite dev server at http://localhost:5173 (backend must be running)
 npm run build        # type-check (tsc -b) + production build to frontend/dist/
 npm run lint         # ESLint
+npm test             # Vitest unit tests (pure logic only — src/**/*.test.ts)
 ```
 
 ## Currently Implemented

@@ -1,5 +1,44 @@
 # Development Log
 
+## 2026-06-13 — Frontend test harness (Vitest) for pure logic
+
+**Goal:** add a lightweight unit-test setup for small, pure frontend logic — no
+browser/DOM, no component or e2e framework. No backend changes.
+
+**Harness**
+
+- Added `vitest` (dev dependency only) and a `"test": "vitest run"` script.
+- `vitest.config.ts`: `environment: 'node'`, `include: ['src/**/*.test.ts']` —
+  pure-logic only, no jsdom/testing-library/Playwright/Cypress.
+- Kept the production build decoupled from tests: `tsconfig.app.json` now excludes
+  `src/**/*.test.ts`, and `tsconfig.node.json` includes `vitest.config.ts`. The
+  `tsc -b && vite build` pipeline is unchanged in behavior and does not pull in
+  test files.
+
+**Narrow refactors to enable testing**
+
+- `api/client.ts`: exported the previously-private `extractErrorMessage` (no
+  behavior change; documented as test-only surface).
+- `lib/sort.ts` (new): extracted the inline watchlist-analysis ordering into a
+  pure, immutable `sortByScoreDesc<T extends { score: number }>()` helper;
+  `WatchlistsPage` now calls it (cleaner JSX, identical display behavior). This
+  orders by the backend-provided `score` only — it does not recompute scores.
+
+**Tests added (17, all passing)**
+
+- `api/client.test.ts` (8): error extraction — string `detail`, FastAPI 422
+  validation arrays (single + joined `msg`s), unknown JSON shape, null/non-JSON
+  body, blank-string detail, msg-less array, and HTTP-status fallback.
+- `lib/format.test.ts` (4): `formatTimestamp` — valid ISO formats and contains
+  the year, null and empty return the em-dash fallback, invalid input does not
+  throw.
+- `lib/sort.test.ts` (5): `sortByScoreDesc` — highest-first ordering, input not
+  mutated, stable ordering for ties, negative scores, and empty array.
+
+**Checks:** `npm test` → 17 passed; `npm run build` + `npm run lint` clean;
+`pytest` → 1589 passed. No backend, API-contract, schema, scoring, or analysis
+behavior changed; no runtime dependencies added (Vitest is dev-only).
+
 ## 2026-06-13 — Frontend + API hardening / polish pass
 
 **Goal:** improve reliability and UX of the existing full-stack MVP — no new

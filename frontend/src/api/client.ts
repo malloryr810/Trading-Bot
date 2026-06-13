@@ -29,8 +29,10 @@ interface ValidationErrorItem {
  * FastAPI returns `detail` as a plain string for our raised HTTPExceptions, but
  * as an array of `{loc, msg, type}` objects for request-validation (422) errors.
  * Handle both so the UI never shows "[object Object]".
+ *
+ * Exported for unit testing; not part of the public client surface.
  */
-function extractErrorMessage(body: unknown, status: number): string {
+export function extractErrorMessage(body: unknown, status: number): string {
   if (body && typeof body === 'object' && 'detail' in body) {
     const detail = (body as { detail: unknown }).detail
     if (typeof detail === 'string' && detail.trim()) {

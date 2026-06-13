@@ -14,6 +14,7 @@ import { ErrorMessage } from '../components/ErrorMessage'
 import { LoadingState } from '../components/LoadingState'
 import { getErrorMessage } from '../lib/errors'
 import { formatTimestamp } from '../lib/format'
+import { sortByScoreDesc } from '../lib/sort'
 import type {
   WatchlistAnalysisResponse,
   WatchlistDetail,
@@ -439,9 +440,7 @@ export function WatchlistsPage() {
 
                     {analysis.results.length > 0 && (
                       <ul className="analysis-list">
-                        {[...analysis.results]
-                          .sort((a, b) => b.score - a.score)
-                          .map((r) => (
+                        {sortByScoreDesc(analysis.results).map((r) => (
                           <li key={r.ticker} className="analysis-card">
                             <div className="analysis-card-main">
                               <span className="analysis-card-ticker">
