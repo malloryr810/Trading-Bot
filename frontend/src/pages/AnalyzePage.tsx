@@ -99,7 +99,9 @@ export function AnalyzePage() {
         </p>
       </div>
 
-      {loading && <LoadingState />}
+      {loading && (
+        <LoadingState message="Analyzing — this may take a few seconds…" />
+      )}
       {error && <ErrorMessage message={error} />}
       {report && (
         <StockReportView report={report} savedId={savedId ?? undefined} />

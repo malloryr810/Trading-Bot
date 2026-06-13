@@ -42,6 +42,9 @@ export function DashboardPage() {
         <Link to="/analyze" className="btn btn-primary">
           Analyze a ticker →
         </Link>
+        <Link to="/watchlists" className="btn btn-secondary">
+          Manage watchlists
+        </Link>
         <Link to="/reports" className="btn btn-secondary">
           View saved reports
         </Link>

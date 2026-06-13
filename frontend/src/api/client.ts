@@ -19,6 +19,41 @@ export class ApiError extends Error {
   }
 }
 
+interface ValidationErrorItem {
+  msg?: string
+}
+
+/**
+ * Turn a parsed error body into a readable message.
+ *
+ * FastAPI returns `detail` as a plain string for our raised HTTPExceptions, but
+ * as an array of `{loc, msg, type}` objects for request-validation (422) errors.
+ * Handle both so the UI never shows "[object Object]".
+ */
+function extractErrorMessage(body: unknown, status: number): string {
+  if (body && typeof body === 'object' && 'detail' in body) {
+    const detail = (body as { detail: unknown }).detail
+    if (typeof detail === 'string' && detail.trim()) {
+      return detail
+    }
+    if (Array.isArray(detail)) {
+      const messages = detail
+        .map((item): string | null =>
+          item &&
+          typeof item === 'object' &&
+          typeof (item as ValidationErrorItem).msg === 'string'
+            ? (item as ValidationErrorItem).msg!
+            : null,
+        )
+        .filter((m): m is string => m !== null)
+      if (messages.length > 0) {
+        return messages.join('; ')
+      }
+    }
+  }
+  return `Request failed (HTTP ${status}).`
+}
+
 /** Single fetch + error-handling path shared by every verb. */
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response
@@ -28,8 +63,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(0, 'Backend unavailable. Is the FastAPI server running?')
   }
   if (!response.ok) {
-    const body: { detail?: string } = await response.json().catch(() => ({}))
-    throw new ApiError(response.status, body.detail ?? `HTTP ${response.status}`)
+    const body: unknown = await response.json().catch(() => null)
+    throw new ApiError(response.status, extractErrorMessage(body, response.status))
   }
   return response.json() as Promise<T>
 }

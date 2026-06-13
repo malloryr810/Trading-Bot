@@ -439,7 +439,9 @@ export function WatchlistsPage() {
 
                     {analysis.results.length > 0 && (
                       <ul className="analysis-list">
-                        {analysis.results.map((r) => (
+                        {[...analysis.results]
+                          .sort((a, b) => b.score - a.score)
+                          .map((r) => (
                           <li key={r.ticker} className="analysis-card">
                             <div className="analysis-card-main">
                               <span className="analysis-card-ticker">

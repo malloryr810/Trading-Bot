@@ -1,5 +1,43 @@
 # Development Log
 
+## 2026-06-13 — Frontend + API hardening / polish pass
+
+**Goal:** improve reliability and UX of the existing full-stack MVP — no new
+features, no analysis-engine changes. Frontend-only code changes.
+
+**Backend/API review (no changes):** route error handling is consistent in the
+way that matters — `analysis`/`reports` map known pipeline errors → 422 with a
+clean 500 catch-all; `watchlists` map validation → 400 and not-found → 404.
+Unexpected watchlist-route errors fall through to FastAPI's default 500, which is
+safe (no internal leak) and now rendered cleanly by the hardened client. Left the
+backend untouched to keep API contracts stable.
+
+**Frontend hardening + polish**
+
+- `api/client.ts`: hardened error extraction. FastAPI returns `detail` as a
+  string for raised `HTTPException`s but as an array of `{loc, msg, type}` for
+  422 request-validation errors; a non-JSON body (e.g. the default 500) has no
+  `detail` at all. Added `extractErrorMessage()` to handle all three — string
+  detail used directly, validation arrays joined from their `msg` fields, and a
+  clean `Request failed (HTTP <status>).` fallback. Previously a 422 surfaced as
+  "[object Object]". Verified against the live API's actual 422/404 shapes.
+- `components/LoadingState.tsx`: default message changed from the analyze-specific
+  string to a neutral "Loading…" (it's a shared component). `AnalyzePage` now
+  passes its own "Analyzing…" message explicitly so its UX is unchanged.
+- `pages/DashboardPage.tsx`: added a "Manage watchlists" action link (the
+  dashboard previously linked only to Analyze and Saved Reports).
+- `pages/ReportDetailPage.tsx`: added an `<h1>Saved Report</h1>` page heading for
+  consistency with the other pages, and clarified the saved-context line
+  ("Report #N · saved <timestamp>").
+- `pages/WatchlistsPage.tsx`: successful watchlist-analysis results are now
+  displayed best-score-first (immutable display sort by the existing `score`
+  field — no recomputation), matching the CLI watchlist-scan convention. Failed
+  tickers remain in their own section.
+
+**Checks:** `pytest` → 1589 passed; frontend `npm run build` + `npm run lint`
+clean (no CSS changes). No scoring/analysis/report/persistence/CLI/API behavior
+changed; no API contract or schema change; no dependencies added.
+
 ## 2026-06-13 — Milestone consolidation and documentation accuracy pass
 
 **Goal:** reconcile all docs with the actual full-stack state now that watchlist

@@ -45,12 +45,13 @@ function ReportDetail({ reportId }: { reportId: number }) {
   return (
     <div className="page">
       <BackLink />
+      <h1>Saved Report</h1>
       {loading && <LoadingState message="Loading report…" />}
       {error && <ErrorMessage message={error} />}
       {detail && (
         <>
           <p className="saved-notice">
-            Saved report #{detail.id} · {formatTimestamp(detail.created_at)}
+            Report #{detail.id} · saved {formatTimestamp(detail.created_at)}
           </p>
           <StockReportView report={detail.report} />
         </>
