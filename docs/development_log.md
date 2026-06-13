@@ -1,5 +1,43 @@
 # Development Log
 
+## 2026-06-13 — Milestone consolidation and documentation accuracy pass
+
+**Goal:** reconcile all docs with the actual full-stack state now that watchlist
+management + analysis and the report-history UI are complete. Docs-only — no
+product behavior changed.
+
+**Verified against ground truth** (route files, `App.tsx`, `app/services/`): the
+13 API endpoints (health, analyze, reports ×3, watchlists ×7) and 5 frontend
+routes (`/`, `/analyze`, `/watchlists`, `/reports`, `/reports/:id`) documented in
+`README.md`/`CLAUDE.md` match the code exactly; no fabricated endpoints or routes.
+
+**Stale docs corrected**
+
+- `docs/project_plan.md`: added the full-stack work to "Completed" (FastAPI
+  backend, SQLite report + watchlist persistence, watchlist CRUD + on-demand
+  analysis, React/Vite frontend with all five pages). Fixed a direct
+  contradiction — "Dashboards or web UIs" was listed as out-of-scope while a web
+  UI now exists; replaced with a note that the local research/display web UI
+  exists and performs no trading/scheduling, and kept scheduled scans/alerts as
+  out-of-scope.
+- `docs/full_stack_product_architecture.md`: marked Phases 3–6 done (were shown
+  as pending), noted the frontend was built with React + Vite rather than the
+  originally-planned Next.js, and replaced the stale "Immediate Next Step"
+  (pointed at Phase 3) with current status (Phases 1–6 done; 7/8 gated).
+- `docs/frontend_plan.md`: status header said "Milestone 2 is next" — updated to
+  reflect all pages are live; retained the body as the original design plan.
+- `docs/watchlist_management_plan.md`: added an "Implemented" status banner;
+  retained the body as the original plan.
+- `docs/architecture.md`: added a pointer noting the FastAPI/SQLite/React layers
+  exist on top of the core pipeline (the doc otherwise covers only the CLI core).
+
+`README.md`/`CLAUDE.md` were already accurate (kept current in prior passes) and
+needed no changes beyond what earlier milestones already applied.
+
+**Checks:** `pytest` → 1589 passed; frontend `npm run build` + `npm run lint`
+clean. No code changed; no scoring/analysis/report/persistence/CLI/API/frontend
+behavior changed; no guardrails affected.
+
 ## 2026-06-13 — Watchlist analysis review and cleanup
 
 **Goal:** focused review of the completed watchlist-analysis milestone

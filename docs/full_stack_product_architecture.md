@@ -303,27 +303,41 @@ These constraints apply to all phases and all contributors:
 |---|---|---|
 | **1** | Architecture alignment | This document. No code changes. ✓ Done |
 | **2** | FastAPI backend — core | `app/api/`, `GET /api/health`, `POST /api/analyze`; wraps `analyze_stock`; no database yet. ✓ Done |
-| **3** | Database persistence | `app/db/`, SQLite, save `StockReport` snapshots, `GET /api/reports/history` |
-| **4** | Next.js frontend foundation | Project scaffold, API client, Dashboard page, Stock Analysis page |
-| **5** | Watchlist management | Backend routes + frontend Watchlist page; scan and display ranked results |
-| **6** | Research notes and report history | Notes CRUD, report history page, ticker-linked browsing |
-| **7** | Mock trading simulation | `app/simulation/`, mock trade recording, portfolio summary, performance metrics |
-| **8** | ML research layer | `app/ml/`, feature engineering from historical snapshots, signal evaluation models |
-| **9** | Deployment and hardening | Environment config, containerization, auth if needed, PostgreSQL migration if needed |
+| **3** | Database persistence | `app/data/database.py` (SQLAlchemy Core, SQLite), save `StockReport` snapshots, `GET /api/reports/history`, `GET /api/reports/{id}`. ✓ Done |
+| **4** | Frontend foundation | Built with **React + Vite + TypeScript** (not Next.js): scaffold, typed API client, Dashboard + Analyze pages. ✓ Done |
+| **5** | Watchlist management | Watchlist CRUD (backend + frontend) **plus** on-demand `POST /api/watchlists/{id}/analyze` with results displayed on the Watchlists page (analysis-only, not saved). ✓ Done |
+| **6** | Report history UI | Saved Reports list (`/reports`) and Report Detail (`/reports/:id`) pages over the existing read endpoints. ✓ Done (research notes not started) |
+| **7** | Mock trading simulation | `app/simulation/`, mock trade recording, portfolio summary, performance metrics. Not started — gated, requires explicit scoping |
+| **8** | ML research layer | `app/ml/`, feature engineering from historical snapshots, signal evaluation models. Not started — gated, requires explicit scoping |
+| **9** | Deployment and hardening | Environment config, containerization, auth if needed, PostgreSQL migration if needed. Not started |
 
 Each phase must be completable independently. A phase is not started until the previous phase's core functionality is tested and stable.
 
+> Note: the original plan named Next.js for the frontend; the project was built
+> with React + Vite + TypeScript instead. `CLAUDE.md` and `docs/frontend_plan.md`
+> reflect the actual stack.
+
 ---
 
-## 12. Immediate Next Step
+## 12. Status and Next Step
 
-~~FastAPI Backend — Phase 2 is complete.~~ The next code milestone is **Database Persistence — Phase 3**.
+Phases 1–6 are complete: FastAPI backend, SQLite report persistence, the React +
+Vite frontend, watchlist management (CRUD + on-demand analysis), and the report
+history/detail UI are all built and tested. See `docs/development_log.md` for the
+per-milestone history and `docs/project_plan.md` for the full completed list.
 
-Scope:
-- Create `app/db/` package with SQLite session management and ORM models.
-- Save `StockReport` snapshots to an `analysis_reports` table on every `POST /api/analyze` call.
-- Implement `GET /api/reports/history` returning a paginated list of saved reports.
-- Implement `GET /api/reports/{id}` returning a single saved report.
-- Use SQLite for local development. No migration to PostgreSQL yet.
+No code milestone is currently in progress. The remaining phases are gated and
+require explicit scoping and approval before any implementation begins:
 
-**Do not add** in Phase 3: frontend, ML, simulation, authentication, watchlist endpoints, or mock trading.
+- **Phase 7 — Mock trading simulation** (`app/simulation/`): do not create or
+  populate until explicitly scoped.
+- **Phase 8 — ML research layer** (`app/ml/`): do not create or populate until
+  explicitly scoped.
+- **Phase 9 — Deployment and hardening.**
+
+Candidate non-gated follow-ups (optional, not started): research notes,
+saved watchlist-analysis snapshots, and scoring calibration improvements.
+
+**Do not add** without an explicitly scoped task: broker/trading integration,
+order execution, scheduled scans, alerts, background jobs, mock trading, ML
+scoring, or portfolio logic.

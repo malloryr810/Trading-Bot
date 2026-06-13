@@ -59,6 +59,17 @@ All items below are implemented and tested.
 - [x] Improved market data validation — full OHLCV column, null, and numeric checks
 - [x] Company name and current price propagated through pipeline — Rating → StockReport → watchlist summary
 
+### Application Layer (API + Persistence + Frontend)
+
+- [x] FastAPI backend — app factory (`app/api/main.py`); thin routes delegate to services
+- [x] `GET /api/health`, `POST /api/analyze` (analysis only, no save)
+- [x] SQLite report persistence — `analysis_reports` table (SQLAlchemy Core); `POST /api/reports/analyze`, `GET /api/reports/history`, `GET /api/reports/{id}`
+- [x] SQLite watchlist persistence — `watchlists` / `watchlist_tickers` tables; `watchlist_service` CRUD
+- [x] Watchlist CRUD API — `GET/POST /api/watchlists`, `GET/PATCH/DELETE /api/watchlists/{id}`, add/remove ticker endpoints
+- [x] Watchlist on-demand analysis — `watchlist_analysis_service` + `POST /api/watchlists/{id}/analyze` (partial success; results not saved)
+- [x] React + Vite + TypeScript frontend — Dashboard, Analyze, Watchlists, Saved Reports, Report Detail pages
+- [x] Typed API client and display-only pages — no scoring/analysis logic duplicated in the frontend
+
 ### Maintenance
 
 - [x] Documentation cleanup — `CLAUDE.md`, `README.md`, `architecture.md`, `project_plan.md`
@@ -104,4 +115,8 @@ The following will not be implemented in this project:
 - Automated position management
 - Margin or options trading
 - Portfolio automation
-- Dashboards or web UIs
+- Scheduled scans, alerts, or background jobs
+
+(Note: a local web UI now exists — the React + Vite frontend listed under
+"Completed." It is a research/display surface only and performs no trading,
+scheduling, or order execution.)

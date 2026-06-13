@@ -7,6 +7,12 @@ stocks and watchlists, producing scored plain-text research reports. It is not
 an automated trading system and contains no broker integrations, order
 execution, or position management.
 
+> This document covers the core analysis pipeline (data → analysis → scoring →
+> reports → CLI). The project also has a FastAPI backend, SQLite persistence
+> (reports + watchlists), and a React + Vite frontend layered on top of the same
+> services — see `CLAUDE.md` and `docs/full_stack_product_architecture.md` for
+> the full-stack view.
+
 ## Design Principles
 
 - **Modular** — each layer has a single responsibility and clean interfaces

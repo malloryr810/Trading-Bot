@@ -1,8 +1,11 @@
 # Frontend Plan — Investment Bot
 
-> **Status:** Milestone 1 complete — React + Vite shell with API connectivity is built and tested.
-> Dashboard page (health check, disclaimer) and Analyze page (analyze-only + analyze-and-save) are live.
-> Milestone 2 (report history + detail pages) is next.
+> **Status:** Built and in active use. Live pages: Dashboard (`/`), Analyze
+> (`/analyze`), Watchlists (`/watchlists`, including on-demand watchlist
+> analysis), Saved Reports (`/reports`), and Report Detail (`/reports/:id`). The
+> report history + detail pages originally scoped as "Milestone 2" are complete.
+> The sections below are retained as the original design plan; see `CLAUDE.md`
+> and `docs/development_log.md` for the current implemented state.
 
 ---
 

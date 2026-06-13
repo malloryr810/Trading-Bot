@@ -1,10 +1,16 @@
 # Phase 5 — Watchlist Management Plan
 
-> Planning document only. No code is implemented as part of this document.
-> This plan must respect every guardrail in `CLAUDE.md`: no broker APIs, no live
-> trading, no order execution, no alerts, no scheduled scans, no mock simulation,
-> no ML scoring, and no portfolio logic. Existing scoring, analysis, report
-> generation, and CLI behavior must not change.
+> **Status: Implemented.** This plan has since been built — watchlist CRUD
+> (tables, `watchlist_service`, `/api/watchlists` routes, Watchlists frontend
+> page) plus on-demand watchlist analysis (`watchlist_analysis_service`,
+> `POST /api/watchlists/{id}/analyze`, results shown on the Watchlists page and
+> not saved). The document below is retained as the original design plan; see
+> `CLAUDE.md` and `docs/development_log.md` for the current state.
+>
+> Original planning note: this plan must respect every guardrail in `CLAUDE.md`:
+> no broker APIs, no live trading, no order execution, no alerts, no scheduled
+> scans, no mock simulation, no ML scoring, and no portfolio logic. Existing
+> scoring, analysis, report generation, and CLI behavior must not change.
 
 ## 1. Purpose
 
