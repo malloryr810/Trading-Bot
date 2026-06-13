@@ -140,6 +140,16 @@ CORS is configured to allow `http://localhost:5173` and `http://127.0.0.1:5173`
 | `POST` | `/api/reports/analyze` | Analyze a ticker and **save** the snapshot; returns saved metadata + report |
 | `GET` | `/api/reports/history` | List saved report summaries (id, ticker, category, score, confidence, created_at) |
 | `GET` | `/api/reports/{id}` | Return one full saved `StockReport` snapshot by id |
+| `GET` | `/api/watchlists` | List saved watchlists (id, name, description, timestamps, ticker_count) |
+| `POST` | `/api/watchlists` | Create a watchlist (`{name, description?}`) |
+| `GET` | `/api/watchlists/{id}` | Return one watchlist with its tickers |
+| `PATCH` | `/api/watchlists/{id}` | Update a watchlist's name and/or description |
+| `DELETE` | `/api/watchlists/{id}` | Delete a watchlist and its tickers |
+| `POST` | `/api/watchlists/{id}/tickers` | Add a ticker to a watchlist (`{ticker}`) |
+| `DELETE` | `/api/watchlists/{id}/tickers/{ticker}` | Remove a ticker from a watchlist |
+
+> **Watchlist management is storage only.** These endpoints persist named ticker
+> lists for later research — they do **not** run analysis, scans, or trades.
 
 **Analysis only (no persistence):**
 
@@ -194,20 +204,20 @@ npm run dev
 
 The app opens at `http://localhost:5173`.
 
-**Current Milestone 1 scope:**
+**Current frontend scope:**
 - Dashboard page — backend health status, disclaimer, link to Analyze
 - Analyze page — enter a ticker, choose "Analyze only" (POST /api/analyze) or "Analyze and save" (POST /api/reports/analyze), view the StockReport result
+- Watchlists page — create, rename, and delete named watchlists; add and remove tickers; basic CRUD over the watchlist API (storage only, no analysis run from here)
 
-**Planned in Milestone 2:** saved report history page and report detail page.
+**Planned next:** saved report history page and report detail page.
 
-### Build for production
+### Build and lint
 
 ```bash
 cd frontend
-npm run build
+npm run build        # type-check + production build to frontend/dist/
+npm run lint         # ESLint
 ```
-
-Outputs to `frontend/dist/`.
 
 ---
 
@@ -233,8 +243,8 @@ app/data/ → app/analysis/ → app/analysis/scoring.py → app/reports/ → app
 | `app/analysis/` | Compute independent signal lists from data |
 | `app/analysis/scoring.py` | Aggregate signals into a composite Rating |
 | `app/reports/` | Format a Rating into a human-readable StockReport |
-| `app/services/` | Public service boundary — `analyze_stock` for analysis, `report_persistence_service` for saved snapshot I/O |
-| `app/data/database.py` | SQLAlchemy Core schema and engine factory; no business logic |
+| `app/services/` | Public service boundary — `analyze_stock` for analysis, `report_persistence_service` for saved snapshot I/O, `watchlist_service` for watchlist CRUD |
+| `app/data/database.py` | SQLAlchemy Core schema and engine factory (`analysis_reports`, `watchlists`, `watchlist_tickers`); no business logic |
 | `app/watchlist.py` | Orchestrate the pipeline across multiple tickers |
 | `app/main.py` | Thin argparse CLI shell; delegates to `app/services/` |
 | `app/api/` | Thin FastAPI layer; delegates to `app/services/` |
@@ -285,18 +295,21 @@ app/
       health.py                    # GET /api/health
       analysis.py                  # POST /api/analyze (analysis only, no save)
       reports.py                   # POST /api/reports/analyze, GET /api/reports/history, GET /api/reports/{id}
+      watchlists.py                # GET/POST/PATCH/DELETE /api/watchlists and /tickers
     schemas/
       analysis.py                  # AnalyzeRequest Pydantic schema
       reports.py                   # SavedReportSummary, SavedReportDetail schemas
+      watchlists.py                # Watchlist request/response schemas
   services/
     stock_analysis_service.py      # analyze_stock — public entry point for CLI and API
     report_persistence_service.py  # save_stock_report, list_saved_reports, get_saved_report
+    watchlist_service.py           # watchlist + ticker CRUD (storage only)
   data/
     market_data.py                 # OHLCV price history
     fundamentals.py                # Company fundamentals
     news_data.py                   # Recent news headlines
     storage.py                     # Saves reports and JSON results to disk
-    database.py                    # SQLAlchemy Core engine and analysis_reports table
+    database.py                    # SQLAlchemy Core engine; analysis_reports + watchlists + watchlist_tickers tables
   analysis/
     technicals.py                  # Technical indicators and signals
     fundamentals_analysis.py       # Fundamental signals
@@ -321,11 +334,12 @@ docs/                              # Architecture, scoring rules, data sources, 
 outputs/
   reports/                         # Saved plain-text reports (TICKER_YYYYMMDD_HHMMSS.txt)
   results/                         # Saved JSON results (TICKER_YYYYMMDD_HHMMSS.json)
-frontend/                          # React + Vite + TypeScript frontend (Milestone 1)
+frontend/                          # React + Vite + TypeScript frontend (Dashboard, Analyze, Watchlists)
   src/
     api/
-      client.ts                    # Base fetch wrapper; base URL, ApiError class
+      client.ts                    # Base fetch wrapper (get/post/patch/del); base URL, ApiError class
       analysisApi.ts               # checkHealth, analyzeOnly, analyzeAndSave
+      watchlistApi.ts              # Watchlist CRUD client functions
     components/
       LoadingState.tsx             # Spinner with accessible role/aria attributes
       ErrorMessage.tsx             # Accessible error display
@@ -333,8 +347,10 @@ frontend/                          # React + Vite + TypeScript frontend (Milesto
     pages/
       DashboardPage.tsx            # Health status, disclaimer, nav to Analyze
       AnalyzePage.tsx              # Ticker input, analyze/save actions, report result
+      WatchlistsPage.tsx           # Watchlist CRUD UI (create/rename/delete, add/remove tickers)
     types/
-      report.ts                    # TypeScript interfaces mirroring backend schemas
+      report.ts                    # TypeScript interfaces mirroring backend report schemas
+      watchlist.ts                 # TypeScript interfaces mirroring backend watchlist schemas
     App.tsx                        # BrowserRouter, NavLink header, route table
     main.tsx                       # Vite entry point
     styles.css                     # Plain CSS — no framework
@@ -353,16 +369,23 @@ persistence layer stores StockReport JSON snapshots with a history and detail
 endpoint for retrieval. All routes are backed by the same service layer used by
 the CLI.
 
-A React + Vite frontend (`frontend/`) is in active development. Milestone 1 is
-complete: the Dashboard and Analyze pages are built and connected to the backend.
-The Analyze page supports both analyze-only and analyze-and-save flows. Report
-history and detail pages are planned for Milestone 2.
+Watchlist management is implemented at a basic CRUD level across all layers:
+SQLite tables (`watchlists`, `watchlist_tickers`), a `watchlist_service`, the
+`/api/watchlists` endpoints, and a Watchlists page in the frontend. Users can
+create, rename, and delete named watchlists and add or remove tickers. This is
+storage only — no analysis, scans, alerts, or trades run from a watchlist.
+
+A React + Vite frontend (`frontend/`) is in active development. The Dashboard,
+Analyze, and Watchlists pages are built and connected to the backend. The Analyze
+page supports both analyze-only and analyze-and-save flows. Saved report history
+and detail pages are planned next.
 
 ## Planned Future Work
 
 These areas are on the roadmap but not yet built:
 
-- **React + Vite frontend** — browser UI for analysis and saved report history (see `docs/frontend_plan.md` for the full plan)
+- **Saved report history UI** — browser pages for saved report history and report detail (see `docs/frontend_plan.md`)
+- **Watchlist analysis** — analyze every ticker in a saved watchlist by reusing the existing pipeline (CRUD foundation is in place; see `docs/watchlist_management_plan.md`)
 - **Improved scoring calibration** — better-calibrated weights and thresholds (see `docs/scoring_calibration_plan.md`)
 - **Better data validation** — richer error messages for missing or stale data fields
 - **Backtesting** — validate signals against historical outcomes (requires careful design)

@@ -1,5 +1,56 @@
 # Development Log
 
+## 2026-06-13 — Phase 5 review, integration verification, and docs sync
+
+**Goal:** full integration + code-quality review of the completed Watchlist
+Management milestone (backend persistence/service, API routes, frontend UI), plus
+a docs accuracy pass. Behavior-preserving.
+
+**Review outcome:** integration is sound end to end. Verified API response field
+names match the frontend TypeScript types exactly (`WatchlistSummary` /
+`WatchlistDetail`), request payloads match the Pydantic models, error mapping is
+consistent (400 validation / 404 not-found), and the page refresh flows
+(create→select, add/remove/edit→apply returned detail + refresh list,
+delete→clear+refresh) are correct. Duplicate-ticker adds are idempotent in both
+the service and the UI. No bugs found; no backend behavior changed.
+
+**Cleanup performed**
+
+- `frontend/src/api/client.ts`: removed triplicated fetch/error-handling blocks
+  (introduced when `del` was added) by extracting a single `request<T>()` core
+  plus a `jsonInit` helper; `get`/`post`/`patch`/`del` now delegate to it.
+  Behavior-identical (same `ApiError` semantics, same status-0 network handling);
+  bundle marginally smaller. No other source files changed.
+
+**Verification**
+
+- `pytest` → 1569 passed. `pytest tests/test_watchlist_service.py
+  tests/test_watchlist_api.py` covered. `npm run build` + `npm run lint` clean.
+- SQLite integration check (in-memory + on-disk): tickers persist normalized and
+  deduped, duplicate add creates no row, `updated_at` advances, deleting a
+  watchlist cascades to its ticker rows (no orphans), and `watchlists` /
+  `watchlist_tickers` coexist with `analysis_reports` without interference.
+- Live HTTP smoke test (uvicorn on a temp DB): CORS preflight returns
+  `allow-methods: GET, POST, PATCH, DELETE, OPTIONS` with the origin scoped to
+  `http://localhost:5173` (not loosened); full create → rename → add (lowercase
+  normalized) → duplicate (idempotent) → remove → delete flow returned correct
+  bodies and 201/400/404 codes; data persisted to the on-disk SQLite file.
+- Browser-driven click-through was not possible in this environment (no browser);
+  the live HTTP smoke test + automated suites cover the same backend paths. Note:
+  the "Saved Reports" / "Report Detail" pages referenced in the task do not exist
+  yet — only Dashboard, Analyze, and Watchlists pages are implemented.
+
+**Docs synced**
+
+- `README.md`: added the seven `/api/watchlists` endpoints, Watchlists frontend
+  scope, `npm run lint`, watchlist service/tables in architecture + project
+  structure, and an updated Current Status / roadmap.
+- `CLAUDE.md`: added watchlist service/routes/schemas/frontend rows, frontend
+  commands, a watchlist-vs-`app/watchlist.py` layer rule, an explicit
+  frontend-owns-no-business-logic rule, and Phase 5 marked Milestone 1 complete.
+
+No scoring, analysis, report generation, CLI, or backend API behavior changed.
+
 ## 2026-06-13 — Phase 5 Milestone 1: watchlist management frontend
 
 **Goal:** add a display-and-manage UI for saved watchlists over the existing

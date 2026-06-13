@@ -58,8 +58,21 @@ pytest
 # Run a single test file
 pytest tests/test_risk_analysis.py
 
+# Run the watchlist suites specifically
+pytest tests/test_watchlist_service.py tests/test_watchlist_api.py
+
 # Compile-check a module without running it
 python -m py_compile app/analysis/scoring.py
+```
+
+### Frontend commands
+
+```bash
+cd frontend
+npm install          # first-time setup (cp .env.example .env if needed)
+npm run dev          # Vite dev server at http://localhost:5173 (backend must be running)
+npm run build        # type-check (tsc -b) + production build to frontend/dist/
+npm run lint         # ESLint
 ```
 
 ## Currently Implemented
@@ -87,21 +100,26 @@ python -m py_compile app/analysis/scoring.py
 | `app/utils/helpers.py` | Shared low-level helpers: `safe_float` and `normalize_ticker` |
 | `app/services/stock_analysis_service.py` | `analyze_stock` — public entry point for all callers (CLI and API); `_analyze_ticker` is internal |
 | `app/services/report_persistence_service.py` | `save_stock_report`, `list_saved_reports`, `get_saved_report` — SQLite persistence boundary |
-| `app/data/database.py` | SQLAlchemy Core engine factory (`build_engine`) and `analysis_reports` table definition |
+| `app/services/watchlist_service.py` | Watchlist + ticker CRUD over SQLite (storage only); `WatchlistValidationError`/`WatchlistNotFoundError`; optional `engine` kwarg for tests |
+| `app/data/database.py` | SQLAlchemy Core engine factory (`build_engine`) and table definitions: `analysis_reports`, `watchlists`, `watchlist_tickers` |
 | `app/api/main.py` | FastAPI app factory; `uvicorn app.api.main:app` entry point |
 | `app/api/routes/health.py` | `GET /api/health` |
 | `app/api/routes/analysis.py` | `POST /api/analyze` — analysis only; calls `analyze_stock`, does not save |
 | `app/api/routes/reports.py` | `POST /api/reports/analyze`, `GET /api/reports/history`, `GET /api/reports/{id}` |
+| `app/api/routes/watchlists.py` | Watchlist CRUD routes — `GET/POST /api/watchlists`, `GET/PATCH/DELETE /api/watchlists/{id}`, `POST` / `DELETE` `/api/watchlists/{id}/tickers[/{ticker}]`; thin, delegate to `watchlist_service` |
 | `app/api/schemas/analysis.py` | `AnalyzeRequest` — validates and normalizes ticker at the API boundary |
 | `app/api/schemas/reports.py` | `SavedReportSummary`, `SavedReportDetail` — response schemas for persistence endpoints |
+| `app/api/schemas/watchlists.py` | Watchlist request/response schemas (`CreateWatchlistRequest`, `UpdateWatchlistRequest`, `AddTickerRequest`, `WatchlistSummary`, `WatchlistDetail`, `DeleteResponse`) |
 | `app/api/errors.py` | `KNOWN_ANALYSIS_ERRORS` — shared tuple of pipeline error types used by both API routes for 422 mapping |
 | `app/main.py` | Thin argparse CLI shell — delegates entirely to `app/services/` |
-| `frontend/` | React + Vite + TypeScript browser frontend (Milestone 1 complete) |
-| `frontend/src/api/client.ts` | Base fetch wrapper; `ApiError` class; `VITE_API_BASE_URL` env var |
+| `frontend/` | React + Vite + TypeScript browser frontend (Dashboard, Analyze, Watchlists) |
+| `frontend/src/api/client.ts` | Base fetch wrapper (`get`/`post`/`patch`/`del` over one shared `request` helper); `ApiError` class; `VITE_API_BASE_URL` env var |
 | `frontend/src/api/analysisApi.ts` | `checkHealth`, `analyzeOnly`, `analyzeAndSave` — one function per backend endpoint |
+| `frontend/src/api/watchlistApi.ts` | Watchlist CRUD client functions — one per `/api/watchlists` endpoint |
 | `frontend/src/components/` | `LoadingState`, `ErrorMessage`, `StockReportView` — presentational only |
-| `frontend/src/pages/` | `DashboardPage` (health check, disclaimer), `AnalyzePage` (analyze + display) |
+| `frontend/src/pages/` | `DashboardPage` (health check, disclaimer), `AnalyzePage` (analyze + display), `WatchlistsPage` (watchlist CRUD UI) |
 | `frontend/src/types/report.ts` | TypeScript interfaces mirroring `StockReport`, `SavedReportSummary`, `SavedReportDetail` |
+| `frontend/src/types/watchlist.ts` | TypeScript interfaces mirroring the backend watchlist schemas |
 
 ## Architecture
 
@@ -137,8 +155,10 @@ data/ → analysis/ → scoring.py → reports/ → services/ → CLI / API
 - **API persistence routes** (`/api/reports/*`) call `analyze_stock` from `stock_analysis_service` and the persistence functions from `report_persistence_service`. They never duplicate pipeline logic.
 - **`POST /api/analyze`** is analysis-only and must never save to the database. Saving is exclusively done via `POST /api/reports/analyze`.
 - **CLI** must remain functional. Adding API or frontend layers must not break `python -m app.main`.
-- **Database** uses SQLAlchemy Core (not ORM). The `analysis_reports` table stores full `StockReport` JSON snapshots alongside indexed summary columns. The database file lives at `data/investment_bot.db` (configurable via `DATABASE_PATH` env var).
+- **Database** uses SQLAlchemy Core (not ORM). The `analysis_reports` table stores full `StockReport` JSON snapshots alongside indexed summary columns. The `watchlists` and `watchlist_tickers` tables store named ticker lists. The database file lives at `data/investment_bot.db` (configurable via `DATABASE_PATH` env var).
 - **Persistence service functions** accept an optional `engine` keyword argument for test injection. Production callers omit it; a shared engine is lazily initialised on first call.
+- **Watchlist management** (`watchlist_service` + `/api/watchlists`) is storage/CRUD only — it never runs analysis, scans, alerts, or trades. It is separate from `app/watchlist.py`, which is the CLI multi-ticker analysis scanner. Do not merge the two; do not add analysis to the watchlist CRUD layer without an explicitly scoped task.
+- **Frontend** owns no business logic: it calls the typed API client and formats results for display. It must not recalculate scores, categories, weights, or re-validate domain rules the backend already enforces.
 
 ## Scoring Weights
 
@@ -178,7 +198,7 @@ Each analysis module follows the same pattern:
 | 2 | FastAPI backend — `GET /api/health`, `POST /api/analyze` | Done |
 | 3 | SQLite persistence — save StockReport snapshots, report history endpoints | **Milestone 1 complete** — `POST /api/reports/analyze`, `GET /api/reports/history`, `GET /api/reports/{id}` |
 | 4 | React + Vite frontend — Milestone 1: shell with API connectivity | **Complete** — Dashboard + Analyze pages, health check, analyze-only and analyze-and-save flows |
-| 5 | Watchlist management (frontend + backend routes) | Not started |
+| 5 | Watchlist management (frontend + backend routes) | **Milestone 1 complete** — `watchlists`/`watchlist_tickers` tables, `watchlist_service`, `/api/watchlists` CRUD routes, Watchlists frontend page. Storage only; watchlist analysis not yet built |
 | 6 | Research notes and report history UI | Not started |
 | 7 | Mock trading simulation (`app/simulation/`) | Not started |
 | 8 | ML research layer (`app/ml/`) | Not started |

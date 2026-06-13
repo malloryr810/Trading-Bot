@@ -19,10 +19,11 @@ export class ApiError extends Error {
   }
 }
 
-export async function get<T>(path: string): Promise<T> {
+/** Single fetch + error-handling path shared by every verb. */
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response
   try {
-    response = await fetch(`${BASE_URL}${path}`)
+    response = await fetch(`${BASE_URL}${path}`, init)
   } catch {
     throw new ApiError(0, 'Backend unavailable. Is the FastAPI server running?')
   }
@@ -33,52 +34,26 @@ export async function get<T>(path: string): Promise<T> {
   return response.json() as Promise<T>
 }
 
-async function sendJson<T>(
-  method: 'POST' | 'PATCH',
-  path: string,
-  body: unknown,
-): Promise<T> {
-  let response: Response
-  try {
-    response = await fetch(`${BASE_URL}${path}`, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-  } catch {
-    throw new ApiError(0, 'Backend unavailable. Is the FastAPI server running?')
+function jsonInit(method: 'POST' | 'PATCH', body: unknown): RequestInit {
+  return {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   }
-  if (!response.ok) {
-    const errorBody: { detail?: string } = await response.json().catch(() => ({}))
-    throw new ApiError(
-      response.status,
-      errorBody.detail ?? `HTTP ${response.status}`,
-    )
-  }
-  return response.json() as Promise<T>
 }
 
-export async function post<T>(path: string, body: unknown): Promise<T> {
-  return sendJson<T>('POST', path, body)
+export function get<T>(path: string): Promise<T> {
+  return request<T>(path)
 }
 
-export async function patch<T>(path: string, body: unknown): Promise<T> {
-  return sendJson<T>('PATCH', path, body)
+export function post<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, jsonInit('POST', body))
 }
 
-export async function del<T>(path: string): Promise<T> {
-  let response: Response
-  try {
-    response = await fetch(`${BASE_URL}${path}`, { method: 'DELETE' })
-  } catch {
-    throw new ApiError(0, 'Backend unavailable. Is the FastAPI server running?')
-  }
-  if (!response.ok) {
-    const errorBody: { detail?: string } = await response.json().catch(() => ({}))
-    throw new ApiError(
-      response.status,
-      errorBody.detail ?? `HTTP ${response.status}`,
-    )
-  }
-  return response.json() as Promise<T>
+export function patch<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, jsonInit('PATCH', body))
+}
+
+export function del<T>(path: string): Promise<T> {
+  return request<T>(path, { method: 'DELETE' })
 }
