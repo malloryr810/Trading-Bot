@@ -9,14 +9,10 @@ import {
   removeTickerFromWatchlist,
   updateWatchlist,
 } from '../api/watchlistApi'
-import { ApiError } from '../api/client'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { LoadingState } from '../components/LoadingState'
+import { getErrorMessage } from '../lib/errors'
 import type { WatchlistDetail, WatchlistSummary } from '../types/watchlist'
-
-function messageFrom(err: unknown, fallback: string): string {
-  return err instanceof ApiError ? err.message : fallback
-}
 
 export function WatchlistsPage() {
   const [watchlists, setWatchlists] = useState<WatchlistSummary[]>([])
@@ -44,7 +40,7 @@ export function WatchlistsPage() {
       setWatchlists(data)
       return data
     } catch (err) {
-      setListError(messageFrom(err, 'Failed to load watchlists.'))
+      setListError(getErrorMessage(err, 'Failed to load watchlists.'))
       return []
     } finally {
       setListLoading(false)
@@ -63,7 +59,7 @@ export function WatchlistsPage() {
         }
       })
       .catch((err: unknown) => {
-        if (active) setListError(messageFrom(err, 'Failed to load watchlists.'))
+        if (active) setListError(getErrorMessage(err, 'Failed to load watchlists.'))
       })
       .finally(() => {
         if (active) setListLoading(false)
@@ -85,7 +81,7 @@ export function WatchlistsPage() {
       applySelected(await getWatchlist(id))
     } catch (err) {
       setSelected(null)
-      setDetailError(messageFrom(err, 'Failed to load watchlist.'))
+      setDetailError(getErrorMessage(err, 'Failed to load watchlist.'))
     }
   }
 
@@ -108,7 +104,7 @@ export function WatchlistsPage() {
       await refreshList()
       applySelected(created)
     } catch (err) {
-      setListError(messageFrom(err, 'Failed to create watchlist.'))
+      setListError(getErrorMessage(err, 'Failed to create watchlist.'))
     } finally {
       setCreating(false)
     }
@@ -128,7 +124,7 @@ export function WatchlistsPage() {
       setTickerInput('')
       await refreshList()
     } catch (err) {
-      setDetailError(messageFrom(err, 'Failed to add ticker.'))
+      setDetailError(getErrorMessage(err, 'Failed to add ticker.'))
     } finally {
       setBusy(false)
     }
@@ -142,7 +138,7 @@ export function WatchlistsPage() {
       applySelected(await removeTickerFromWatchlist(selected.id, ticker))
       await refreshList()
     } catch (err) {
-      setDetailError(messageFrom(err, 'Failed to remove ticker.'))
+      setDetailError(getErrorMessage(err, 'Failed to remove ticker.'))
     } finally {
       setBusy(false)
     }
@@ -166,7 +162,7 @@ export function WatchlistsPage() {
       )
       await refreshList()
     } catch (err) {
-      setDetailError(messageFrom(err, 'Failed to update watchlist.'))
+      setDetailError(getErrorMessage(err, 'Failed to update watchlist.'))
     } finally {
       setBusy(false)
     }
@@ -181,7 +177,7 @@ export function WatchlistsPage() {
       setSelected(null)
       await refreshList()
     } catch (err) {
-      setDetailError(messageFrom(err, 'Failed to delete watchlist.'))
+      setDetailError(getErrorMessage(err, 'Failed to delete watchlist.'))
     } finally {
       setBusy(false)
     }

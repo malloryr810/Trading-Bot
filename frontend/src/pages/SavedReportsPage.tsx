@@ -1,18 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listSavedReports } from '../api/reportsApi'
-import { ApiError } from '../api/client'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { LoadingState } from '../components/LoadingState'
+import { getErrorMessage } from '../lib/errors'
+import { formatTimestamp } from '../lib/format'
 import type { SavedReportSummary } from '../types/report'
-
-function formatTimestamp(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString()
-  } catch {
-    return iso
-  }
-}
 
 export function SavedReportsPage() {
   const [reports, setReports] = useState<SavedReportSummary[]>([])
@@ -31,13 +24,7 @@ export function SavedReportsPage() {
         }
       })
       .catch((err: unknown) => {
-        if (active) {
-          setError(
-            err instanceof ApiError
-              ? err.message
-              : 'Failed to load saved reports.',
-          )
-        }
+        if (active) setError(getErrorMessage(err, 'Failed to load saved reports.'))
       })
       .finally(() => {
         if (active) setLoading(false)

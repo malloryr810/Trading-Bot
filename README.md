@@ -344,6 +344,9 @@ frontend/                          # React + Vite + TypeScript frontend (Dashboa
       LoadingState.tsx             # Spinner with accessible role/aria attributes
       ErrorMessage.tsx             # Accessible error display
       StockReportView.tsx          # Full StockReport result display
+    lib/
+      format.ts                    # formatTimestamp — shared display formatting
+      errors.ts                    # getErrorMessage — consistent ApiError messaging
     pages/
       DashboardPage.tsx            # Health status, disclaimer, nav to Analyze / Saved Reports
       AnalyzePage.tsx              # Ticker input, analyze/save actions, report result

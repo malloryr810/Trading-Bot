@@ -118,6 +118,7 @@ npm run lint         # ESLint
 | `frontend/src/api/watchlistApi.ts` | Watchlist CRUD client functions — one per `/api/watchlists` endpoint |
 | `frontend/src/api/reportsApi.ts` | `listSavedReports`, `getSavedReport` — read-only saved-report history |
 | `frontend/src/components/` | `LoadingState`, `ErrorMessage`, `StockReportView` — presentational only |
+| `frontend/src/lib/` | `format.ts` (`formatTimestamp`) and `errors.ts` (`getErrorMessage`) — shared pure display/error helpers used across pages |
 | `frontend/src/pages/` | `DashboardPage` (health check, disclaimer), `AnalyzePage` (analyze + display), `WatchlistsPage` (watchlist CRUD UI), `SavedReportsPage` (`/reports` list), `ReportDetailPage` (`/reports/:id`, reuses `StockReportView`) |
 | `frontend/src/types/report.ts` | TypeScript interfaces mirroring `StockReport`, `SavedReportSummary`, `SavedReportDetail` |
 | `frontend/src/types/watchlist.ts` | TypeScript interfaces mirroring the backend watchlist schemas |

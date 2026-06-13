@@ -1,19 +1,11 @@
 import type { ReactNode } from 'react'
+import { formatTimestamp } from '../lib/format'
 import type { StockReport } from '../types/report'
 
 interface Props {
   report: StockReport
   /** ID of the saved snapshot, shown when report was saved via analyze-and-save. */
   savedId?: number
-}
-
-function formatTimestamp(iso: string | null): string {
-  if (!iso) return '—'
-  try {
-    return new Date(iso).toLocaleString()
-  } catch {
-    return iso
-  }
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {

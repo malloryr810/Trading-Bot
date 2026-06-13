@@ -1,5 +1,41 @@
 # Development Log
 
+## 2026-06-13 — Frontend quality review and cleanup
+
+**Goal:** review the frontend now that all main pages exist (Dashboard, Analyze,
+Watchlists, Saved Reports, Report Detail); remove real duplication and sync docs.
+Frontend + docs only — no backend touched.
+
+**Review outcome:** architecture is sound. API calls are centralised in `api/*`;
+pages render only backend-provided data (no score/category/confidence
+recomputation); TypeScript types match the backend responses; navigation and
+route paths are consistent; loading/empty/error states are present on every async
+page. No dead CSS found (every `styles.css` selector is referenced); CSS left
+unchanged. No type/unused-import issues (`ReactNode` is used).
+
+**Cleanup performed (removes genuine duplication)**
+
+- Added `frontend/src/lib/format.ts` (`formatTimestamp`) — previously defined
+  three times (StockReportView, SavedReportsPage, ReportDetailPage); now one
+  shared helper.
+- Added `frontend/src/lib/errors.ts` (`getErrorMessage(err, fallback)`) —
+  replaces the `err instanceof ApiError ? err.message : fallback` pattern that
+  was inlined across AnalyzePage (×2), SavedReportsPage, ReportDetailPage and the
+  local `messageFrom` in WatchlistsPage (×8 call sites). `ApiError` is now
+  imported only by `client.ts` and `lib/errors.ts`; the four pages dropped their
+  direct `ApiError` imports. Error handling is now consistent across all pages.
+- Behavior unchanged: same messages, same fallbacks, same `ApiError` semantics.
+
+**Docs synced:** added the new `lib/` folder to the README project structure and
+the CLAUDE.md frontend module table. No other doc drift found (route/status
+descriptions were already current).
+
+**Checks:** `npm run build` + `npm run lint` clean (CSS bundle hash unchanged,
+confirming JS-only changes). Backend suite not rerun — no backend files changed.
+No browser available for a click-through; the production build (type-checks all
+routes/imports) plus static review and the unused-CSS scan cover the same ground.
+No backend, scoring, analysis, report-generation, or CLI behavior changed.
+
 ## 2026-06-13 — Saved Reports / Report History frontend
 
 **Goal:** add display-only frontend pages for saved analysis reports the backend

@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { analyzeAndSave, analyzeOnly } from '../api/analysisApi'
-import { ApiError } from '../api/client'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { LoadingState } from '../components/LoadingState'
 import { StockReportView } from '../components/StockReportView'
+import { getErrorMessage } from '../lib/errors'
 import type { StockReport } from '../types/report'
 
 export function AnalyzePage() {
@@ -32,11 +32,7 @@ export function AnalyzePage() {
       const result = await analyzeOnly(t)
       setReport(result)
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : 'Analysis failed — please try again.',
-      )
+      setError(getErrorMessage(err, 'Analysis failed — please try again.'))
     } finally {
       setLoading(false)
     }
@@ -55,11 +51,7 @@ export function AnalyzePage() {
       setReport(result.report)
       setSavedId(result.id)
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : 'Analysis failed — please try again.',
-      )
+      setError(getErrorMessage(err, 'Analysis failed — please try again.'))
     } finally {
       setLoading(false)
     }
