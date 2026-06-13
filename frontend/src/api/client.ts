@@ -33,14 +33,43 @@ export async function get<T>(path: string): Promise<T> {
   return response.json() as Promise<T>
 }
 
-export async function post<T>(path: string, body: unknown): Promise<T> {
+async function sendJson<T>(
+  method: 'POST' | 'PATCH',
+  path: string,
+  body: unknown,
+): Promise<T> {
   let response: Response
   try {
     response = await fetch(`${BASE_URL}${path}`, {
-      method: 'POST',
+      method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
+  } catch {
+    throw new ApiError(0, 'Backend unavailable. Is the FastAPI server running?')
+  }
+  if (!response.ok) {
+    const errorBody: { detail?: string } = await response.json().catch(() => ({}))
+    throw new ApiError(
+      response.status,
+      errorBody.detail ?? `HTTP ${response.status}`,
+    )
+  }
+  return response.json() as Promise<T>
+}
+
+export async function post<T>(path: string, body: unknown): Promise<T> {
+  return sendJson<T>('POST', path, body)
+}
+
+export async function patch<T>(path: string, body: unknown): Promise<T> {
+  return sendJson<T>('PATCH', path, body)
+}
+
+export async function del<T>(path: string): Promise<T> {
+  let response: Response
+  try {
+    response = await fetch(`${BASE_URL}${path}`, { method: 'DELETE' })
   } catch {
     throw new ApiError(0, 'Backend unavailable. Is the FastAPI server running?')
   }

@@ -1,5 +1,50 @@
 # Development Log
 
+## 2026-06-13 — Phase 5 Milestone 1: watchlist management frontend
+
+**Goal:** add a display-and-manage UI for saved watchlists over the existing
+FastAPI watchlist endpoints, per `docs/watchlist_management_plan.md`. Frontend
+only — no backend, scoring, analysis, report, or CLI changes.
+
+**Types (`frontend/src/types/watchlist.ts`, new)**
+
+- `WatchlistSummary`, `WatchlistDetail`, `CreateWatchlistRequest`,
+  `UpdateWatchlistRequest`, `AddTickerRequest`, `DeleteResponse` — display-layer
+  interfaces mirroring `app/api/schemas/watchlists.py`. No analysis/scoring logic.
+
+**API client (`frontend/src/api/client.ts`, `watchlistApi.ts`)**
+
+- Extended the shared base client with `patch` and `del` helpers (POST/PATCH
+  share a `sendJson` core); same `BASE_URL` + `ApiError` handling as `get`/`post`.
+  No second client style introduced.
+- `watchlistApi.ts`: one typed function per endpoint — `listWatchlists`,
+  `createWatchlist`, `getWatchlist`, `updateWatchlist`, `deleteWatchlist`,
+  `addTickerToWatchlist`, `removeTickerFromWatchlist`. Ticker path segment is
+  `encodeURIComponent`-escaped.
+
+**Page + routing (`frontend/src/pages/WatchlistsPage.tsx`, `App.tsx`, `styles.css`)**
+
+- New `/watchlists` route and a "Watchlists" nav link using the existing
+  `NavLink` style.
+- Master-detail layout: left pane = create form + list of saved watchlists with
+  ticker counts; right pane = selected watchlist with edit (rename/description),
+  add-ticker form, removable ticker chips, and delete. Reuses the shared
+  `LoadingState` and `ErrorMessage` components.
+- States covered: loading, empty (no watchlists / no tickers), and error. Form
+  buttons disable while requests are in flight, matching the Analyze page.
+- Flow: after create → refresh list and select the new watchlist; after
+  add/remove ticker or edit → apply the returned detail and refresh the list
+  (keeps `ticker_count` current); after delete → clear selection and refresh.
+- Mount fetch uses promise callbacks (not synchronous setState in the effect) to
+  satisfy `react-hooks/set-state-in-effect`, mirroring `DashboardPage`.
+- Added watchlist CSS (layout grid, list items, ticker chips, shared
+  `.text-input`, `.btn-danger`) consistent with existing tokens. No analysis,
+  scoring, or persistence logic in the frontend — all writes go through the API.
+
+**Verification:** `npm run build` (tsc + vite) and `npm run lint` both clean. No
+backend files touched, so the Python suite was not rerun (last known: 1569
+passed). No scoring/trading/backend behavior changed.
+
 ## 2026-06-13 — Phase 5 Milestone 1: watchlist API routes (API + tests only)
 
 **Goal:** expose the existing watchlist service over HTTP per
