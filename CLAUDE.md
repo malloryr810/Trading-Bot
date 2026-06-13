@@ -112,12 +112,13 @@ npm run lint         # ESLint
 | `app/api/schemas/watchlists.py` | Watchlist request/response schemas (`CreateWatchlistRequest`, `UpdateWatchlistRequest`, `AddTickerRequest`, `WatchlistSummary`, `WatchlistDetail`, `DeleteResponse`) |
 | `app/api/errors.py` | `KNOWN_ANALYSIS_ERRORS` — shared tuple of pipeline error types used by both API routes for 422 mapping |
 | `app/main.py` | Thin argparse CLI shell — delegates entirely to `app/services/` |
-| `frontend/` | React + Vite + TypeScript browser frontend (Dashboard, Analyze, Watchlists) |
+| `frontend/` | React + Vite + TypeScript browser frontend (Dashboard, Analyze, Watchlists, Saved Reports) |
 | `frontend/src/api/client.ts` | Base fetch wrapper (`get`/`post`/`patch`/`del` over one shared `request` helper); `ApiError` class; `VITE_API_BASE_URL` env var |
 | `frontend/src/api/analysisApi.ts` | `checkHealth`, `analyzeOnly`, `analyzeAndSave` — one function per backend endpoint |
 | `frontend/src/api/watchlistApi.ts` | Watchlist CRUD client functions — one per `/api/watchlists` endpoint |
+| `frontend/src/api/reportsApi.ts` | `listSavedReports`, `getSavedReport` — read-only saved-report history |
 | `frontend/src/components/` | `LoadingState`, `ErrorMessage`, `StockReportView` — presentational only |
-| `frontend/src/pages/` | `DashboardPage` (health check, disclaimer), `AnalyzePage` (analyze + display), `WatchlistsPage` (watchlist CRUD UI) |
+| `frontend/src/pages/` | `DashboardPage` (health check, disclaimer), `AnalyzePage` (analyze + display), `WatchlistsPage` (watchlist CRUD UI), `SavedReportsPage` (`/reports` list), `ReportDetailPage` (`/reports/:id`, reuses `StockReportView`) |
 | `frontend/src/types/report.ts` | TypeScript interfaces mirroring `StockReport`, `SavedReportSummary`, `SavedReportDetail` |
 | `frontend/src/types/watchlist.ts` | TypeScript interfaces mirroring the backend watchlist schemas |
 
@@ -199,7 +200,7 @@ Each analysis module follows the same pattern:
 | 3 | SQLite persistence — save StockReport snapshots, report history endpoints | **Milestone 1 complete** — `POST /api/reports/analyze`, `GET /api/reports/history`, `GET /api/reports/{id}` |
 | 4 | React + Vite frontend — Milestone 1: shell with API connectivity | **Complete** — Dashboard + Analyze pages, health check, analyze-only and analyze-and-save flows |
 | 5 | Watchlist management (frontend + backend routes) | **Milestone 1 complete** — `watchlists`/`watchlist_tickers` tables, `watchlist_service`, `/api/watchlists` CRUD routes, Watchlists frontend page. Storage only; watchlist analysis not yet built |
-| 6 | Research notes and report history UI | Not started |
+| 6 | Research notes and report history UI | **Report history UI done** — Saved Reports list (`/reports`) and Report Detail (`/reports/:id`) over the existing read endpoints. Research notes not started |
 | 7 | Mock trading simulation (`app/simulation/`) | Not started |
 | 8 | ML research layer (`app/ml/`) | Not started |
 | 9 | Deployment and hardening | Not started |

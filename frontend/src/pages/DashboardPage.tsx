@@ -42,11 +42,10 @@ export function DashboardPage() {
         <Link to="/analyze" className="btn btn-primary">
           Analyze a ticker →
         </Link>
+        <Link to="/reports" className="btn btn-secondary">
+          View saved reports
+        </Link>
       </div>
-
-      <p className="milestone-note">
-        Saved report history and report detail pages are planned for Milestone 2.
-      </p>
     </div>
   )
 }

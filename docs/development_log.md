@@ -1,5 +1,48 @@
 # Development Log
 
+## 2026-06-13 — Saved Reports / Report History frontend
+
+**Goal:** add display-only frontend pages for saved analysis reports the backend
+already persists (`GET /api/reports/history`, `GET /api/reports/{id}`). No new
+analysis, no backend changes.
+
+**API client (`frontend/src/api/reportsApi.ts`, new)**
+
+- `listSavedReports(limit=50)` → `SavedReportSummary[]` (GET /api/reports/history),
+  `getSavedReport(id)` → `SavedReportDetail` (GET /api/reports/{id}). Reuses the
+  shared `get` helper + `ApiError`; no second client style. Read-only — no save
+  function added (saving stays in `analyzeAndSave`).
+- Reused existing `SavedReportSummary` / `SavedReportDetail` / `StockReport`
+  types in `types/report.ts`; no new types needed.
+
+**Pages + routing**
+
+- `SavedReportsPage` at `/reports`: lists summaries (ticker, company, category
+  badge, score, confidence, saved timestamp); each card links to the detail
+  page. Loading / empty / error states. Empty state points to Analyze →
+  "Analyze and save".
+- `ReportDetailPage` at `/reports/:id`: loads one snapshot and renders it via the
+  existing `StockReportView` component (ticker, company, price, category, score,
+  confidence, summaries, key positive factors, key risks, triggers, data
+  timestamp, sources) plus the saved id/timestamp. Invalid id is handled in
+  render; missing id surfaces the backend 404 message. A keyed inner component
+  remounts per id so the load effect runs once per report (and satisfies
+  `react-hooks/set-state-in-effect`).
+- `App.tsx`: added a "Saved Reports" nav link and the `/reports` + `/reports/:id`
+  routes. `DashboardPage`: added a "View saved reports" secondary link and
+  removed the now-stale "planned for Milestone 2" note.
+- `styles.css`: added report-list/card styles, a `detail-back` spacing rule, and
+  a flex gap on `.dashboard-actions` (now two links). No existing selectors
+  changed.
+
+**Verification:** `npm run build` + `npm run lint` clean. Live HTTP smoke test
+(uvicorn on a temp DB) confirmed the read endpoints return shapes matching the
+frontend types: empty history → `[]`, missing detail → 404, and a seeded report
+round-tripped through history + detail with the full nested `report`. No browser
+was available for a click-through; the smoke test + build/lint cover the data
+contract and type-safety. No backend, scoring, analysis, report-generation, or
+CLI behavior changed.
+
 ## 2026-06-13 — Phase 5 review, integration verification, and docs sync
 
 **Goal:** full integration + code-quality review of the completed Watchlist

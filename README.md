@@ -208,8 +208,7 @@ The app opens at `http://localhost:5173`.
 - Dashboard page — backend health status, disclaimer, link to Analyze
 - Analyze page — enter a ticker, choose "Analyze only" (POST /api/analyze) or "Analyze and save" (POST /api/reports/analyze), view the StockReport result
 - Watchlists page — create, rename, and delete named watchlists; add and remove tickers; basic CRUD over the watchlist API (storage only, no analysis run from here)
-
-**Planned next:** saved report history page and report detail page.
+- Saved Reports page (`/reports`) — list of previously saved analysis snapshots; each links to a Report Detail page (`/reports/:id`) that renders the full saved report. Display-only — no analysis is run here.
 
 ### Build and lint
 
@@ -334,20 +333,23 @@ docs/                              # Architecture, scoring rules, data sources, 
 outputs/
   reports/                         # Saved plain-text reports (TICKER_YYYYMMDD_HHMMSS.txt)
   results/                         # Saved JSON results (TICKER_YYYYMMDD_HHMMSS.json)
-frontend/                          # React + Vite + TypeScript frontend (Dashboard, Analyze, Watchlists)
+frontend/                          # React + Vite + TypeScript frontend (Dashboard, Analyze, Watchlists, Saved Reports)
   src/
     api/
       client.ts                    # Base fetch wrapper (get/post/patch/del); base URL, ApiError class
       analysisApi.ts               # checkHealth, analyzeOnly, analyzeAndSave
       watchlistApi.ts              # Watchlist CRUD client functions
+      reportsApi.ts                # listSavedReports, getSavedReport (read-only history)
     components/
       LoadingState.tsx             # Spinner with accessible role/aria attributes
       ErrorMessage.tsx             # Accessible error display
       StockReportView.tsx          # Full StockReport result display
     pages/
-      DashboardPage.tsx            # Health status, disclaimer, nav to Analyze
+      DashboardPage.tsx            # Health status, disclaimer, nav to Analyze / Saved Reports
       AnalyzePage.tsx              # Ticker input, analyze/save actions, report result
       WatchlistsPage.tsx           # Watchlist CRUD UI (create/rename/delete, add/remove tickers)
+      SavedReportsPage.tsx         # List of saved report snapshots (/reports)
+      ReportDetailPage.tsx         # One saved report rendered in full (/reports/:id)
     types/
       report.ts                    # TypeScript interfaces mirroring backend report schemas
       watchlist.ts                 # TypeScript interfaces mirroring backend watchlist schemas
@@ -376,15 +378,15 @@ create, rename, and delete named watchlists and add or remove tickers. This is
 storage only — no analysis, scans, alerts, or trades run from a watchlist.
 
 A React + Vite frontend (`frontend/`) is in active development. The Dashboard,
-Analyze, and Watchlists pages are built and connected to the backend. The Analyze
-page supports both analyze-only and analyze-and-save flows. Saved report history
-and detail pages are planned next.
+Analyze, Watchlists, and Saved Reports pages are built and connected to the
+backend. The Analyze page supports both analyze-only and analyze-and-save flows;
+the Saved Reports page lists persisted snapshots and links to a read-only Report
+Detail page.
 
 ## Planned Future Work
 
 These areas are on the roadmap but not yet built:
 
-- **Saved report history UI** — browser pages for saved report history and report detail (see `docs/frontend_plan.md`)
 - **Watchlist analysis** — analyze every ticker in a saved watchlist by reusing the existing pipeline (CRUD foundation is in place; see `docs/watchlist_management_plan.md`)
 - **Improved scoring calibration** — better-calibrated weights and thresholds (see `docs/scoring_calibration_plan.md`)
 - **Better data validation** — richer error messages for missing or stale data fields
