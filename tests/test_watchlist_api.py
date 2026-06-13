@@ -8,11 +8,41 @@ engine.  No network calls and no writes to the real project database.
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 from fastapi.testclient import TestClient
 
 import app.services.watchlist_service as service
 from app.data.database import build_engine
+from app.models.rating import ConfidenceLevel, RatingCategory
+from app.models.stock_report import StockReport
+
+# analyze_stock as imported inside the watchlist analysis service module.
+_ANALYZE = "app.services.watchlist_analysis_service.analyze_stock"
+
+
+def _report_for(ticker: str) -> StockReport:
+    return StockReport(
+        ticker=ticker,
+        final_category=RatingCategory.WATCHLIST,
+        score=60.0,
+        confidence_level=ConfidenceLevel.MEDIUM,
+        company_name=f"{ticker} Inc.",
+        current_price=100.0,
+    )
+
+
+def _analyze_ok(*ok_tickers):
+    """side_effect: succeed for ok_tickers, raise for everything else."""
+    ok = set(ok_tickers)
+
+    def _side_effect(ticker: str) -> StockReport:
+        if ticker in ok:
+            return _report_for(ticker)
+        raise RuntimeError(f"no data for {ticker}")
+
+    return _side_effect
 
 
 # ---------------------------------------------------------------------------
@@ -277,3 +307,78 @@ class TestCorsMethods:
         assert resp.status_code == 200
         allowed = resp.headers.get("access-control-allow-methods", "")
         assert "DELETE" in allowed
+
+
+# ---------------------------------------------------------------------------
+# POST /api/watchlists/{id}/analyze
+# ---------------------------------------------------------------------------
+
+
+def _create_with_tickers(client, tickers, name="Tech"):
+    wl = _create(client, name).json()
+    for ticker in tickers:
+        client.post(f"/api/watchlists/{wl['id']}/tickers", json={"ticker": ticker})
+    return wl["id"]
+
+
+class TestAnalyzeWatchlist:
+    def test_valid_watchlist_returns_200(self, client):
+        wl_id = _create_with_tickers(client, ["AAPL", "MSFT"])
+        with patch(_ANALYZE, side_effect=_analyze_ok("AAPL", "MSFT")):
+            resp = client.post(f"/api/watchlists/{wl_id}/analyze")
+        assert resp.status_code == 200
+
+    def test_response_contract(self, client):
+        wl_id = _create_with_tickers(client, ["AAPL", "MSFT"], name="My List")
+        with patch(_ANALYZE, side_effect=_analyze_ok("AAPL", "MSFT")):
+            data = client.post(f"/api/watchlists/{wl_id}/analyze").json()
+        assert data["watchlist_id"] == wl_id
+        assert data["watchlist_name"] == "My List"
+        assert "analyzed_at" in data
+        assert data["total_tickers"] == 2
+        assert data["successful_count"] == 2
+        assert data["failed_count"] == 0
+        assert len(data["results"]) == 2
+        assert data["errors"] == []
+
+    def test_result_item_has_report_and_summary(self, client):
+        wl_id = _create_with_tickers(client, ["AAPL"])
+        with patch(_ANALYZE, side_effect=_analyze_ok("AAPL")):
+            data = client.post(f"/api/watchlists/{wl_id}/analyze").json()
+        item = data["results"][0]
+        assert item["ticker"] == "AAPL"
+        assert item["category"] == RatingCategory.WATCHLIST.value
+        assert item["score"] == 60.0
+        assert item["confidence"] == ConfidenceLevel.MEDIUM.value
+        assert item["current_price"] == 100.0
+        assert item["report"]["ticker"] == "AAPL"
+
+    def test_missing_watchlist_returns_404(self, client):
+        with patch(_ANALYZE, side_effect=_analyze_ok("AAPL")):
+            assert client.post("/api/watchlists/999/analyze").status_code == 404
+
+    def test_empty_watchlist_returns_400(self, client):
+        wl_id = _create_with_tickers(client, [])
+        with patch(_ANALYZE) as mock_analyze:
+            resp = client.post(f"/api/watchlists/{wl_id}/analyze")
+        assert resp.status_code == 400
+        mock_analyze.assert_not_called()
+
+    def test_partial_failure_returns_200_with_counts(self, client):
+        wl_id = _create_with_tickers(client, ["AAPL", "BADX", "MSFT"])
+        with patch(_ANALYZE, side_effect=_analyze_ok("AAPL", "MSFT")):
+            resp = client.post(f"/api/watchlists/{wl_id}/analyze")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["successful_count"] == 2
+        assert data["failed_count"] == 1
+        assert data["errors"][0]["ticker"] == "BADX"
+        assert isinstance(data["errors"][0]["error"], str)
+
+    def test_all_failures_returns_200(self, client):
+        wl_id = _create_with_tickers(client, ["BADX", "BADY"])
+        with patch(_ANALYZE, side_effect=_analyze_ok()):
+            data = client.post(f"/api/watchlists/{wl_id}/analyze").json()
+        assert data["successful_count"] == 0
+        assert data["failed_count"] == 2
+        assert data["results"] == []

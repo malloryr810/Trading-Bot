@@ -23,9 +23,11 @@ from app.api.schemas.watchlists import (
     CreateWatchlistRequest,
     DeleteResponse,
     UpdateWatchlistRequest,
+    WatchlistAnalysisResponse,
     WatchlistDetail,
     WatchlistSummary,
 )
+from app.services.watchlist_analysis_service import analyze_watchlist
 from app.services.watchlist_service import (
     WatchlistNotFoundError,
     WatchlistValidationError,
@@ -102,6 +104,21 @@ async def delete_ticker(watchlist_id: int, ticker: str) -> dict:
     """Remove a ticker from a watchlist (idempotent if absent)."""
     try:
         return remove_ticker_from_watchlist(watchlist_id, ticker)
+    except (WatchlistNotFoundError, LookupError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except (WatchlistValidationError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/{watchlist_id}/analyze", response_model=WatchlistAnalysisResponse)
+async def post_watchlist_analyze(watchlist_id: int) -> dict:
+    """Analyze every ticker in a watchlist; partial success, no save.
+
+    Per-ticker failures are captured in the response ``errors`` list. The
+    request fails only when the watchlist is missing (404) or empty (400).
+    """
+    try:
+        return analyze_watchlist(watchlist_id)
     except (WatchlistNotFoundError, LookupError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except (WatchlistValidationError, ValueError) as exc:

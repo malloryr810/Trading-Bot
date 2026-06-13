@@ -147,9 +147,13 @@ CORS is configured to allow `http://localhost:5173` and `http://127.0.0.1:5173`
 | `DELETE` | `/api/watchlists/{id}` | Delete a watchlist and its tickers |
 | `POST` | `/api/watchlists/{id}/tickers` | Add a ticker to a watchlist (`{ticker}`) |
 | `DELETE` | `/api/watchlists/{id}/tickers/{ticker}` | Remove a ticker from a watchlist |
+| `POST` | `/api/watchlists/{id}/analyze` | Analyze every ticker in a watchlist; returns per-ticker results + errors (partial success, nothing saved) |
 
-> **Watchlist management is storage only.** These endpoints persist named ticker
-> lists for later research — they do **not** run analysis, scans, or trades.
+> **Watchlist CRUD is storage only.** The list/ticker endpoints persist named
+> ticker lists; they do not run analysis. `POST /api/watchlists/{id}/analyze`
+> runs the existing analysis pipeline over the saved tickers on demand and
+> returns the results — it does **not** save them, schedule scans, or trade.
+> There is no frontend UI for analyze-watchlist yet (API only).
 
 **Analysis only (no persistence):**
 
@@ -303,6 +307,7 @@ app/
     stock_analysis_service.py      # analyze_stock — public entry point for CLI and API
     report_persistence_service.py  # save_stock_report, list_saved_reports, get_saved_report
     watchlist_service.py           # watchlist + ticker CRUD (storage only)
+    watchlist_analysis_service.py  # analyze_watchlist — run analyze_stock over a saved watchlist
   data/
     market_data.py                 # OHLCV price history
     fundamentals.py                # Company fundamentals

@@ -12,6 +12,8 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from app.models.stock_report import StockReport
+
 
 # --- Requests --------------------------------------------------------------
 
@@ -66,3 +68,35 @@ class DeleteResponse(BaseModel):
 
     status: str = "deleted"
     id: int
+
+
+class WatchlistAnalysisResult(BaseModel):
+    """One successfully analyzed ticker within a watchlist analysis run."""
+
+    ticker: str
+    company_name: str | None
+    category: str
+    score: float
+    confidence: str
+    current_price: float | None
+    report: StockReport
+
+
+class WatchlistAnalysisError(BaseModel):
+    """One ticker that failed to analyze; failures never abort the run."""
+
+    ticker: str
+    error: str
+
+
+class WatchlistAnalysisResponse(BaseModel):
+    """Structured result of analyzing every ticker in a saved watchlist."""
+
+    watchlist_id: int
+    watchlist_name: str
+    analyzed_at: datetime
+    total_tickers: int
+    successful_count: int
+    failed_count: int
+    results: list[WatchlistAnalysisResult]
+    errors: list[WatchlistAnalysisError]

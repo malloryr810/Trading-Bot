@@ -101,15 +101,16 @@ npm run lint         # ESLint
 | `app/services/stock_analysis_service.py` | `analyze_stock` — public entry point for all callers (CLI and API); `_analyze_ticker` is internal |
 | `app/services/report_persistence_service.py` | `save_stock_report`, `list_saved_reports`, `get_saved_report` — SQLite persistence boundary |
 | `app/services/watchlist_service.py` | Watchlist + ticker CRUD over SQLite (storage only); `WatchlistValidationError`/`WatchlistNotFoundError`; optional `engine` kwarg for tests |
+| `app/services/watchlist_analysis_service.py` | `analyze_watchlist` — reuses `get_watchlist` + `analyze_stock` to analyze every ticker in a saved watchlist; partial success (per-ticker errors captured); analysis-only, nothing saved |
 | `app/data/database.py` | SQLAlchemy Core engine factory (`build_engine`) and table definitions: `analysis_reports`, `watchlists`, `watchlist_tickers` |
 | `app/api/main.py` | FastAPI app factory; `uvicorn app.api.main:app` entry point |
 | `app/api/routes/health.py` | `GET /api/health` |
 | `app/api/routes/analysis.py` | `POST /api/analyze` — analysis only; calls `analyze_stock`, does not save |
 | `app/api/routes/reports.py` | `POST /api/reports/analyze`, `GET /api/reports/history`, `GET /api/reports/{id}` |
-| `app/api/routes/watchlists.py` | Watchlist CRUD routes — `GET/POST /api/watchlists`, `GET/PATCH/DELETE /api/watchlists/{id}`, `POST` / `DELETE` `/api/watchlists/{id}/tickers[/{ticker}]`; thin, delegate to `watchlist_service` |
+| `app/api/routes/watchlists.py` | Watchlist CRUD routes — `GET/POST /api/watchlists`, `GET/PATCH/DELETE /api/watchlists/{id}`, `POST` / `DELETE` `/api/watchlists/{id}/tickers[/{ticker}]`, `POST /api/watchlists/{id}/analyze` (analyze-watchlist, partial success); thin, delegate to services |
 | `app/api/schemas/analysis.py` | `AnalyzeRequest` — validates and normalizes ticker at the API boundary |
 | `app/api/schemas/reports.py` | `SavedReportSummary`, `SavedReportDetail` — response schemas for persistence endpoints |
-| `app/api/schemas/watchlists.py` | Watchlist request/response schemas (`CreateWatchlistRequest`, `UpdateWatchlistRequest`, `AddTickerRequest`, `WatchlistSummary`, `WatchlistDetail`, `DeleteResponse`) |
+| `app/api/schemas/watchlists.py` | Watchlist request/response schemas (`CreateWatchlistRequest`, `UpdateWatchlistRequest`, `AddTickerRequest`, `WatchlistSummary`, `WatchlistDetail`, `DeleteResponse`, plus analyze-watchlist: `WatchlistAnalysisResponse`/`Result`/`Error`) |
 | `app/api/errors.py` | `KNOWN_ANALYSIS_ERRORS` — shared tuple of pipeline error types used by both API routes for 422 mapping |
 | `app/main.py` | Thin argparse CLI shell — delegates entirely to `app/services/` |
 | `frontend/` | React + Vite + TypeScript browser frontend (Dashboard, Analyze, Watchlists, Saved Reports) |
@@ -200,7 +201,7 @@ Each analysis module follows the same pattern:
 | 2 | FastAPI backend — `GET /api/health`, `POST /api/analyze` | Done |
 | 3 | SQLite persistence — save StockReport snapshots, report history endpoints | **Milestone 1 complete** — `POST /api/reports/analyze`, `GET /api/reports/history`, `GET /api/reports/{id}` |
 | 4 | React + Vite frontend — Milestone 1: shell with API connectivity | **Complete** — Dashboard + Analyze pages, health check, analyze-only and analyze-and-save flows |
-| 5 | Watchlist management (frontend + backend routes) | **Milestone 1 complete** — `watchlists`/`watchlist_tickers` tables, `watchlist_service`, `/api/watchlists` CRUD routes, Watchlists frontend page. Storage only; watchlist analysis not yet built |
+| 5 | Watchlist management (frontend + backend routes) | **Milestone 1 complete** — `watchlists`/`watchlist_tickers` tables, `watchlist_service`, `/api/watchlists` CRUD routes, Watchlists frontend page. **Analyze-watchlist backend done** — `watchlist_analysis_service` + `POST /api/watchlists/{id}/analyze` (analysis-only, partial success); no frontend UI for it yet |
 | 6 | Research notes and report history UI | **Report history UI done** — Saved Reports list (`/reports`) and Report Detail (`/reports/:id`) over the existing read endpoints. Research notes not started |
 | 7 | Mock trading simulation (`app/simulation/`) | Not started |
 | 8 | ML research layer (`app/ml/`) | Not started |

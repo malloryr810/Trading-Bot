@@ -1,5 +1,58 @@
 # Development Log
 
+## 2026-06-13 — Analyze Watchlist backend service + API
+
+**Goal:** let the backend analyze every ticker in a saved watchlist by reusing
+the existing single-ticker pipeline, returning a structured, frontend-ready
+result. Backend/API + tests only — no frontend, no new scoring logic.
+
+**Service (`app/services/watchlist_analysis_service.py`, new)**
+
+- `analyze_watchlist(watchlist_id, *, engine=None) -> dict`. Reuses
+  `get_watchlist` (watchlist_service) for lookup and `analyze_stock`
+  (stock_analysis_service) per ticker — no analysis/scoring duplicated here.
+- Raises the existing `WatchlistNotFoundError` (missing) and
+  `WatchlistValidationError` (no tickers) so the API maps them with the same
+  pattern as the other watchlist routes.
+- **Partial success:** each ticker runs in its own try/except; a failure is
+  captured in `errors` (`{ticker, error}`) and never aborts the run. The request
+  fails outright only when the watchlist is missing or empty.
+- Returns `{watchlist_id, watchlist_name, analyzed_at (UTC), total_tickers,
+  successful_count, failed_count, results, errors}`. Each success item carries
+  `ticker, company_name, category, score, confidence, current_price` plus the
+  full `StockReport` under `report` (via `model_dump(mode="json")`, matching the
+  persistence service's report shape).
+- **Analysis-only:** generated reports are not saved. Saving a watchlist run is
+  noted here as a future enhancement, intentionally not implemented in this pass.
+
+**API (`app/api/routes/watchlists.py`, `app/api/schemas/watchlists.py`)**
+
+- `POST /api/watchlists/{watchlist_id}/analyze` → `WatchlistAnalysisResponse`.
+  Thin handler: calls the service, maps not-found→404 and validation→400 (same
+  style as the sibling routes). Partial ticker failures return 200 with the
+  errors listed.
+- New schemas: `WatchlistAnalysisResult`, `WatchlistAnalysisError`,
+  `WatchlistAnalysisResponse` (the result's `report` field is the existing
+  `StockReport` model).
+
+**Tests**
+
+- `tests/test_watchlist_analysis_service.py` (new, 13): missing→not-found,
+  empty→validation (and analyze not called), single/multiple successes, result
+  and error item shapes, full report included, one-failure-doesn't-block-others,
+  all-failures, envelope keys, UTC `analyzed_at`. `analyze_stock` is mocked — no
+  network.
+- `tests/test_watchlist_api.py` (+7): 200 happy path, response contract, result
+  item shape, 404 missing, 400 empty (analyze not called), partial failure → 200
+  with counts, all failures → 200. `analyze_stock` mocked.
+
+**Verification:** `pytest tests/test_watchlist_analysis_service.py
+tests/test_watchlist_api.py` → 55 passed; full suite → 1589 passed. Live HTTP
+check confirmed 404 (missing), 400 with a clear message (empty), and route
+registration with no `/tickers` path conflict. No frontend, scoring, analysis,
+report-generation, or CLI behavior changed; no dependencies added. There is no
+frontend UI for this endpoint yet.
+
 ## 2026-06-13 — Frontend quality review and cleanup
 
 **Goal:** review the frontend now that all main pages exist (Dashboard, Analyze,
