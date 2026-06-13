@@ -85,7 +85,8 @@ def analyze_watchlist(
     for ticker in tickers:
         try:
             report = analyze_stock(ticker)
-        except Exception as exc:  # noqa: BLE001 — partial success: never abort the run
+        except Exception as exc:
+            # Partial success: one ticker's failure never aborts the run.
             errors.append({"ticker": ticker, "error": str(exc) or type(exc).__name__})
             continue
         results.append(_success_item(report))

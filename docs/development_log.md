@@ -1,5 +1,40 @@
 # Development Log
 
+## 2026-06-13 — Watchlist analysis review and cleanup
+
+**Goal:** focused review of the completed watchlist-analysis milestone
+(backend service, API, frontend UI). Behavior-preserving.
+
+**Review outcome:** the feature is sound across layers.
+- Backend: `analyze_watchlist` reuses `get_watchlist` + `analyze_stock` with no
+  scoring/report logic duplicated; partial success is correct and tested
+  (per-ticker failures captured, run never aborts); empty watchlist → 400,
+  missing → 404; the route is thin; nothing is persisted (analysis-only); no
+  scheduling/alerts/trading introduced.
+- Contract: verified field-by-field that the service dict keys, the Pydantic
+  `WatchlistAnalysisResponse`/`Result`/`Error` schemas, and the frontend
+  `WatchlistAnalysis*` types all match exactly.
+- Frontend: `analyzeWatchlist` uses the shared `post` client and the correct
+  endpoint; the page duplicates no backend logic (display formatting only —
+  `toFixed` and the shared `formatTimestamp` helper); results are labelled
+  on-demand/not-saved; Analyze is disabled + messaged for empty watchlists;
+  loading/error/result and failed-ticker sections are clear; analysis is cleared
+  on selection/ticker changes and delete; mutating controls are disabled during
+  analysis. CRUD is unaffected.
+
+**Cleanup performed:** removed a misleading `# noqa: BLE001` directive in
+`watchlist_analysis_service.py` (the project configures no ruff/flake8 and uses
+no `noqa` elsewhere; the broad `except Exception` for partial success matches the
+existing `app/watchlist.py` / `stock_analysis_service.py` style). Replaced it with
+a plain explanatory comment. No behavior change.
+
+**Checks:** `pytest tests/test_watchlist_analysis_service.py
+tests/test_watchlist_api.py` → 55 passed; full suite → 1589 passed; frontend
+`npm run build` + `npm run lint` clean. No browser available for a click-through;
+the field-alignment check, type-checking build, and existing tests cover the
+contract. No scoring, analysis, report-generation, persistence, CLI, or trading
+behavior changed.
+
 ## 2026-06-13 — Analyze Watchlist frontend UI
 
 **Goal:** let the Watchlists page analyze the selected watchlist on demand via the
