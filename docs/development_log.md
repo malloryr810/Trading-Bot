@@ -1,5 +1,48 @@
 # Development Log
 
+## 2026-06-13 — Phase 5 Milestone 1: watchlist API routes (API + tests only)
+
+**Goal:** expose the existing watchlist service over HTTP per
+`docs/watchlist_management_plan.md`. API layer and tests only — no frontend, no
+scoring/analysis/report/CLI changes.
+
+**Schemas (`app/api/schemas/watchlists.py`, new)**
+
+- Requests: `CreateWatchlistRequest` (name, description?), `UpdateWatchlistRequest`
+  (name?, description?), `AddTickerRequest` (ticker).
+- Responses: `WatchlistSummary` (list view, includes `ticker_count`),
+  `WatchlistDetail` (single item, includes `tickers`), `DeleteResponse`.
+
+**Routes (`app/api/routes/watchlists.py`, new)**
+
+- `APIRouter(prefix="/watchlists", tags=["watchlists"])` with seven endpoints:
+  `GET /api/watchlists`, `POST /api/watchlists`, `GET/PATCH/DELETE
+  /api/watchlists/{id}`, `POST /api/watchlists/{id}/tickers`,
+  `DELETE /api/watchlists/{id}/tickers/{ticker}`.
+- Thin handlers: each calls the matching `watchlist_service` function. Mapping —
+  `WatchlistValidationError`/`ValueError` → 400, `WatchlistNotFoundError`/
+  `LookupError` → 404. Pydantic request validation surfaces as 422 (FastAPI
+  default). `POST /api/watchlists` returns 201. No business logic in routes.
+
+**App wiring + CORS (`app/api/main.py`)**
+
+- Registered the watchlists router under `/api`.
+- Widened CORS `allow_methods` from `["GET", "POST"]` to
+  `["GET", "POST", "PATCH", "DELETE", "OPTIONS"]` so the browser frontend can use
+  the new verbs. Origins unchanged (still the two Vite localhost origins).
+
+**Tests (`tests/test_watchlist_api.py`, new)**
+
+- 35 integration tests via FastAPI `TestClient`, driving routes → real service →
+  a temporary SQLite engine injected into the service module (no network, no real
+  DB writes). Covers all seven endpoints: happy paths, 400 on blank name/ticker,
+  404 on missing watchlist, ticker normalization, idempotent duplicate add and
+  absent-ticker remove, and CORS preflight allowing PATCH/DELETE.
+
+**Verification:** `pytest tests/test_watchlist_api.py` → 35 passed; full suite →
+1569 passed. No frontend, scoring, analysis, report, or CLI behavior changed; the
+only pre-existing endpoints touched are unaffected (CORS widening is additive).
+
 ## 2026-06-13 — Phase 5 Milestone 1: watchlist persistence + service (backend only)
 
 **Goal:** lay the backend foundation for watchlist management per
