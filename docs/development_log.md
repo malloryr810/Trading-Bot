@@ -1,5 +1,49 @@
 # Development Log
 
+## 2026-06-13 — Phase 5 Milestone 1: watchlist persistence + service (backend only)
+
+**Goal:** lay the backend foundation for watchlist management per
+`docs/watchlist_management_plan.md`. Storage and service layer only — no API
+routes, no frontend, no scoring/analysis/report/CLI changes.
+
+**Database (`app/data/database.py`)**
+
+- Added two SQLAlchemy Core tables: `watchlists` (id, name, description,
+  created_at, updated_at) and `watchlist_tickers` (id, watchlist_id FK →
+  watchlists.id, ticker, created_at).
+- `watchlist_tickers` carries a `UniqueConstraint(watchlist_id, ticker)` so a
+  ticker appears at most once per list. Schema is intentionally minimal — no
+  prices, scores, report ids, or analysis snapshots.
+
+**Service (`app/services/watchlist_service.py`, new)**
+
+- Public functions mirroring `report_persistence_service` style, each with an
+  optional keyword-only `engine` for test injection:
+  `create_watchlist`, `list_watchlists`, `get_watchlist`, `update_watchlist`,
+  `delete_watchlist`, `add_ticker_to_watchlist`, `remove_ticker_from_watchlist`.
+- Returns plain dicts with stable keys; watchlist detail includes a `tickers`
+  list (insertion order). `list_watchlists` returns summaries with `ticker_count`.
+- Validation: names stripped and required; blank/None descriptions collapse to
+  None; tickers normalized via shared `normalize_ticker` (trim + uppercase);
+  blank tickers rejected.
+- Custom errors `WatchlistValidationError(ValueError)` and
+  `WatchlistNotFoundError(LookupError)`. Get/update/delete on a missing id and
+  add/remove ticker on a missing watchlist raise not-found (never silently
+  create). Duplicate ticker adds and missing-ticker removals are idempotent.
+- Watchlist deletion removes child ticker rows explicitly (does not rely on
+  SQLite cascade, which is off by default here). Datetimes re-attached to UTC on
+  read, matching the persistence service convention.
+
+**Tests (`tests/test_watchlist_service.py`, new)**
+
+- 50 service tests using a temporary SQLite engine (`tmp_path`); deterministic,
+  no live APIs. Covers CRUD, validation, normalization, duplicate/idempotent
+  behavior, cascade-style ticker deletion, and not-found paths.
+
+**Verification:** `pytest tests/test_watchlist_service.py` → 50 passed; full
+suite → 1534 passed. No API, frontend, scoring, analysis, report, or CLI
+behavior changed.
+
 ## 2026-06-10 — Codebase review and documentation sync
 
 **Goal:** full code-quality review (clean/useful/no redundancy) plus a docs accuracy pass. Behavior-preserving only.
