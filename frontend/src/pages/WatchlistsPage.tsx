@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   addTickerToWatchlist,
+  analyzeWatchlist,
   createWatchlist,
   deleteWatchlist,
   getWatchlist,
@@ -12,7 +13,12 @@ import {
 import { ErrorMessage } from '../components/ErrorMessage'
 import { LoadingState } from '../components/LoadingState'
 import { getErrorMessage } from '../lib/errors'
-import type { WatchlistDetail, WatchlistSummary } from '../types/watchlist'
+import { formatTimestamp } from '../lib/format'
+import type {
+  WatchlistAnalysisResponse,
+  WatchlistDetail,
+  WatchlistSummary,
+} from '../types/watchlist'
 
 export function WatchlistsPage() {
   const [watchlists, setWatchlists] = useState<WatchlistSummary[]>([])
@@ -31,6 +37,11 @@ export function WatchlistsPage() {
 
   const [editName, setEditName] = useState('')
   const [editDescription, setEditDescription] = useState('')
+
+  // On-demand analysis result for the selected watchlist (not saved server-side).
+  const [analysis, setAnalysis] = useState<WatchlistAnalysisResponse | null>(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analysisError, setAnalysisError] = useState<string | null>(null)
 
   async function refreshList(): Promise<WatchlistSummary[]> {
     setListLoading(true)
@@ -73,6 +84,9 @@ export function WatchlistsPage() {
     setSelected(detail)
     setEditName(detail.name)
     setEditDescription(detail.description ?? '')
+    // Any selection change or ticker mutation invalidates a prior analysis.
+    setAnalysis(null)
+    setAnalysisError(null)
   }
 
   async function handleSelect(id: number) {
@@ -175,11 +189,27 @@ export function WatchlistsPage() {
     try {
       await deleteWatchlist(selected.id)
       setSelected(null)
+      setAnalysis(null)
+      setAnalysisError(null)
       await refreshList()
     } catch (err) {
       setDetailError(getErrorMessage(err, 'Failed to delete watchlist.'))
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function handleAnalyze() {
+    if (!selected || selected.tickers.length === 0) return
+    setAnalyzing(true)
+    setAnalysisError(null)
+    setAnalysis(null)
+    try {
+      setAnalysis(await analyzeWatchlist(selected.id))
+    } catch (err) {
+      setAnalysisError(getErrorMessage(err, 'Failed to analyze watchlist.'))
+    } finally {
+      setAnalyzing(false)
     }
   }
 
@@ -202,7 +232,7 @@ export function WatchlistsPage() {
               placeholder="Name (e.g. Semiconductors)"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              disabled={creating}
+              disabled={creating || analyzing}
               aria-label="New watchlist name"
             />
             <input
@@ -211,14 +241,14 @@ export function WatchlistsPage() {
               placeholder="Description (optional)"
               value={newDescription}
               onChange={(e) => setNewDescription(e.target.value)}
-              disabled={creating}
+              disabled={creating || analyzing}
               aria-label="New watchlist description"
             />
             <button
               type="button"
               className="btn btn-primary"
               onClick={handleCreate}
-              disabled={creating}
+              disabled={creating || analyzing}
             >
               {creating ? 'Creating…' : 'Create watchlist'}
             </button>
@@ -243,6 +273,7 @@ export function WatchlistsPage() {
                       selected?.id === wl.id ? ' is-selected' : ''
                     }`}
                     onClick={() => handleSelect(wl.id)}
+                    disabled={busy || analyzing}
                   >
                     <span className="watchlist-item-name">{wl.name}</span>
                     <span className="watchlist-item-count">
@@ -273,7 +304,7 @@ export function WatchlistsPage() {
                   type="button"
                   className="btn btn-danger"
                   onClick={handleDelete}
-                  disabled={busy}
+                  disabled={busy || analyzing}
                 >
                   Delete
                 </button>
@@ -291,7 +322,7 @@ export function WatchlistsPage() {
                   className="text-input"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  disabled={busy}
+                  disabled={busy || analyzing}
                   aria-label="Edit watchlist name"
                 />
                 <input
@@ -300,14 +331,14 @@ export function WatchlistsPage() {
                   placeholder="Description (optional)"
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
-                  disabled={busy}
+                  disabled={busy || analyzing}
                   aria-label="Edit watchlist description"
                 />
                 <button
                   type="button"
                   className="btn btn-secondary"
                   onClick={handleSaveEdit}
-                  disabled={busy}
+                  disabled={busy || analyzing}
                 >
                   Save changes
                 </button>
@@ -327,14 +358,14 @@ export function WatchlistsPage() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleAddTicker()
                     }}
-                    disabled={busy}
+                    disabled={busy || analyzing}
                     aria-label="Add ticker symbol"
                   />
                   <button
                     type="button"
                     className="btn btn-primary"
                     onClick={handleAddTicker}
-                    disabled={busy}
+                    disabled={busy || analyzing}
                   >
                     Add
                   </button>
@@ -353,7 +384,7 @@ export function WatchlistsPage() {
                           type="button"
                           className="ticker-remove"
                           onClick={() => handleRemoveTicker(ticker)}
-                          disabled={busy}
+                          disabled={busy || analyzing}
                           aria-label={`Remove ${ticker}`}
                         >
                           ×
@@ -361,6 +392,106 @@ export function WatchlistsPage() {
                       </li>
                     ))}
                   </ul>
+                )}
+              </div>
+
+              <div className="watchlist-analyze">
+                <h3 className="section-title">Analyze</h3>
+                <div className="analyze-row">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleAnalyze}
+                    disabled={
+                      busy || analyzing || selected.tickers.length === 0
+                    }
+                  >
+                    {analyzing ? 'Analyzing…' : 'Analyze watchlist'}
+                  </button>
+                  <span className="action-hint">
+                    On-demand analysis — results show here and are not saved.
+                  </span>
+                </div>
+                {selected.tickers.length === 0 && (
+                  <p className="empty-state">
+                    Add at least one ticker to analyze.
+                  </p>
+                )}
+
+                {analyzing && (
+                  <LoadingState message="Analyzing watchlist — this may take a few seconds…" />
+                )}
+                {analysisError && <ErrorMessage message={analysisError} />}
+
+                {analysis && (
+                  <div className="analysis-result">
+                    <p className="analysis-summary">
+                      <strong>{analysis.watchlist_name}</strong> ·{' '}
+                      {analysis.total_tickers}{' '}
+                      {analysis.total_tickers === 1 ? 'ticker' : 'tickers'} ·{' '}
+                      {analysis.successful_count} succeeded ·{' '}
+                      {analysis.failed_count} failed
+                    </p>
+                    <p className="analysis-meta">
+                      Analyzed {formatTimestamp(analysis.analyzed_at)} · on-demand
+                      result, not saved to history
+                    </p>
+
+                    {analysis.results.length > 0 && (
+                      <ul className="analysis-list">
+                        {analysis.results.map((r) => (
+                          <li key={r.ticker} className="analysis-card">
+                            <div className="analysis-card-main">
+                              <span className="analysis-card-ticker">
+                                {r.ticker}
+                              </span>
+                              {r.company_name && (
+                                <span className="analysis-card-company">
+                                  {r.company_name}
+                                </span>
+                              )}
+                            </div>
+                            <div className="analysis-card-verdict">
+                              <span className="category-badge">
+                                {r.category}
+                              </span>
+                              <span className="analysis-card-score">
+                                Score {r.score.toFixed(1)}
+                              </span>
+                              <span className="analysis-card-confidence">
+                                {r.confidence}
+                              </span>
+                              {r.current_price != null && (
+                                <span className="analysis-card-price">
+                                  ${r.current_price.toFixed(2)}
+                                </span>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+
+                    {analysis.errors.length > 0 && (
+                      <div className="analysis-errors">
+                        <h4 className="analysis-errors-title">
+                          Failed tickers ({analysis.errors.length})
+                        </h4>
+                        <ul className="analysis-error-list">
+                          {analysis.errors.map((e) => (
+                            <li key={e.ticker} className="analysis-error-item">
+                              <span className="analysis-error-ticker">
+                                {e.ticker}
+                              </span>
+                              <span className="analysis-error-msg">
+                                {e.error}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

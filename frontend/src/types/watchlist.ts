@@ -5,6 +5,8 @@
  * Source of truth: app/api/schemas/watchlists.py
  */
 
+import type { StockReport } from './report'
+
 export interface WatchlistSummary {
   id: number
   name: string
@@ -40,4 +42,32 @@ export interface AddTickerRequest {
 export interface DeleteResponse {
   status: string
   id: number
+}
+
+// --- Analyze watchlist (on-demand, not saved) ------------------------------
+
+export interface WatchlistAnalysisResult {
+  ticker: string
+  company_name: string | null
+  category: string
+  score: number
+  confidence: string
+  current_price: number | null
+  report: StockReport
+}
+
+export interface WatchlistAnalysisError {
+  ticker: string
+  error: string
+}
+
+export interface WatchlistAnalysisResponse {
+  watchlist_id: number
+  watchlist_name: string
+  analyzed_at: string
+  total_tickers: number
+  successful_count: number
+  failed_count: number
+  results: WatchlistAnalysisResult[]
+  errors: WatchlistAnalysisError[]
 }

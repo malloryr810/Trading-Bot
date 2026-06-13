@@ -101,7 +101,7 @@ npm run lint         # ESLint
 | `app/services/stock_analysis_service.py` | `analyze_stock` — public entry point for all callers (CLI and API); `_analyze_ticker` is internal |
 | `app/services/report_persistence_service.py` | `save_stock_report`, `list_saved_reports`, `get_saved_report` — SQLite persistence boundary |
 | `app/services/watchlist_service.py` | Watchlist + ticker CRUD over SQLite (storage only); `WatchlistValidationError`/`WatchlistNotFoundError`; optional `engine` kwarg for tests |
-| `app/services/watchlist_analysis_service.py` | `analyze_watchlist` — reuses `get_watchlist` + `analyze_stock` to analyze every ticker in a saved watchlist; partial success (per-ticker errors captured); analysis-only, nothing saved |
+| `app/services/watchlist_analysis_service.py` | `analyze_watchlist` — reuses `get_watchlist` + `analyze_stock` to analyze every ticker in a saved watchlist; partial success (per-ticker errors captured); analysis-only, nothing saved. Surfaced in the UI via the Watchlists page "Analyze watchlist" button |
 | `app/data/database.py` | SQLAlchemy Core engine factory (`build_engine`) and table definitions: `analysis_reports`, `watchlists`, `watchlist_tickers` |
 | `app/api/main.py` | FastAPI app factory; `uvicorn app.api.main:app` entry point |
 | `app/api/routes/health.py` | `GET /api/health` |
@@ -120,7 +120,7 @@ npm run lint         # ESLint
 | `frontend/src/api/reportsApi.ts` | `listSavedReports`, `getSavedReport` — read-only saved-report history |
 | `frontend/src/components/` | `LoadingState`, `ErrorMessage`, `StockReportView` — presentational only |
 | `frontend/src/lib/` | `format.ts` (`formatTimestamp`) and `errors.ts` (`getErrorMessage`) — shared pure display/error helpers used across pages |
-| `frontend/src/pages/` | `DashboardPage` (health check, disclaimer), `AnalyzePage` (analyze + display), `WatchlistsPage` (watchlist CRUD UI), `SavedReportsPage` (`/reports` list), `ReportDetailPage` (`/reports/:id`, reuses `StockReportView`) |
+| `frontend/src/pages/` | `DashboardPage` (health check, disclaimer), `AnalyzePage` (analyze + display), `WatchlistsPage` (watchlist CRUD UI + on-demand "Analyze watchlist" results), `SavedReportsPage` (`/reports` list), `ReportDetailPage` (`/reports/:id`, reuses `StockReportView`) |
 | `frontend/src/types/report.ts` | TypeScript interfaces mirroring `StockReport`, `SavedReportSummary`, `SavedReportDetail` |
 | `frontend/src/types/watchlist.ts` | TypeScript interfaces mirroring the backend watchlist schemas |
 
@@ -201,7 +201,7 @@ Each analysis module follows the same pattern:
 | 2 | FastAPI backend — `GET /api/health`, `POST /api/analyze` | Done |
 | 3 | SQLite persistence — save StockReport snapshots, report history endpoints | **Milestone 1 complete** — `POST /api/reports/analyze`, `GET /api/reports/history`, `GET /api/reports/{id}` |
 | 4 | React + Vite frontend — Milestone 1: shell with API connectivity | **Complete** — Dashboard + Analyze pages, health check, analyze-only and analyze-and-save flows |
-| 5 | Watchlist management (frontend + backend routes) | **Milestone 1 complete** — `watchlists`/`watchlist_tickers` tables, `watchlist_service`, `/api/watchlists` CRUD routes, Watchlists frontend page. **Analyze-watchlist backend done** — `watchlist_analysis_service` + `POST /api/watchlists/{id}/analyze` (analysis-only, partial success); no frontend UI for it yet |
+| 5 | Watchlist management (frontend + backend routes) | **Milestone 1 complete** — `watchlists`/`watchlist_tickers` tables, `watchlist_service`, `/api/watchlists` CRUD routes, Watchlists frontend page. **Analyze-watchlist done** — `watchlist_analysis_service` + `POST /api/watchlists/{id}/analyze` (analysis-only, partial success), surfaced in the Watchlists page via an on-demand "Analyze watchlist" button; results are not saved |
 | 6 | Research notes and report history UI | **Report history UI done** — Saved Reports list (`/reports`) and Report Detail (`/reports/:id`) over the existing read endpoints. Research notes not started |
 | 7 | Mock trading simulation (`app/simulation/`) | Not started |
 | 8 | ML research layer (`app/ml/`) | Not started |

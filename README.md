@@ -152,8 +152,9 @@ CORS is configured to allow `http://localhost:5173` and `http://127.0.0.1:5173`
 > **Watchlist CRUD is storage only.** The list/ticker endpoints persist named
 > ticker lists; they do not run analysis. `POST /api/watchlists/{id}/analyze`
 > runs the existing analysis pipeline over the saved tickers on demand and
-> returns the results — it does **not** save them, schedule scans, or trade.
-> There is no frontend UI for analyze-watchlist yet (API only).
+> returns the results — it does **not** save them, schedule scans, or trade. The
+> Watchlists page has an "Analyze watchlist" button that calls this endpoint and
+> displays the results on demand (results are not persisted).
 
 **Analysis only (no persistence):**
 
@@ -211,7 +212,7 @@ The app opens at `http://localhost:5173`.
 **Current frontend scope:**
 - Dashboard page — backend health status, disclaimer, link to Analyze
 - Analyze page — enter a ticker, choose "Analyze only" (POST /api/analyze) or "Analyze and save" (POST /api/reports/analyze), view the StockReport result
-- Watchlists page — create, rename, and delete named watchlists; add and remove tickers; basic CRUD over the watchlist API (storage only, no analysis run from here)
+- Watchlists page — create, rename, and delete named watchlists; add and remove tickers; CRUD over the watchlist API. Also includes an "Analyze watchlist" button that runs the analysis pipeline over the saved tickers on demand and shows per-ticker results and failures (results are not saved)
 - Saved Reports page (`/reports`) — list of previously saved analysis snapshots; each links to a Report Detail page (`/reports/:id`) that renders the full saved report. Display-only — no analysis is run here.
 
 ### Build and lint

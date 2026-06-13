@@ -12,6 +12,7 @@ import type {
   CreateWatchlistRequest,
   DeleteResponse,
   UpdateWatchlistRequest,
+  WatchlistAnalysisResponse,
   WatchlistDetail,
   WatchlistSummary,
 } from '../types/watchlist'
@@ -62,4 +63,14 @@ export async function removeTickerFromWatchlist(
   return del<WatchlistDetail>(
     `/api/watchlists/${id}/tickers/${encodeURIComponent(ticker)}`,
   )
+}
+
+/**
+ * POST /api/watchlists/{id}/analyze — run the analysis pipeline over every
+ * ticker in the watchlist. On-demand only; results are not saved server-side.
+ */
+export async function analyzeWatchlist(
+  id: number,
+): Promise<WatchlistAnalysisResponse> {
+  return post<WatchlistAnalysisResponse>(`/api/watchlists/${id}/analyze`, {})
 }

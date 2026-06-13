@@ -656,3 +656,137 @@ body {
 .detail-back {
   margin: 0 0 16px;
 }
+
+/* ── Watchlist analysis (on-demand) ────────────────────────────────── */
+.watchlist-analyze {
+  border-top: 1px solid var(--color-border);
+  padding-top: 16px;
+  margin-top: 16px;
+}
+
+.analyze-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.analysis-result {
+  margin-top: 14px;
+}
+
+.analysis-summary {
+  margin: 0 0 2px;
+  font-size: 0.95rem;
+}
+
+.analysis-meta {
+  margin: 0 0 14px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.analysis-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.analysis-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.analysis-card-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 130px;
+}
+
+.analysis-card-ticker {
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.analysis-card-company {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-card-verdict {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.analysis-card-score {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.analysis-card-confidence {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  text-transform: capitalize;
+}
+
+.analysis-card-price {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.analysis-errors {
+  border-top: 1px solid var(--color-border);
+  padding-top: 12px;
+}
+
+.analysis-errors-title {
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-error);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.analysis-error-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.analysis-error-item {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 0.85rem;
+}
+
+.analysis-error-ticker {
+  font-weight: 700;
+  min-width: 56px;
+  flex-shrink: 0;
+}
+
+.analysis-error-msg {
+  color: var(--color-text-muted);
+  word-break: break-word;
+}

@@ -1,5 +1,43 @@
 # Development Log
 
+## 2026-06-13 — Analyze Watchlist frontend UI
+
+**Goal:** let the Watchlists page analyze the selected watchlist on demand via the
+existing `POST /api/watchlists/{id}/analyze` endpoint and display per-ticker
+results and failures. Frontend only — no backend changes.
+
+**Types + API client**
+
+- `types/watchlist.ts`: added `WatchlistAnalysisResponse`, `WatchlistAnalysisResult`,
+  `WatchlistAnalysisError` mirroring the backend schema; the result's `report`
+  field reuses the existing `StockReport` type.
+- `api/watchlistApi.ts`: added `analyzeWatchlist(id)` → `POST
+  /api/watchlists/{id}/analyze`, reusing the shared `post` helper + `ApiError`.
+
+**Watchlists page (`pages/WatchlistsPage.tsx`)**
+
+- Added an "Analyze watchlist" button in the selected watchlist's detail pane,
+  with a hint that results are on-demand and not saved. Disabled while busy/
+  analyzing and when the watchlist has zero tickers (plus an "add a ticker"
+  message).
+- On click, calls `analyzeWatchlist(selected.id)`; shows `LoadingState` while
+  running and `ErrorMessage` (via `getErrorMessage`) on failure.
+- Renders a concise result: summary line (name, total/succeeded/failed counts),
+  `analyzed_at` (formatted, labelled "not saved to history"), a success card list
+  (ticker, company, category badge, score, confidence, price — display only, no
+  recomputation), and a separate "failed tickers" list (ticker + error). The full
+  `StockReport` is intentionally not rendered per ticker.
+- **Stale-state handling:** analysis is cleared whenever the selection or its
+  tickers change (centralised in `applySelected`, which runs on select/add/remove/
+  edit) and on delete. To prevent races, all mutating controls (create, select,
+  add/remove ticker, edit, delete) are disabled while an analysis is in flight.
+- `styles.css`: added analysis section/card/error styles consistent with existing
+  tokens; mobile-friendly (flex-wrap). No existing selectors changed.
+
+**Verification:** `npm run build` + `npm run lint` clean. No backend files
+changed, so the Python suite was not rerun. No saving, scheduling, alerts, or
+trading behavior added — analysis is on-demand and display-only.
+
 ## 2026-06-13 — Analyze Watchlist backend service + API
 
 **Goal:** let the backend analyze every ticker in a saved watchlist by reusing
