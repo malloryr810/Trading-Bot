@@ -190,12 +190,16 @@ The database file is stored at `data/investment_bot.db` (configurable via the
 
 ### Prerequisites
 
-The backend must be running before the frontend will work (the health check calls `/api/health` on load).
+- The backend must be running before the frontend will work (the health check calls `/api/health` on load).
+- **Node 22 LTS** (≥ 22.13). The frontend toolchain (Vite 8, Vitest 3) targets the
+  active LTS line; `frontend/.nvmrc` pins it. With nvm: `cd frontend && nvm use`.
+  Newer odd-numbered Node releases (e.g. 23.x) work but emit an engine warning.
 
 ### First-time setup
 
 ```bash
 cd frontend
+nvm use                     # selects Node 22 from .nvmrc (optional but recommended)
 cp .env.example .env        # copy the env template (edit if backend runs on a different port)
 npm install
 ```
@@ -215,12 +219,13 @@ The app opens at `http://localhost:5173`.
 - Watchlists page — create, rename, and delete named watchlists; add and remove tickers; CRUD over the watchlist API. Also includes an "Analyze watchlist" button that runs the analysis pipeline over the saved tickers on demand and shows per-ticker results and failures (results are not saved)
 - Saved Reports page (`/reports`) — list of previously saved analysis snapshots; each links to a Report Detail page (`/reports/:id`) that renders the full saved report. Display-only — no analysis is run here.
 
-### Build and lint
+### Build, lint, and test
 
 ```bash
 cd frontend
-npm run build        # type-check + production build to frontend/dist/
+npm run build        # type-check (tsc -b) + production build to frontend/dist/
 npm run lint         # ESLint
+npm test             # Vitest unit tests (pure utilities — no browser/DOM)
 ```
 
 ---

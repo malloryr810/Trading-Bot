@@ -69,12 +69,18 @@ python -m py_compile app/analysis/scoring.py
 
 ```bash
 cd frontend
+nvm use              # Node 22 LTS from frontend/.nvmrc (engines: node >=22.13.0)
 npm install          # first-time setup (cp .env.example .env if needed)
 npm run dev          # Vite dev server at http://localhost:5173 (backend must be running)
 npm run build        # type-check (tsc -b) + production build to frontend/dist/
 npm run lint         # ESLint
 npm test             # Vitest unit tests (pure logic only — src/**/*.test.ts)
 ```
+
+Frontend Node version: use the active LTS line (Node 22, ≥ 22.13) per
+`frontend/.nvmrc`. A known dev-only npm-audit advisory (esbuild via Vite/Vitest)
+is documented in `docs/development_log.md`; do not run `npm audit fix --force`
+(it would downgrade Vitest and break the test harness).
 
 ## Currently Implemented
 

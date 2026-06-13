@@ -1,5 +1,46 @@
 # Development Log
 
+## 2026-06-13 — Frontend tooling hygiene (Node version + npm audit review)
+
+**Goal:** clean up frontend tooling/docs around the Node engine warning and npm
+audit advisories. No app behavior, dependency, backend, or contract changes.
+
+**Node version**
+
+- Added `frontend/.nvmrc` = `22` (active LTS line). Vitest 3 / Vite 8 support
+  `^22.13.0`; the local dev box was on Node 23.11 (an odd, non-LTS line Vitest's
+  `engines` excludes), which is what produced the `EBADENGINE` warning. Using
+  `nvm use` → Node 22 resolves it.
+- Added an `engines` field to `frontend/package.json`: `node >=22.13.0`,
+  `npm >=10` (advisory documentation; `engine-strict` is not enabled, so this does
+  not break local dev on a newer Node).
+
+**npm audit review (no changes made)**
+
+- `npm audit` reports **5 high-severity** advisories, all tracing to a single
+  transitive **esbuild@0.27.7** (deduped), pulled in by both the app's
+  `vite@8.0.16` and Vitest's internal `vite@7.3.5`. The advisory is the esbuild
+  **dev-server** issue (GHSA-gv7w-rqvm-qjhr + a Windows dev-server file-read);
+  range `0.17.0–0.28.0`.
+- **Dev-only / not shipped:** esbuild is a build/dev-server tool; the production
+  bundle is Rollup-built and contains no esbuild. The advisory concerns the local
+  dev server, not the deployed app. It also predates the test harness (Vite has
+  always pulled esbuild); Vitest only increased the copy count.
+- **No safe fix available:** the only remediation npm offers is
+  `npm audit fix --force`, which downgrades Vitest to `0.34.6` (a breaking change
+  that would gut the test harness). Per the guardrails this is **not** run.
+  Deferred as a known dev-only tooling advisory until Vite/Vitest ship a release
+  pinning a patched esbuild (≥ 0.29) on a non-breaking upgrade path.
+
+**Docs:** `README.md` — added a Node 22 prerequisite + `nvm use`, and completed
+the frontend command list (`build`/`lint`/`test`). `CLAUDE.md` — added the Node
+version note and a pointer to this audit decision.
+
+**Checks:** `pytest` → 1589 passed; `npm test` → 17 passed; `npm run build` +
+`npm run lint` clean (bundle hashes unchanged — no behavior change); `npm audit`
+→ 5 high (dev-only, deferred as above). No dependencies added, changed, or
+removed; `package-lock.json` untouched.
+
 ## 2026-06-13 — Frontend test harness (Vitest) for pure logic
 
 **Goal:** add a lightweight unit-test setup for small, pure frontend logic — no
