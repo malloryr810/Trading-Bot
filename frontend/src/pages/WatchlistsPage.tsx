@@ -266,7 +266,7 @@ export function WatchlistsPage() {
     <div className="page">
       <PageHeader
         title="Watchlists"
-        subtitle="Group tickers you want to research, then run on-demand analysis. Results are shown here and are not saved."
+        subtitle="Group tickers you want to research, then run on-demand analysis. Results show here unsaved, or save a snapshot to keep a historical record."
       />
 
       <div className="watchlist-layout">

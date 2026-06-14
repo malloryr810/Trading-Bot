@@ -33,6 +33,17 @@ This tool prints reports. It does not place trades.
 - **Improved market data validation** — full OHLCV column, null-check, and numeric-type validation
 - **argparse CLI** — full flag support including `--help`
 
+### Web application (FastAPI backend + React/Vite frontend)
+
+- **FastAPI backend** — exposes the same analysis pipeline used by the CLI; interactive docs at `/docs`
+- **Saved reports** — analyze-and-save a `StockReport` to SQLite, then browse history and a full report-detail view
+- **Watchlists** — create/rename/delete named ticker lists, add/remove tickers (storage-only CRUD)
+- **On-demand watchlist analysis** — run the pipeline over a saved watchlist; per-ticker partial success, results not saved
+- **Saved watchlist analysis snapshots** — explicitly save a watchlist analysis run as a historical record, with a snapshot-detail view
+- **Snapshot trend charts** — Lightweight Charts line of successful-ticker count or backend-derived average score across saved snapshots (toggle; historical data only)
+- **Daily price chart** — read-only market-data history endpoint rendered as a daily closing-price chart on the Analyze page
+- **Dark dashboard** — app shell with sidebar; dashboard summary cards over real saved reports and watchlists
+
 ## What Is Not Included (By Design)
 
 This project intentionally does not implement:
@@ -148,6 +159,10 @@ CORS is configured to allow `http://localhost:5173` and `http://127.0.0.1:5173`
 | `POST` | `/api/watchlists/{id}/tickers` | Add a ticker to a watchlist (`{ticker}`) |
 | `DELETE` | `/api/watchlists/{id}/tickers/{ticker}` | Remove a ticker from a watchlist |
 | `POST` | `/api/watchlists/{id}/analyze` | Analyze every ticker in a watchlist; returns per-ticker results + errors (partial success, nothing saved) |
+| `POST` | `/api/watchlists/{id}/analysis-snapshots` | Analyze the watchlist **and save** the run as a historical snapshot (explicit) |
+| `GET` | `/api/watchlists/{id}/analysis-snapshots` | List saved snapshot summaries for a watchlist (newest first; includes `average_score`) |
+| `GET` | `/api/watchlist-analysis-snapshots/{id}` | Return one saved snapshot's full detail (results + errors) |
+| `GET` | `/api/market-data/{ticker}/history` | Read-only daily historical OHLCV price series (for the price chart) |
 
 > **Watchlist CRUD is storage only.** The list/ticker endpoints persist named
 > ticker lists; they do not run analysis. `POST /api/watchlists/{id}/analyze`
@@ -214,10 +229,14 @@ npm run dev
 The app opens at `http://localhost:5173`.
 
 **Current frontend scope:**
-- Dashboard page — backend health status, disclaimer, link to Analyze
-- Analyze page — enter a ticker, choose "Analyze only" (POST /api/analyze) or "Analyze and save" (POST /api/reports/analyze), view the StockReport result
-- Watchlists page — create, rename, and delete named watchlists; add and remove tickers; CRUD over the watchlist API. Also includes an "Analyze watchlist" button that runs the analysis pipeline over the saved tickers on demand and shows per-ticker results and failures (results are not saved)
+- Dark app shell with a left sidebar; routing via React Router
+- Dashboard page — backend health/source status, disclaimer, and summary cards over real saved reports and watchlists (rating breakdown, top candidates, recent reports). Market Overview and Portfolio are clearly labeled "coming soon" placeholders
+- Analyze page — enter a ticker, choose "Analyze only" (POST /api/analyze) or "Analyze and save" (POST /api/reports/analyze), view the StockReport result and a daily closing-price chart
+- Watchlists page — create, rename, and delete named watchlists; add and remove tickers (CRUD over the watchlist API). "Analyze watchlist" runs the pipeline on demand and shows per-ticker results/failures (not saved); "Analyze & save snapshot" records a historical snapshot. Saved snapshots list with a snapshot-trend chart (success count / average score toggle)
+- Snapshot Detail page (`/watchlists/:watchlistId/snapshots/:snapshotId`) — full read-only view of one saved watchlist analysis snapshot
 - Saved Reports page (`/reports`) — list of previously saved analysis snapshots; each links to a Report Detail page (`/reports/:id`) that renders the full saved report. Display-only — no analysis is run here.
+
+> The frontend is display-only: it formats values the backend produced and never recomputes scores, categories, weights, or averages.
 
 ### Build, lint, and test
 
@@ -252,8 +271,8 @@ app/data/ → app/analysis/ → app/analysis/scoring.py → app/reports/ → app
 | `app/analysis/` | Compute independent signal lists from data |
 | `app/analysis/scoring.py` | Aggregate signals into a composite Rating |
 | `app/reports/` | Format a Rating into a human-readable StockReport |
-| `app/services/` | Public service boundary — `analyze_stock` for analysis, `report_persistence_service` for saved snapshot I/O, `watchlist_service` for watchlist CRUD |
-| `app/data/database.py` | SQLAlchemy Core schema and engine factory (`analysis_reports`, `watchlists`, `watchlist_tickers`); no business logic |
+| `app/services/` | Public service boundary — `analyze_stock` (analysis), `report_persistence_service` (saved-report I/O), `watchlist_service` (watchlist CRUD), `watchlist_analysis_service` (on-demand scan), `watchlist_analysis_snapshot_service` (saved snapshots + `average_score`), `market_data_service` (price-history responses) |
+| `app/data/database.py` | SQLAlchemy Core schema and engine factory (`analysis_reports`, `watchlists`, `watchlist_tickers`, `watchlist_analysis_snapshots`, `watchlist_analysis_snapshot_results`); no business logic |
 | `app/watchlist.py` | Orchestrate the pipeline across multiple tickers |
 | `app/main.py` | Thin argparse CLI shell; delegates to `app/services/` |
 | `app/api/` | Thin FastAPI layer; delegates to `app/services/` |
@@ -304,22 +323,29 @@ app/
       health.py                    # GET /api/health
       analysis.py                  # POST /api/analyze (analysis only, no save)
       reports.py                   # POST /api/reports/analyze, GET /api/reports/history, GET /api/reports/{id}
-      watchlists.py                # GET/POST/PATCH/DELETE /api/watchlists and /tickers
+      watchlists.py                # GET/POST/PATCH/DELETE /api/watchlists, /tickers, /analyze
+      watchlist_snapshots.py       # POST/GET /api/watchlists/{id}/analysis-snapshots, GET /api/watchlist-analysis-snapshots/{id}
+      market_data.py               # GET /api/market-data/{ticker}/history
     schemas/
       analysis.py                  # AnalyzeRequest Pydantic schema
       reports.py                   # SavedReportSummary, SavedReportDetail schemas
-      watchlists.py                # Watchlist request/response schemas
+      watchlists.py                # Watchlist + analyze request/response schemas
+      watchlist_snapshots.py       # WatchlistSnapshotSummary/Detail (incl. average_score)
+      market_data.py               # PricePoint, PriceHistoryResponse schemas
+    errors.py                      # Shared KNOWN_ANALYSIS_ERRORS tuple
   services/
     stock_analysis_service.py      # analyze_stock — public entry point for CLI and API
     report_persistence_service.py  # save_stock_report, list_saved_reports, get_saved_report
     watchlist_service.py           # watchlist + ticker CRUD (storage only)
     watchlist_analysis_service.py  # analyze_watchlist — run analyze_stock over a saved watchlist
+    watchlist_analysis_snapshot_service.py  # save/list/get snapshots; derives average_score
+    market_data_service.py         # build read-only price-history responses
   data/
     market_data.py                 # OHLCV price history
     fundamentals.py                # Company fundamentals
     news_data.py                   # Recent news headlines
     storage.py                     # Saves reports and JSON results to disk
-    database.py                    # SQLAlchemy Core engine; analysis_reports + watchlists + watchlist_tickers tables
+    database.py                    # SQLAlchemy Core engine; analysis_reports, watchlists, watchlist_tickers, watchlist_analysis_snapshots(+_results)
   analysis/
     technicals.py                  # Technical indicators and signals
     fundamentals_analysis.py       # Fundamental signals
@@ -344,30 +370,32 @@ docs/                              # Architecture, scoring rules, data sources, 
 outputs/
   reports/                         # Saved plain-text reports (TICKER_YYYYMMDD_HHMMSS.txt)
   results/                         # Saved JSON results (TICKER_YYYYMMDD_HHMMSS.json)
-frontend/                          # React + Vite + TypeScript frontend (Dashboard, Analyze, Watchlists, Saved Reports)
+frontend/                          # React + Vite + TypeScript frontend
   src/
     api/
       client.ts                    # Base fetch wrapper (get/post/patch/del); base URL, ApiError class
       analysisApi.ts               # checkHealth, analyzeOnly, analyzeAndSave
-      watchlistApi.ts              # Watchlist CRUD client functions
+      watchlistApi.ts              # Watchlist CRUD + analyze + snapshot client functions
       reportsApi.ts                # listSavedReports, getSavedReport (read-only history)
+      marketDataApi.ts             # getPriceHistory (read-only)
     components/
       LoadingState.tsx             # Spinner with accessible role/aria attributes
       ErrorMessage.tsx             # Accessible error display
       StockReportView.tsx          # Full StockReport result display
-    lib/
-      format.ts                    # formatTimestamp — shared display formatting
-      errors.ts                    # getErrorMessage — consistent ApiError messaging
+      layout/                      # AppShell, Sidebar, PageHeader
+      charts/                      # StockPriceChart, WatchlistSnapshotTrendChart (Lightweight Charts)
+      dashboard/                   # ComingSoonCard
+      watchlist/                   # WatchlistCard, AnalysisResultCard
+    lib/                           # Pure, tested helpers: format, errors, sort, dashboard, watchlist, chartData, snapshotTrend
     pages/
-      DashboardPage.tsx            # Health status, disclaimer, nav to Analyze / Saved Reports
-      AnalyzePage.tsx              # Ticker input, analyze/save actions, report result
-      WatchlistsPage.tsx           # Watchlist CRUD UI (create/rename/delete, add/remove tickers)
+      DashboardPage.tsx            # Summary cards over saved reports/watchlists; health/source status
+      AnalyzePage.tsx              # Ticker input, analyze/save actions, report result + price chart
+      WatchlistsPage.tsx           # Watchlist CRUD, on-demand analyze, save snapshot, snapshot list + trend chart
+      WatchlistSnapshotDetailPage.tsx  # One saved snapshot rendered in full
       SavedReportsPage.tsx         # List of saved report snapshots (/reports)
       ReportDetailPage.tsx         # One saved report rendered in full (/reports/:id)
-    types/
-      report.ts                    # TypeScript interfaces mirroring backend report schemas
-      watchlist.ts                 # TypeScript interfaces mirroring backend watchlist schemas
-    App.tsx                        # BrowserRouter, NavLink header, route table
+    types/                         # report.ts, watchlist.ts, marketData.ts (mirror backend schemas)
+    App.tsx                        # BrowserRouter + AppShell (sidebar) + route table
     main.tsx                       # Vite entry point
     styles.css                     # Plain CSS — no framework
   .env.example                     # Copy to .env before running dev server
@@ -391,19 +419,24 @@ SQLite tables (`watchlists`, `watchlist_tickers`), a `watchlist_service`, the
 create, rename, and delete named watchlists and add or remove tickers. This is
 storage only — no analysis, scans, alerts, or trades run from a watchlist.
 
-A React + Vite frontend (`frontend/`) is in active development. The Dashboard,
-Analyze, Watchlists, and Saved Reports pages are built and connected to the
-backend. The Analyze page supports both analyze-only and analyze-and-save flows;
-the Saved Reports page lists persisted snapshots and links to a read-only Report
-Detail page.
+On-demand watchlist analysis is built: `POST /api/watchlists/{id}/analyze` runs
+the pipeline over saved tickers (partial success, not saved), and the
+analyze-and-save snapshot flow persists historical runs to two snapshot tables,
+surfaced through the snapshot list, snapshot-detail view, and snapshot-trend
+charts. A read-only market-data history endpoint backs the daily price chart.
+
+A React + Vite frontend (`frontend/`) is in active development with a dark app
+shell and sidebar. The Dashboard, Analyze, Watchlists, Snapshot Detail, Saved
+Reports, and Report Detail pages are built and connected to the backend. The
+frontend is display-only and never recomputes analysis, scores, or averages.
 
 ## Planned Future Work
 
 These areas are on the roadmap but not yet built:
 
-- **Watchlist analysis** — analyze every ticker in a saved watchlist by reusing the existing pipeline (CRUD foundation is in place; see `docs/watchlist_management_plan.md`)
 - **Improved scoring calibration** — better-calibrated weights and thresholds (see `docs/scoring_calibration_plan.md`)
 - **Better data validation** — richer error messages for missing or stale data fields
+- **Manual portfolio tracking** — hand-entered holdings (no broker linking, no automated trading)
 - **Backtesting** — validate signals against historical outcomes (requires careful design)
 - **Paper trading simulation** — test signal-driven strategies without real capital (requires backtesting first)
 - **ML/LLM sentiment** — replace keyword matching with a trained model (later phase)

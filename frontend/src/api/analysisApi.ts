@@ -1,8 +1,6 @@
 /**
- * Functions for each backend endpoint used in Milestone 1.
- *
- * Milestone 1 scope: health check, analyze-only, analyze-and-save.
- * History and detail endpoints will be added in Milestone 2.
+ * Functions for the core analysis endpoints: health check, analyze-only, and
+ * analyze-and-save. Saved-report reads live in reportsApi.ts.
  */
 
 import { get, post } from './client'

@@ -81,8 +81,8 @@ watchlist_tickers = Table(
 
 # --- Saved watchlist analysis snapshots (Phase 6) -------------------------
 # A snapshot is a historical record of a single, explicitly user-triggered
-# on-demand watchlist analysis run.  It exists so future score-trend views can
-# read past runs without re-analyzing.  This is NOT a scheduled scan: rows are
+# on-demand watchlist analysis run.  It lets score-trend views read past runs
+# without re-analyzing.  This is NOT a scheduled scan: rows are
 # only ever written when the user invokes the analyze-and-save endpoint.
 # ``watchlist_name`` is denormalised so a snapshot remains readable even if the
 # source watchlist is later renamed or deleted.

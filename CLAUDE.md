@@ -109,27 +109,33 @@ is documented in `docs/development_log.md`; do not run `npm audit fix --force`
 | `app/services/report_persistence_service.py` | `save_stock_report`, `list_saved_reports`, `get_saved_report` — SQLite persistence boundary |
 | `app/services/watchlist_service.py` | Watchlist + ticker CRUD over SQLite (storage only); `WatchlistValidationError`/`WatchlistNotFoundError`; optional `engine` kwarg for tests |
 | `app/services/watchlist_analysis_service.py` | `analyze_watchlist` — reuses `get_watchlist` + `analyze_stock` to analyze every ticker in a saved watchlist; partial success (per-ticker errors captured); analysis-only, nothing saved. Surfaced in the UI via the Watchlists page "Analyze watchlist" button |
-| `app/data/database.py` | SQLAlchemy Core engine factory (`build_engine`) and table definitions: `analysis_reports`, `watchlists`, `watchlist_tickers` |
+| `app/services/watchlist_analysis_snapshot_service.py` | `analyze_and_save_snapshot`, `save_watchlist_analysis_snapshot`, `list_watchlist_snapshots`, `get_watchlist_snapshot` — saves/reads historical snapshots of explicit analyze-and-save runs; derives `average_score` from stored success-row scores (`_mean_score`). Not a scheduled scan |
+| `app/services/market_data_service.py` | `get_price_history_response` — builds the read-only price-history response (JSON-safe nullable OHLCV) from `market_data`; no analysis/scoring |
+| `app/data/database.py` | SQLAlchemy Core engine factory (`build_engine`) and table definitions: `analysis_reports`, `watchlists`, `watchlist_tickers`, `watchlist_analysis_snapshots`, `watchlist_analysis_snapshot_results` |
 | `app/api/main.py` | FastAPI app factory; `uvicorn app.api.main:app` entry point |
 | `app/api/routes/health.py` | `GET /api/health` |
 | `app/api/routes/analysis.py` | `POST /api/analyze` — analysis only; calls `analyze_stock`, does not save |
 | `app/api/routes/reports.py` | `POST /api/reports/analyze`, `GET /api/reports/history`, `GET /api/reports/{id}` |
 | `app/api/routes/watchlists.py` | Watchlist CRUD routes — `GET/POST /api/watchlists`, `GET/PATCH/DELETE /api/watchlists/{id}`, `POST` / `DELETE` `/api/watchlists/{id}/tickers[/{ticker}]`, `POST /api/watchlists/{id}/analyze` (analyze-watchlist, partial success); thin, delegate to services |
+| `app/api/routes/watchlist_snapshots.py` | `POST`/`GET /api/watchlists/{id}/analysis-snapshots`, `GET /api/watchlist-analysis-snapshots/{id}` — saved snapshot save/list/detail; thin, delegate to snapshot service |
+| `app/api/routes/market_data.py` | `GET /api/market-data/{ticker}/history` — read-only daily OHLCV history |
 | `app/api/schemas/analysis.py` | `AnalyzeRequest` — validates and normalizes ticker at the API boundary |
 | `app/api/schemas/reports.py` | `SavedReportSummary`, `SavedReportDetail` — response schemas for persistence endpoints |
 | `app/api/schemas/watchlists.py` | Watchlist request/response schemas (`CreateWatchlistRequest`, `UpdateWatchlistRequest`, `AddTickerRequest`, `WatchlistSummary`, `WatchlistDetail`, `DeleteResponse`, plus analyze-watchlist: `WatchlistAnalysisResponse`/`Result`/`Error`) |
+| `app/api/schemas/watchlist_snapshots.py` | `WatchlistSnapshotSummary` (incl. `average_score: float \| null`), `WatchlistSnapshotDetail` |
+| `app/api/schemas/market_data.py` | `PricePoint`, `PriceHistoryResponse` — nullable OHLCV transport shapes |
 | `app/api/errors.py` | `KNOWN_ANALYSIS_ERRORS` — shared tuple of pipeline error types used by both API routes for 422 mapping |
 | `app/main.py` | Thin argparse CLI shell — delegates entirely to `app/services/` |
-| `frontend/` | React + Vite + TypeScript browser frontend (Dashboard, Analyze, Watchlists, Saved Reports) |
+| `frontend/` | React + Vite + TypeScript browser frontend; dark app shell with sidebar |
 | `frontend/src/api/client.ts` | Base fetch wrapper (`get`/`post`/`patch`/`del` over one shared `request` helper); `ApiError` class; `VITE_API_BASE_URL` env var |
-| `frontend/src/api/analysisApi.ts` | `checkHealth`, `analyzeOnly`, `analyzeAndSave` — one function per backend endpoint |
-| `frontend/src/api/watchlistApi.ts` | Watchlist CRUD client functions — one per `/api/watchlists` endpoint |
+| `frontend/src/api/analysisApi.ts` | `checkHealth`, `analyzeOnly`, `analyzeAndSave` |
+| `frontend/src/api/watchlistApi.ts` | Watchlist CRUD + `analyzeWatchlist`, `analyzeAndSaveSnapshot`, `listWatchlistSnapshots`, `getWatchlistSnapshot` — one per `/api/watchlists*` endpoint |
 | `frontend/src/api/reportsApi.ts` | `listSavedReports`, `getSavedReport` — read-only saved-report history |
-| `frontend/src/components/` | `LoadingState`, `ErrorMessage`, `StockReportView` — presentational only |
-| `frontend/src/lib/` | `format.ts` (`formatTimestamp`) and `errors.ts` (`getErrorMessage`) — shared pure display/error helpers used across pages |
-| `frontend/src/pages/` | `DashboardPage` (health check, disclaimer), `AnalyzePage` (analyze + display), `WatchlistsPage` (watchlist CRUD UI + on-demand "Analyze watchlist" results), `SavedReportsPage` (`/reports` list), `ReportDetailPage` (`/reports/:id`, reuses `StockReportView`) |
-| `frontend/src/types/report.ts` | TypeScript interfaces mirroring `StockReport`, `SavedReportSummary`, `SavedReportDetail` |
-| `frontend/src/types/watchlist.ts` | TypeScript interfaces mirroring the backend watchlist schemas |
+| `frontend/src/api/marketDataApi.ts` | `getPriceHistory` — read-only daily price history |
+| `frontend/src/components/` | Presentational only: `LoadingState`, `ErrorMessage`, `StockReportView`; `layout/` (`AppShell`, `Sidebar`, `PageHeader`); `charts/` (`StockPriceChart`, `WatchlistSnapshotTrendChart`); `dashboard/` (`ComingSoonCard`); `watchlist/` (`WatchlistCard`, `AnalysisResultCard`) |
+| `frontend/src/lib/` | Pure, tested helpers: `format`, `errors`, `sort`, `dashboard`, `watchlist`, `chartData`, `snapshotTrend`. Display-only — never recompute scores/categories/averages |
+| `frontend/src/pages/` | `DashboardPage` (summary cards, health/source status), `AnalyzePage` (analyze + report + price chart), `WatchlistsPage` (CRUD + on-demand analyze + save snapshot + snapshot list/trend chart), `WatchlistSnapshotDetailPage` (`/watchlists/:watchlistId/snapshots/:snapshotId`), `SavedReportsPage` (`/reports`), `ReportDetailPage` (`/reports/:id`) |
+| `frontend/src/types/` | `report.ts`, `watchlist.ts` (incl. snapshot summary/detail + `average_score`), `marketData.ts` — mirror backend schemas |
 
 ## Architecture
 
@@ -208,13 +214,19 @@ Each analysis module follows the same pattern:
 | 2 | FastAPI backend — `GET /api/health`, `POST /api/analyze` | Done |
 | 3 | SQLite persistence — save StockReport snapshots, report history endpoints | **Milestone 1 complete** — `POST /api/reports/analyze`, `GET /api/reports/history`, `GET /api/reports/{id}` |
 | 4 | React + Vite frontend — Milestone 1: shell with API connectivity | **Complete** — Dashboard + Analyze pages, health check, analyze-only and analyze-and-save flows |
-| 5 | Watchlist management (frontend + backend routes) | **Milestone 1 complete** — `watchlists`/`watchlist_tickers` tables, `watchlist_service`, `/api/watchlists` CRUD routes, Watchlists frontend page. **Analyze-watchlist done** — `watchlist_analysis_service` + `POST /api/watchlists/{id}/analyze` (analysis-only, partial success), surfaced in the Watchlists page via an on-demand "Analyze watchlist" button; results are not saved |
+| 5 | Watchlist management (frontend + backend routes) | **Complete (CRUD + analyze + snapshots)** — `watchlists`/`watchlist_tickers` tables, `watchlist_service`, `/api/watchlists` CRUD, Watchlists page. Analyze-watchlist (`watchlist_analysis_service` + `POST /api/watchlists/{id}/analyze`, partial success, not saved). Saved snapshots (`watchlist_analysis_snapshots(+_results)` tables, `watchlist_analysis_snapshot_service`, snapshot save/list/detail endpoints) with snapshot-detail page and success/average-score trend charts (`average_score` derived in the service) |
 | 6 | Research notes and report history UI | **Report history UI done** — Saved Reports list (`/reports`) and Report Detail (`/reports/:id`) over the existing read endpoints. Research notes not started |
+| — | Market-data chart (read-only) | **Done** — `market_data_service` + `GET /api/market-data/{ticker}/history`; daily price chart on the Analyze page (Lightweight Charts) |
 | 7 | Mock trading simulation (`app/simulation/`) | Not started |
 | 8 | ML research layer (`app/ml/`) | Not started |
 | 9 | Deployment and hardening | Not started |
 
 See `docs/full_stack_product_architecture.md` for full scope of each phase.
+
+**Current priority: code quality and research quality, not more dashboard polish.**
+Do not start the next visual feature (e.g. per-ticker sparklines, batch
+price-history endpoint, portfolio tracking) without an explicitly scoped task.
+Snapshot/report/watchlist concerns are separate and must stay separate.
 
 ## Non-Negotiable Guardrails
 

@@ -1,5 +1,55 @@
 # Development Log
 
+## 2026-06-13 — Code review & documentation refresh
+
+Senior-level review pass after the recent UI/snapshot milestones. No feature
+work, no behavior changes. Findings: the backend (data → analysis → scoring →
+reports → services → API) is clean, thin, and well-bounded; routes delegate to
+services with consistent error mapping (422 pipeline / 400 validation / 404
+not-found / 500 generic); snapshot, report, and watchlist concerns are cleanly
+separated; UTC timestamps are normalised in the snapshot service. No dead code or
+unused exports found (verified by grep across `frontend/src`). The frontend
+display-only contract holds — no scoring/averages recomputed in React.
+
+Small, safe cleanups applied:
+
+- `frontend/src/api/analysisApi.ts` — removed the stale "Milestone 1 / Milestone
+  2" header comment (the history/detail endpoints it said were "coming" already
+  exist in `reportsApi.ts`).
+- `frontend/src/pages/WatchlistsPage.tsx` — corrected the page subtitle that
+  still claimed results "are not saved"; the page now also saves snapshots.
+- `app/data/database.py` — tightened the snapshot-table comment ("future
+  score-trend views" → present tense; those views now exist).
+
+Documentation refreshed to current state:
+
+- `README.md` — added the web-application feature list (saved reports,
+  watchlists, on-demand analysis, saved snapshots, snapshot-trend charts, price
+  chart, dark dashboard); added the snapshot + market-data endpoints to the API
+  table; refreshed the frontend-scope list and project tree; corrected
+  "Planned Future Work" (watchlist analysis is built, not pending).
+- `CLAUDE.md` — added the snapshot/market-data services, routes, and schemas and
+  the two snapshot tables to the module table; refreshed the frontend rows
+  (charts, layout, snapshot detail page, marketDataApi, libs); updated Phase 5/6
+  status and noted the current priority is code/research quality over more
+  dashboard polish.
+
+Recommendations recorded (not actioned, to avoid premature refactors):
+
+- `WatchlistsPage.tsx` (~612 lines) is the largest, most state-heavy component
+  (13 `useState`). It is still readable (small handlers; bulk is JSX) but is the
+  first candidate for extraction (snapshot section, analysis-result section) when
+  it next needs changes. Do not refactor speculatively.
+- The two chart components share an identical Lightweight Charts theme/options
+  block and create/resize/remove lifecycle. Two usages is below the threshold to
+  abstract; revisit only if a third chart appears.
+- Disabled-state flags on WatchlistsPage controls are slightly inconsistent
+  (`savingSnapshot` guards the analyze buttons but not the edit/ticker inputs).
+  Cosmetic, not a bug; left as-is.
+
+Checks: `pytest` 1638 passed; `npm test` 51 passed; `npm run build` clean;
+`npm run lint` clean; `python -m app.main --help` works.
+
 ## 2026-06-13 — Phase 6: Average Score Trend Enhancement
 
 **Goal:** let the user view average score over time alongside successful-ticker
