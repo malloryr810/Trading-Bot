@@ -12,3 +12,16 @@ export function formatTimestamp(iso: string | null): string {
     return iso
   }
 }
+
+/**
+ * Format an ISO timestamp as a date only (no time), in the user's locale.
+ * Returns an em dash for missing values and the raw string if parsing fails.
+ */
+export function formatDate(iso: string | null): string {
+  if (!iso) return '—'
+  try {
+    return new Date(iso).toLocaleDateString()
+  } catch {
+    return iso
+  }
+}

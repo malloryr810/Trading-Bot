@@ -13,8 +13,10 @@ import {
 import { ErrorMessage } from '../components/ErrorMessage'
 import { LoadingState } from '../components/LoadingState'
 import { PageHeader } from '../components/layout/PageHeader'
+import { AnalysisResultCard } from '../components/watchlist/AnalysisResultCard'
+import { WatchlistCard } from '../components/watchlist/WatchlistCard'
 import { getErrorMessage } from '../lib/errors'
-import { formatTimestamp } from '../lib/format'
+import { formatDate, formatTimestamp } from '../lib/format'
 import { sortByScoreDesc } from '../lib/sort'
 import type {
   WatchlistAnalysisResponse,
@@ -219,11 +221,11 @@ export function WatchlistsPage() {
     <div className="page">
       <PageHeader
         title="Watchlists"
-        subtitle="Create named lists of tickers to research later. Storage only — no analysis is run from here yet."
+        subtitle="Group tickers you want to research, then run on-demand analysis. Results are shown here and are not saved."
       />
 
       <div className="watchlist-layout">
-        {/* ── Left: create + list ─────────────────────────────────── */}
+        {/* ── Left: create + overview ─────────────────────────────── */}
         <section className="watchlist-list-pane" aria-label="Saved watchlists">
           <div className="watchlist-create">
             <h2 className="pane-title">New watchlist</h2>
@@ -265,26 +267,17 @@ export function WatchlistsPage() {
           )}
 
           {watchlists.length > 0 && (
-            <ul className="watchlist-items">
+            <div className="watchlist-grid">
               {watchlists.map((wl) => (
-                <li key={wl.id}>
-                  <button
-                    type="button"
-                    className={`watchlist-item${
-                      selected?.id === wl.id ? ' is-selected' : ''
-                    }`}
-                    onClick={() => handleSelect(wl.id)}
-                    disabled={busy || analyzing}
-                  >
-                    <span className="watchlist-item-name">{wl.name}</span>
-                    <span className="watchlist-item-count">
-                      {wl.ticker_count}{' '}
-                      {wl.ticker_count === 1 ? 'ticker' : 'tickers'}
-                    </span>
-                  </button>
-                </li>
+                <WatchlistCard
+                  key={wl.id}
+                  watchlist={wl}
+                  selected={selected?.id === wl.id}
+                  disabled={busy || analyzing}
+                  onSelect={handleSelect}
+                />
               ))}
-            </ul>
+            </div>
           )}
         </section>
 
@@ -298,7 +291,7 @@ export function WatchlistsPage() {
           {detailError && <ErrorMessage message={detailError} />}
 
           {selected && (
-            <div className="watchlist-detail">
+            <div className="selected-watchlist-panel">
               <div className="watchlist-detail-head">
                 <h2 className="pane-title">{selected.name}</h2>
                 <button
@@ -312,9 +305,13 @@ export function WatchlistsPage() {
               </div>
               <p className="watchlist-detail-meta">
                 {selected.tickers.length}{' '}
-                {selected.tickers.length === 1 ? 'ticker' : 'tickers'}
-                {selected.description ? ` · ${selected.description}` : ''}
+                {selected.tickers.length === 1 ? 'ticker' : 'tickers'} · Created{' '}
+                {formatDate(selected.created_at)} · Updated{' '}
+                {formatDate(selected.updated_at)}
               </p>
+              {selected.description && (
+                <p className="watchlist-detail-desc">{selected.description}</p>
+              )}
 
               <div className="watchlist-edit">
                 <h3 className="section-title">Edit details</h3>
@@ -419,6 +416,12 @@ export function WatchlistsPage() {
                   </p>
                 )}
 
+                <p className="watchlist-future-note">
+                  <span className="soon-tag">Soon</span> Per-ticker mini price
+                  charts and saved analysis snapshots are planned for a later
+                  milestone.
+                </p>
+
                 {analyzing && (
                   <LoadingState message="Analyzing watchlist — this may take a few seconds…" />
                 )}
@@ -426,49 +429,30 @@ export function WatchlistsPage() {
 
                 {analysis && (
                   <div className="analysis-result">
-                    <p className="analysis-summary">
-                      <strong>{analysis.watchlist_name}</strong> ·{' '}
-                      {analysis.total_tickers}{' '}
-                      {analysis.total_tickers === 1 ? 'ticker' : 'tickers'} ·{' '}
-                      {analysis.successful_count} succeeded ·{' '}
-                      {analysis.failed_count} failed
-                    </p>
+                    <div className="analysis-stats">
+                      <span className="analysis-stat">
+                        <strong>{analysis.total_tickers}</strong> total
+                      </span>
+                      <span className="analysis-stat is-success">
+                        <strong>{analysis.successful_count}</strong> succeeded
+                      </span>
+                      <span className="analysis-stat is-fail">
+                        <strong>{analysis.failed_count}</strong> failed
+                      </span>
+                    </div>
                     <p className="analysis-meta">
                       Analyzed {formatTimestamp(analysis.analyzed_at)} · on-demand
                       result, not saved to history
                     </p>
 
                     {analysis.results.length > 0 && (
-                      <ul className="analysis-list">
-                        {sortByScoreDesc(analysis.results).map((r) => (
-                          <li key={r.ticker} className="analysis-card">
-                            <div className="analysis-card-main">
-                              <span className="analysis-card-ticker">
-                                {r.ticker}
-                              </span>
-                              {r.company_name && (
-                                <span className="analysis-card-company">
-                                  {r.company_name}
-                                </span>
-                              )}
-                            </div>
-                            <div className="analysis-card-verdict">
-                              <span className="category-badge">
-                                {r.category}
-                              </span>
-                              <span className="analysis-card-score">
-                                Score {r.score.toFixed(1)}
-                              </span>
-                              <span className="analysis-card-confidence">
-                                {r.confidence}
-                              </span>
-                              {r.current_price != null && (
-                                <span className="analysis-card-price">
-                                  ${r.current_price.toFixed(2)}
-                                </span>
-                              )}
-                            </div>
-                          </li>
+                      <ul className="watchlist-analysis-grid">
+                        {sortByScoreDesc(analysis.results).map((r, i) => (
+                          <AnalysisResultCard
+                            key={r.ticker}
+                            result={r}
+                            rank={i + 1}
+                          />
                         ))}
                       </ul>
                     )}

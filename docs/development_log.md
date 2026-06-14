@@ -1,5 +1,53 @@
 # Development Log
 
+## 2026-06-13 — Phase 5: Watchlist Visual Upgrade (Milestone 1 — layout/cards)
+
+**Goal:** restyle the Watchlists page to the dark dashboard look using existing
+real data only. Presentation only — every handler, state value, and API call is
+unchanged. **No new network calls** (no per-ticker history fetches; sparklines
+deferred). No backend/schema/API/scoring changes; no new dependencies.
+
+**Watchlists page sections changed** (`frontend/src/pages/WatchlistsPage.tsx`)
+
+- **Overview** — replaced the plain button list with a `watchlist-grid` of
+  `WatchlistCard`s: name, ticker-count pill, description, and "Updated <date>".
+  Selected card highlighted with an accent left border.
+- **Selected panel** — `selected-watchlist-panel` with a meta line now showing
+  Created/Updated dates and the description; edit + ticker-chip + add-ticker
+  sections retained as-is.
+- **Analysis** — summary stat pills (total / succeeded / failed), results in a
+  `watchlist-analysis-grid` of `AnalysisResultCard`s (rank, big score, category
+  badge, confidence, price, and a clamped one-line summary), still sorted
+  best-score-first via the existing `sortByScoreDesc`. Failed-ticker list kept.
+  Added a clearly labeled "Soon" note that per-ticker mini charts and saved
+  snapshots are planned — no fake charts/prices.
+- Fixed the stale subtitle (previously claimed no analysis runs here).
+
+**Real data used:** `listWatchlists` (name, ticker_count, created/updated),
+`getWatchlist` (tickers, dates, description), and the on-demand
+`analyzeWatchlist` result (category, score, confidence, price, report
+summaries). All values are backend-provided; nothing is recomputed in React.
+
+**Helpers / components / tests added**
+
+- `src/lib/format.ts` — `formatDate` (date-only) + 4 Vitest cases.
+- `src/lib/watchlist.ts` — pure `pickPrimarySummary` (first non-blank
+  technical→fundamental→news→risk summary) + 5 Vitest cases.
+- `src/components/watchlist/WatchlistCard.tsx` and `AnalysisResultCard.tsx` —
+  presentational only.
+- Watchlist CSS reworked in `styles.css` (`watchlist-grid`, `watchlist-card`,
+  `watchlist-analysis-grid`, `analysis-result-*`, stat pills, `soon-tag`);
+  removed now-dead `watchlist-item*` / `analysis-card*` / `analysis-summary`
+  rules.
+
+**Checks**
+
+- `npm run lint` — clean. `npm test` — 37/37 (6 files; +9 new). `npm run build`
+  — green. `pytest` — 1606 passed (unchanged; no backend touched).
+- Live smoke: watchlist create/list/delete confirmed the card fields
+  (`ticker_count`, `created_at`, `updated_at`); DB left clean. Vite dev served
+  `/` with 200.
+
 ## 2026-06-13 — Phase 4: Chart Foundation (daily price history on Analyze)
 
 **Goal:** add the first real stock price chart — daily historical close prices —
