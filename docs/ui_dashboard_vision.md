@@ -213,9 +213,12 @@ src/
 
 Charts are added deliberately, simplest and most useful first:
 
-1. **Daily historical ticker chart (first).** On the Analyze page, using the
-   existing market-data layer (`app/data/market_data.py`) surfaced through a
-   read endpoint. Static, point-in-time OHLC/close history.
+1. **Daily historical ticker chart (first). — DONE (Phase 4).** On the Analyze
+   page, using the existing market-data layer (`app/data/market_data.py`)
+   surfaced through a read endpoint (`GET /api/market-data/{ticker}/history`).
+   Static, point-in-time daily close history rendered with **Lightweight
+   Charts**. Daily history only — **not** real-time/intraday (that remains
+   item 4 / Phase 9).
 2. **Watchlist mini sparklines (second).** Small daily trend lines on watchlist
    cards.
 3. **Watchlist score trend (after snapshots exist).** Requires saved
@@ -223,9 +226,8 @@ Charts are added deliberately, simplest and most useful first:
 4. **Intraday / real-time (later).** Gated behind a dedicated phase due to
    provider, cost, rate-limit, caching, and freshness concerns.
 
-Chart library selection happens **in the chart phase, not before** — evaluate a
-lightweight option (e.g. Recharts or lightweight-charts) only when Phase 4 is
-scoped. No chart dependency is added during the shell or dashboard phases.
+Chart library selection happened in Phase 4: **Lightweight Charts** is the chosen
+library. No other charting dependency should be added without a new scoped task.
 
 ---
 

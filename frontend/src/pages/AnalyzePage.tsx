@@ -1,11 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { analyzeAndSave, analyzeOnly } from '../api/analysisApi'
+import { getPriceHistory } from '../api/marketDataApi'
+import { StockPriceChart } from '../components/charts/StockPriceChart'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { LoadingState } from '../components/LoadingState'
 import { PageHeader } from '../components/layout/PageHeader'
 import { StockReportView } from '../components/StockReportView'
 import { getErrorMessage } from '../lib/errors'
+import type { PriceHistoryResponse } from '../types/marketData'
 import type { StockReport } from '../types/report'
 
 export function AnalyzePage() {
@@ -15,10 +18,43 @@ export function AnalyzePage() {
   const [report, setReport] = useState<StockReport | null>(null)
   const [savedId, setSavedId] = useState<number | null>(null)
 
+  // The ticker whose analysis succeeded — drives the price-history fetch.
+  const [analyzedTicker, setAnalyzedTicker] = useState<string | null>(null)
+  const [history, setHistory] = useState<PriceHistoryResponse | null>(null)
+  const [chartLoading, setChartLoading] = useState(false)
+  const [chartError, setChartError] = useState<string | null>(null)
+
+  // Load price history whenever a new ticker is successfully analyzed. This is
+  // independent of the analysis report: a chart failure never hides the report.
+  // State is only updated inside async callbacks (reset happens in the handlers)
+  // so the effect never triggers a synchronous cascade on mount.
+  useEffect(() => {
+    if (!analyzedTicker) return
+    let active = true
+    getPriceHistory(analyzedTicker)
+      .then((data) => {
+        if (active) setHistory(data)
+      })
+      .catch((err: unknown) => {
+        if (active)
+          setChartError(getErrorMessage(err, 'Could not load price history.'))
+      })
+      .finally(() => {
+        if (active) setChartLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [analyzedTicker])
+
   function clearResult() {
     setError(null)
     setReport(null)
     setSavedId(null)
+    setAnalyzedTicker(null)
+    setHistory(null)
+    setChartError(null)
+    setChartLoading(false)
   }
 
   async function handleAnalyzeOnly() {
@@ -32,6 +68,8 @@ export function AnalyzePage() {
     try {
       const result = await analyzeOnly(t)
       setReport(result)
+      setChartLoading(true)
+      setAnalyzedTicker(t)
     } catch (err) {
       setError(getErrorMessage(err, 'Analysis failed — please try again.'))
     } finally {
@@ -51,6 +89,8 @@ export function AnalyzePage() {
       const result = await analyzeAndSave(t)
       setReport(result.report)
       setSavedId(result.id)
+      setChartLoading(true)
+      setAnalyzedTicker(t)
     } catch (err) {
       setError(getErrorMessage(err, 'Analysis failed — please try again.'))
     } finally {
@@ -106,6 +146,28 @@ export function AnalyzePage() {
       {error && <ErrorMessage message={error} />}
       {report && (
         <StockReportView report={report} savedId={savedId ?? undefined} />
+      )}
+
+      {report && (
+        <section className="price-history-card" aria-label="Price history">
+          <div className="price-history-head">
+            <h2 className="section-title">Price History</h2>
+            <span className="price-history-meta">Daily close · last 1 year</span>
+          </div>
+          {chartLoading && <LoadingState message="Loading price history…" />}
+          {chartError && <ErrorMessage message={chartError} />}
+          {!chartLoading && !chartError && history && (
+            <>
+              {history.prices.length === 0 ? (
+                <p className="empty-state">
+                  No price history available for {history.ticker}.
+                </p>
+              ) : (
+                <StockPriceChart prices={history.prices} />
+              )}
+            </>
+          )}
+        </section>
       )}
 
       <p>

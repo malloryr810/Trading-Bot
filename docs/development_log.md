@@ -1,5 +1,60 @@
 # Development Log
 
+## 2026-06-13 — Phase 4: Chart Foundation (daily price history on Analyze)
+
+**Goal:** add the first real stock price chart — daily historical close prices —
+to the Analyze page using Lightweight Charts and the existing market-data layer.
+**Daily history only; no real-time/intraday charting.** No scoring/analysis/
+persistence changes; no new DB tables; chart data is never stored.
+
+**Backend — new read endpoint**
+
+- `GET /api/market-data/{ticker}/history?period=1y&interval=1d` (read-only).
+- `app/api/schemas/market_data.py` — `PricePoint` / `PriceHistoryResponse`. All
+  numeric fields nullable so non-finite values serialize as JSON `null`.
+- `app/services/market_data_service.py` — thin orchestration over the existing
+  `app.data.market_data.get_price_history`. Normalizes the ticker, validates
+  `period`/`interval` against conservative allow-lists (intraday intervals
+  intentionally excluded), and converts the DataFrame to JSON-safe points via
+  `safe_float`. No analysis/scoring/persistence.
+- `app/api/routes/market_data.py` — thin route; maps `ValueError` /
+  `DataFetchError` → 422, unexpected → 500 (no stack traces leaked).
+- Registered the router in `app/api/main.py`. `market_data.py` itself unchanged.
+- Tests: `tests/test_api_market_data.py` (17 cases) — success, ticker
+  normalization, default + custom params, invalid period/interval (422, no data
+  call), `DataFetchError`/empty → 422, unexpected → 500, and NaN→null safety.
+  Data layer fully mocked; no network.
+
+**Frontend — chart**
+
+- Added dependency **`lightweight-charts` (v5.2.0)** — the only new dep.
+- `src/types/marketData.ts` — mirrors the backend schemas.
+- `src/api/marketDataApi.ts` — `getPriceHistory(ticker, period, interval)`.
+- `src/lib/chartData.ts` + test — pure `toClosingLineData` (drops non-finite
+  closes, maps to `{time, value}`); 5 Vitest cases.
+- `src/components/charts/StockPriceChart.tsx` — dark-themed area chart; creates
+  the chart on mount, resizes via `ResizeObserver`, and calls `chart.remove()`
+  on unmount (no leaks).
+- `AnalyzePage.tsx` — after a successful analysis, a "Price History" card fetches
+  and renders the chart for the analyzed ticker. The fetch is independent of the
+  report: chart loading/empty/error states are self-contained and a chart
+  failure never hides the analysis report.
+- Chart-card styles added to `styles.css`.
+
+**Checks**
+
+- `pytest` — 1606 passed (+17 new; no regressions).
+- `npm test` — 28/28 (5 files; +5 chart-data tests).
+- `npm run lint` — clean. `npm run build` — green (53 modules).
+- Live smoke: `/api/market-data/aapl/history?period=1mo` returned 22 real daily
+  points; invalid period and invalid ticker both returned 422. Vite dev served
+  `/` with 200.
+
+**Dependency / audit note:** `npm install lightweight-charts` reports the same
+**5 high-severity** advisories already documented (esbuild via Vite/Vitest) — no
+new advisories from this package. Did **not** run `npm audit fix --force` (it
+would downgrade Vitest).
+
 ## 2026-06-13 — Phase 3: Dashboard Redesign (real-data card grid)
 
 **Goal:** rebuild the Dashboard into a dark finance card grid that surfaces real

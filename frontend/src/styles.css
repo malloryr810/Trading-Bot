@@ -1197,3 +1197,36 @@ body {
   color: var(--color-text-muted);
   font-weight: 500;
 }
+
+/* ── Price history chart ───────────────────────────────────────────── */
+.price-history-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  box-shadow: var(--shadow);
+  margin-bottom: 24px;
+}
+
+.price-history-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.price-history-head .section-title {
+  margin: 0;
+}
+
+.price-history-meta {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.price-chart {
+  width: 100%;
+  min-height: 320px;
+}
