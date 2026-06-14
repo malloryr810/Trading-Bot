@@ -1,5 +1,59 @@
 # Development Log
 
+## 2026-06-13 — Phase 3: Dashboard Redesign (real-data card grid)
+
+**Goal:** rebuild the Dashboard into a dark finance card grid that surfaces real
+backend data, with anything not built yet clearly labeled. Frontend only — no
+backend, schema, API contract, scoring, or dependency changes. No charts.
+
+**Dashboard sections** (`frontend/src/pages/DashboardPage.tsx`)
+
+- **Hero** — "Research Dashboard" header, quick actions (Analyze / Watchlists /
+  Reports), and the research-only disclaimer (retained).
+- **Market Overview** — `ComingSoonCard`, wide. Index names shown with `—`
+  placeholders only; **no invented prices**. Labeled "Coming Soon".
+- **Watchlists** (real) — counts total watchlists and total tickers
+  (`listWatchlists`, summed via `sumBy`); link to `/watchlists`; loading / empty
+  / error states.
+- **Saved Report Ratings** (real) — groups backend `category` values via
+  `countByCategory` and lists top-by-score tickers (`sortByScoreDesc`), each
+  linking to its report. Display-only aggregation — no ratings recomputed.
+- **Recent Reports** (real, wide) — five most recent saved reports
+  (`listSavedReports`), reusing the existing `report-list` / `report-card`
+  styles; loading / empty / error states.
+- **Portfolio** — `ComingSoonCard`. States manual tracking is planned, no broker
+  linking, no automated trading. **No fake value/holdings.**
+- **Source Status** (informational) — backend reachability via `checkHealth`
+  plus provider notes (yfinance · end-of-day; intraday "Later phase"). Kept
+  distinct from the sidebar Data Status rather than duplicating it.
+
+**Real data vs placeholders**
+
+- Real: watchlist counts, saved-report list, category counts, top-by-score,
+  backend health.
+- Clearly labeled Coming Soon: Market Overview, Portfolio.
+
+**New helpers / components / tests**
+
+- `src/lib/dashboard.ts` — pure `countByCategory` + `sumBy` (display-only
+  aggregation of backend-provided values).
+- `src/lib/dashboard.test.ts` — 6 Vitest cases (grouping, ordering, no-mutation,
+  summing).
+- `src/components/dashboard/ComingSoonCard.tsx` — reusable labeled-placeholder
+  card (used by Market Overview + Portfolio).
+- Dashboard CSS added to `styles.css` (`dashboard-grid`, `dashboard-card`,
+  `metric`, `market-strip`, `coming-soon-*`, `category-count-*`,
+  `source-status-*`). No existing class names changed.
+
+**Checks**
+
+- `npm run lint` — clean.
+- `npm test` — 23/23 passing (4 files; +6 new dashboard tests).
+- `npm run build` — `tsc -b` + Vite green (44 modules).
+- `pytest` — 1589 passed (no backend regression).
+- Live smoke: backend `/api/health`, `/api/watchlists` (`[]`), and
+  `/api/reports/history` returned real data; Vite dev server served `/` with 200.
+
 ## 2026-06-13 — Phase 2: App Shell Redesign (dark finance theme + left sidebar)
 
 **Goal:** establish the dark dashboard foundation and a permanent left-sidebar
