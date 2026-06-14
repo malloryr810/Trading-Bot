@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { getSavedReport } from '../api/reportsApi'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { LoadingState } from '../components/LoadingState'
+import { PageHeader } from '../components/layout/PageHeader'
 import { StockReportView } from '../components/StockReportView'
 import { getErrorMessage } from '../lib/errors'
 import { formatTimestamp } from '../lib/format'
@@ -45,7 +46,7 @@ function ReportDetail({ reportId }: { reportId: number }) {
   return (
     <div className="page">
       <BackLink />
-      <h1>Saved Report</h1>
+      <PageHeader title="Saved Report" />
       {loading && <LoadingState message="Loading report…" />}
       {error && <ErrorMessage message={error} />}
       {detail && (

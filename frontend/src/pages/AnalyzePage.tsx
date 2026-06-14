@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { analyzeAndSave, analyzeOnly } from '../api/analysisApi'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { LoadingState } from '../components/LoadingState'
+import { PageHeader } from '../components/layout/PageHeader'
 import { StockReportView } from '../components/StockReportView'
 import { getErrorMessage } from '../lib/errors'
 import type { StockReport } from '../types/report'
@@ -59,7 +60,7 @@ export function AnalyzePage() {
 
   return (
     <div className="page">
-      <h1>Analyze a Ticker</h1>
+      <PageHeader title="Analyze a Ticker" />
 
       <div className="analyze-form">
         <input

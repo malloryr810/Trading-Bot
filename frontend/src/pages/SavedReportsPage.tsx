@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { listSavedReports } from '../api/reportsApi'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { LoadingState } from '../components/LoadingState'
+import { PageHeader } from '../components/layout/PageHeader'
 import { getErrorMessage } from '../lib/errors'
 import { formatTimestamp } from '../lib/format'
 import type { SavedReportSummary } from '../types/report'
@@ -36,11 +37,10 @@ export function SavedReportsPage() {
 
   return (
     <div className="page">
-      <h1>Saved Reports</h1>
-      <p className="subtitle">
-        Analysis snapshots you saved earlier. Read-only history — open one for
-        the full report.
-      </p>
+      <PageHeader
+        title="Saved Reports"
+        subtitle="Analysis snapshots you saved earlier. Read-only history — open one for the full report."
+      />
 
       {loading && <LoadingState message="Loading saved reports…" />}
       {error && <ErrorMessage message={error} />}

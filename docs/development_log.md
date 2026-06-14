@@ -1,5 +1,53 @@
 # Development Log
 
+## 2026-06-13 — Phase 2: App Shell Redesign (dark finance theme + left sidebar)
+
+**Goal:** establish the dark dashboard foundation and a permanent left-sidebar
+layout while preserving every existing route, page, API call, and behavior.
+Frontend shell/layout only — no backend, schema, API contract, or dependency
+changes.
+
+**New layout components** (`frontend/src/components/layout/`):
+
+- `AppShell.tsx` — flex frame: permanent left sidebar + scrollable main content
+  column. Layout only; owns no routing or data logic.
+- `Sidebar.tsx` — brand block, primary nav (`Dashboard`, `Analyze`,
+  `Watchlists`, `Reports`), and a real **Data Status** footer driven by the
+  existing `checkHealth()` call (Connected / Offline / Checking). Portfolio is
+  intentionally omitted until manual holdings exist.
+- `PageHeader.tsx` — consistent title/subtitle/optional-actions row; adopted by
+  all five pages in place of bare `<h1>` + `.subtitle`.
+
+**App wiring**
+
+- `App.tsx`: replaced the old sticky top `<header>` nav with `<AppShell>`
+  wrapping the unchanged `<Routes>`. All five routes (`/`, `/analyze`,
+  `/watchlists`, `/reports`, `/reports/:id`) are preserved exactly.
+- Dashboard `<h1>` renamed from "Investment Bot" to "Dashboard" since the
+  sidebar now carries the brand.
+
+**Styling / theme** (`frontend/src/styles.css`)
+
+- Converted the existing CSS-custom-property token set to a **dark finance
+  palette** (deep `#0b0f17` base, layered `#141b27` / `#1b2330` surfaces, subtle
+  borders, `#4f8cff` accent, semantic green/red/amber). Kept tokens in the
+  existing `styles.css` rather than splitting into a separate `styles/tokens.css`
+  (minor deviation from the vision doc's target tree; revisit if the file grows).
+- Added `color-scheme: dark`, app-shell/sidebar/page-header rules, and a basic
+  responsive collapse (`max-width: 860px` turns the sidebar into a top bar).
+- Remapped previously hard-coded light values (button hovers, health pills,
+  disclaimer, error message, saved notice, danger button, focus rings) to dark
+  tokens/translucent fills. **No class names were removed**, so every existing
+  page renders unchanged structurally — only restyled.
+
+**Checks**
+
+- `npm run lint` — clean.
+- `npm test` — 17/17 passing (pure-logic suites unaffected).
+- `npm run build` — `tsc -b` + Vite build green (42 modules).
+- `pytest` — 1589 passed (no backend regression).
+- Vite dev server boots and serves `/` with HTTP 200.
+
 ## 2026-06-13 — UI vision & dashboard redesign planning doc
 
 **Goal:** define the new frontend direction before any UI code changes.

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { checkHealth } from '../api/analysisApi'
+import { PageHeader } from '../components/layout/PageHeader'
 
 type HealthStatus = 'checking' | 'ok' | 'unavailable'
 
@@ -15,10 +16,10 @@ export function DashboardPage() {
 
   return (
     <div className="page">
-      <h1>Investment Bot</h1>
-      <p className="subtitle">
-        Personal stock research and decision-support tool.
-      </p>
+      <PageHeader
+        title="Dashboard"
+        subtitle="Personal stock research and decision-support tool."
+      />
 
       <div
         className={`health-indicator health-${healthStatus}`}

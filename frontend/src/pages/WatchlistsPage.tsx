@@ -12,6 +12,7 @@ import {
 } from '../api/watchlistApi'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { LoadingState } from '../components/LoadingState'
+import { PageHeader } from '../components/layout/PageHeader'
 import { getErrorMessage } from '../lib/errors'
 import { formatTimestamp } from '../lib/format'
 import { sortByScoreDesc } from '../lib/sort'
@@ -216,11 +217,10 @@ export function WatchlistsPage() {
 
   return (
     <div className="page">
-      <h1>Watchlists</h1>
-      <p className="subtitle">
-        Create named lists of tickers to research later. Storage only — no
-        analysis is run from here yet.
-      </p>
+      <PageHeader
+        title="Watchlists"
+        subtitle="Create named lists of tickers to research later. Storage only — no analysis is run from here yet."
+      />
 
       <div className="watchlist-layout">
         {/* ── Left: create + list ─────────────────────────────────── */}
