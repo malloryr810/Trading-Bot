@@ -1,5 +1,57 @@
 # Development Log
 
+## 2026-06-13 — Phase 6: Saved Watchlist Analysis Snapshots (Milestone 1)
+
+**Goal:** let an explicitly user-triggered watchlist analysis run be saved as a
+historical snapshot, then list/read those snapshots. Foundation for future score
+trends/sparklines. **Not** a scheduled scan: rows are only written on the
+analyze-and-save action. No trading/broker/alerts/ML/scoring changes; existing
+analyze-only endpoint and saved-report behavior untouched.
+
+**Persistence** (`app/data/database.py`)
+
+- New tables `watchlist_analysis_snapshots` (run header: watchlist id +
+  denormalised `watchlist_name`, `analyzed_at`, total/success/failure counts,
+  `created_at`) and `watchlist_analysis_snapshot_results` (per-ticker rows;
+  success rows store the full success item incl. the StockReport as
+  `summary_json`, failure rows store `error_message`; `status` distinguishes
+  them). Separate from `analysis_reports` and watchlist CRUD.
+
+**Service** — `app/services/watchlist_analysis_snapshot_service.py`
+
+- `analyze_and_save_snapshot` (run once + save), `save_watchlist_analysis_snapshot`
+  (persist an already-produced result), `list_watchlist_snapshots`,
+  `get_watchlist_snapshot`. Reuses `analyze_watchlist`; validates the watchlist
+  exists; normalizes timestamps to UTC. No new analysis/scoring logic.
+
+**API** — `app/api/routes/watchlist_snapshots.py` (+ registered in `main.py`)
+
+- `POST /api/watchlists/{id}/analysis-snapshots` (201, explicit analyze-and-save),
+  `GET /api/watchlists/{id}/analysis-snapshots` (list summaries),
+  `GET /api/watchlist-analysis-snapshots/{snapshot_id}` (detail). 404 for missing
+  watchlist/snapshot, 400 for empty watchlist — consistent with existing routes.
+- Schemas: `app/api/schemas/watchlist_snapshots.py` (reuses the live
+  `WatchlistAnalysisResult`/`Error` shapes for per-ticker rows).
+
+**Frontend** (minimal)
+
+- Types + client functions (`analyzeAndSaveSnapshot`, `listWatchlistSnapshots`,
+  `getWatchlistSnapshot`). On the Watchlists page: an "Analyze & save snapshot"
+  button beside the analyze-only button, and a saved-snapshots list (analyzed
+  time + total/ok/failed counts) loaded when a watchlist is selected. Clearly
+  labeled as historical records of manually triggered runs. No snapshot detail
+  page and no trend/sparkline charts yet (deferred). No per-ticker history calls.
+
+**Tests / checks**
+
+- `pytest` — 1630 passed (+24: 13 snapshot-service, 11 snapshot-API, incl.
+  analyze-only-does-not-save, failed-ticker capture, missing 404s). Existing
+  watchlist analysis tests still pass.
+- `npm test` 37/37 · `npm run lint` clean · `npm run build` green.
+- Live smoke (temp `DATABASE_PATH`): analyze-only left snapshots `[]`;
+  analyze-and-save created a snapshot; list lean (no `results`); detail returned
+  the full report; missing snapshot/watchlist → 404. Temp DB removed.
+
 ## 2026-06-13 — Phase 5: Watchlist Visual Upgrade (Milestone 1 — layout/cards)
 
 **Goal:** restyle the Watchlists page to the dark dashboard look using existing

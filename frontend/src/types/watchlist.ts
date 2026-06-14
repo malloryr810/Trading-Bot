@@ -71,3 +71,21 @@ export interface WatchlistAnalysisResponse {
   results: WatchlistAnalysisResult[]
   errors: WatchlistAnalysisError[]
 }
+
+// --- Saved analysis snapshots (Phase 6) ------------------------------------
+
+export interface WatchlistSnapshotSummary {
+  id: number
+  watchlist_id: number
+  watchlist_name: string
+  analyzed_at: string
+  total_tickers: number
+  success_count: number
+  failure_count: number
+  created_at: string
+}
+
+export interface WatchlistSnapshotDetail extends WatchlistSnapshotSummary {
+  results: WatchlistAnalysisResult[]
+  errors: WatchlistAnalysisError[]
+}

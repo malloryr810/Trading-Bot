@@ -300,9 +300,35 @@ Recommended order (each step small and reviewable):
 Out of scope now, but natural follow-ups once CRUD is stable:
 
 - **Analyze all tickers** in a watchlist by reusing the existing `analyze_stock`
-  pipeline across the saved tickers (no new analysis logic).
+  pipeline across the saved tickers (no new analysis logic). ✓ Done (analyze-only).
 - **Save watchlist analysis snapshots** alongside the existing report history.
+  ✓ Done (Phase 6, Milestone 1) — see below.
 - **Compare watchlist reports over time** (read-only historical view).
+
+## 10a. Saved analysis snapshots (Phase 6, Milestone 1 — done)
+
+A **snapshot** is a historical record of a single, explicitly user-triggered
+on-demand analysis run. It is **storage-separate** from watchlist CRUD and from
+`analysis_reports`, and is **never** written by a schedule or background job.
+
+- Tables (`app/data/database.py`): `watchlist_analysis_snapshots` (one row per
+  run: watchlist id + denormalised name, `analyzed_at`, total/success/failure
+  counts, `created_at`) and `watchlist_analysis_snapshot_results` (one row per
+  ticker; success rows store the full success item as `summary_json`, failure
+  rows store `error_message`). `watchlist_name` is denormalised so a snapshot
+  stays readable after a rename/delete.
+- Service: `app/services/watchlist_analysis_snapshot_service.py`
+  (`analyze_and_save_snapshot`, `save_watchlist_analysis_snapshot`,
+  `list_watchlist_snapshots`, `get_watchlist_snapshot`). It reuses
+  `analyze_watchlist` — no new analysis/scoring logic.
+- API (`app/api/routes/watchlist_snapshots.py`):
+  - `POST /api/watchlists/{id}/analysis-snapshots` — analyze once **and** save
+    (explicit; distinct from the analyze-only endpoint, which still never saves).
+  - `GET  /api/watchlists/{id}/analysis-snapshots` — list summaries (newest first).
+  - `GET  /api/watchlist-analysis-snapshots/{snapshot_id}` — full detail.
+- Frontend: an "Analyze & save snapshot" button plus a saved-snapshots list on
+  the selected watchlist. Snapshot detail page and score-trend charts are
+  deferred to a later milestone.
 - **Tag watchlists** for lightweight categorization.
 - **Add notes per ticker** within a watchlist.
 - **Mock simulation** only much later, and only after the core research workflow

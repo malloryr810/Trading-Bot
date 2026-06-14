@@ -14,6 +14,8 @@ import type {
   UpdateWatchlistRequest,
   WatchlistAnalysisResponse,
   WatchlistDetail,
+  WatchlistSnapshotDetail,
+  WatchlistSnapshotSummary,
   WatchlistSummary,
 } from '../types/watchlist'
 
@@ -73,4 +75,35 @@ export async function analyzeWatchlist(
   id: number,
 ): Promise<WatchlistAnalysisResponse> {
   return post<WatchlistAnalysisResponse>(`/api/watchlists/${id}/analyze`, {})
+}
+
+/**
+ * POST /api/watchlists/{id}/analysis-snapshots — explicitly run an on-demand
+ * analysis once and save it as a historical snapshot. Distinct from analyze.
+ */
+export async function analyzeAndSaveSnapshot(
+  id: number,
+): Promise<WatchlistSnapshotDetail> {
+  return post<WatchlistSnapshotDetail>(
+    `/api/watchlists/${id}/analysis-snapshots`,
+    {},
+  )
+}
+
+/** GET /api/watchlists/{id}/analysis-snapshots — saved snapshots, newest first. */
+export async function listWatchlistSnapshots(
+  id: number,
+): Promise<WatchlistSnapshotSummary[]> {
+  return get<WatchlistSnapshotSummary[]>(
+    `/api/watchlists/${id}/analysis-snapshots`,
+  )
+}
+
+/** GET /api/watchlist-analysis-snapshots/{snapshotId} — one snapshot's detail. */
+export async function getWatchlistSnapshot(
+  snapshotId: number,
+): Promise<WatchlistSnapshotDetail> {
+  return get<WatchlistSnapshotDetail>(
+    `/api/watchlist-analysis-snapshots/${snapshotId}`,
+  )
 }

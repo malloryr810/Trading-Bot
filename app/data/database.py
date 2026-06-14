@@ -79,6 +79,57 @@ watchlist_tickers = Table(
     UniqueConstraint("watchlist_id", "ticker", name="uq_watchlist_ticker"),
 )
 
+# --- Saved watchlist analysis snapshots (Phase 6) -------------------------
+# A snapshot is a historical record of a single, explicitly user-triggered
+# on-demand watchlist analysis run.  It exists so future score-trend views can
+# read past runs without re-analyzing.  This is NOT a scheduled scan: rows are
+# only ever written when the user invokes the analyze-and-save endpoint.
+# ``watchlist_name`` is denormalised so a snapshot remains readable even if the
+# source watchlist is later renamed or deleted.
+
+watchlist_analysis_snapshots = Table(
+    "watchlist_analysis_snapshots",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column(
+        "watchlist_id",
+        Integer,
+        ForeignKey("watchlists.id"),
+        nullable=False,
+    ),
+    Column("watchlist_name", String, nullable=False),
+    Column("analyzed_at", DateTime, nullable=False),
+    Column("total_tickers", Integer, nullable=False),
+    Column("success_count", Integer, nullable=False),
+    Column("failure_count", Integer, nullable=False),
+    Column("created_at", DateTime, nullable=False),
+)
+
+watchlist_analysis_snapshot_results = Table(
+    "watchlist_analysis_snapshot_results",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column(
+        "snapshot_id",
+        Integer,
+        ForeignKey("watchlist_analysis_snapshots.id"),
+        nullable=False,
+    ),
+    Column("ticker", String, nullable=False),
+    # "success" or "failure" — drives whether this row is a result or an error.
+    Column("status", String, nullable=False),
+    Column("company_name", String, nullable=True),
+    Column("category", String, nullable=True),
+    Column("score", Float, nullable=True),
+    Column("confidence", String, nullable=True),
+    Column("current_price", Float, nullable=True),
+    # Full success item (incl. the StockReport) as JSON so the snapshot detail
+    # renders without re-running analysis.  Null for failure rows.
+    Column("summary_json", Text, nullable=True),
+    # Set for failure rows; null for success rows.
+    Column("error_message", Text, nullable=True),
+)
+
 
 def build_engine(db_path: Path | str | None = None) -> Engine:
     """Create a SQLite engine and ensure the schema exists.

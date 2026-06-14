@@ -1083,6 +1083,56 @@ body {
   border-radius: 999px;
 }
 
+/* Saved analysis snapshots */
+.watchlist-snapshots {
+  border-top: 1px solid var(--color-border);
+  padding-top: 16px;
+  margin-top: 16px;
+}
+
+.snapshot-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.snapshot-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 9px 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+}
+
+.snapshot-date {
+  color: var(--color-text);
+}
+
+.snapshot-counts {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-text-muted);
+}
+
+.snapshot-ok {
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.snapshot-fail {
+  color: var(--color-error);
+  font-weight: 600;
+}
+
 .analysis-errors {
   border-top: 1px solid var(--color-border);
   padding-top: 12px;

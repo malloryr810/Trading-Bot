@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   addTickerToWatchlist,
+  analyzeAndSaveSnapshot,
   analyzeWatchlist,
   createWatchlist,
   deleteWatchlist,
   getWatchlist,
   listWatchlists,
+  listWatchlistSnapshots,
   removeTickerFromWatchlist,
   updateWatchlist,
 } from '../api/watchlistApi'
@@ -21,6 +23,7 @@ import { sortByScoreDesc } from '../lib/sort'
 import type {
   WatchlistAnalysisResponse,
   WatchlistDetail,
+  WatchlistSnapshotSummary,
   WatchlistSummary,
 } from '../types/watchlist'
 
@@ -47,6 +50,12 @@ export function WatchlistsPage() {
   const [analyzing, setAnalyzing] = useState(false)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
 
+  // Saved analysis snapshots for the selected watchlist (historical records).
+  const [snapshots, setSnapshots] = useState<WatchlistSnapshotSummary[]>([])
+  const [snapshotsLoading, setSnapshotsLoading] = useState(false)
+  const [snapshotError, setSnapshotError] = useState<string | null>(null)
+  const [savingSnapshot, setSavingSnapshot] = useState(false)
+
   async function refreshList(): Promise<WatchlistSummary[]> {
     setListLoading(true)
     setListError(null)
@@ -59,6 +68,20 @@ export function WatchlistsPage() {
       return []
     } finally {
       setListLoading(false)
+    }
+  }
+
+  // Load saved snapshots for a watchlist. Called from event handlers (never an
+  // effect body), so setting state here does not cascade on mount.
+  async function loadSnapshots(watchlistId: number) {
+    setSnapshotsLoading(true)
+    setSnapshotError(null)
+    try {
+      setSnapshots(await listWatchlistSnapshots(watchlistId))
+    } catch (err) {
+      setSnapshotError(getErrorMessage(err, 'Failed to load snapshots.'))
+    } finally {
+      setSnapshotsLoading(false)
     }
   }
 
@@ -97,6 +120,7 @@ export function WatchlistsPage() {
     setDetailError(null)
     try {
       applySelected(await getWatchlist(id))
+      void loadSnapshots(id)
     } catch (err) {
       setSelected(null)
       setDetailError(getErrorMessage(err, 'Failed to load watchlist.'))
@@ -121,6 +145,9 @@ export function WatchlistsPage() {
       setNewDescription('')
       await refreshList()
       applySelected(created)
+      // A brand-new watchlist has no snapshots yet.
+      setSnapshots([])
+      setSnapshotError(null)
     } catch (err) {
       setListError(getErrorMessage(err, 'Failed to create watchlist.'))
     } finally {
@@ -195,6 +222,8 @@ export function WatchlistsPage() {
       setSelected(null)
       setAnalysis(null)
       setAnalysisError(null)
+      setSnapshots([])
+      setSnapshotError(null)
       await refreshList()
     } catch (err) {
       setDetailError(getErrorMessage(err, 'Failed to delete watchlist.'))
@@ -214,6 +243,21 @@ export function WatchlistsPage() {
       setAnalysisError(getErrorMessage(err, 'Failed to analyze watchlist.'))
     } finally {
       setAnalyzing(false)
+    }
+  }
+
+  // Explicit, user-triggered: run the analysis once and save it as a snapshot.
+  async function handleAnalyzeAndSave() {
+    if (!selected || selected.tickers.length === 0) return
+    setSavingSnapshot(true)
+    setSnapshotError(null)
+    try {
+      await analyzeAndSaveSnapshot(selected.id)
+      await loadSnapshots(selected.id)
+    } catch (err) {
+      setSnapshotError(getErrorMessage(err, 'Failed to save snapshot.'))
+    } finally {
+      setSavingSnapshot(false)
     }
   }
 
@@ -273,7 +317,7 @@ export function WatchlistsPage() {
                   key={wl.id}
                   watchlist={wl}
                   selected={selected?.id === wl.id}
-                  disabled={busy || analyzing}
+                  disabled={busy || analyzing || savingSnapshot}
                   onSelect={handleSelect}
                 />
               ))}
@@ -401,15 +445,32 @@ export function WatchlistsPage() {
                     className="btn btn-primary"
                     onClick={handleAnalyze}
                     disabled={
-                      busy || analyzing || selected.tickers.length === 0
+                      busy ||
+                      analyzing ||
+                      savingSnapshot ||
+                      selected.tickers.length === 0
                     }
                   >
                     {analyzing ? 'Analyzing…' : 'Analyze watchlist'}
                   </button>
-                  <span className="action-hint">
-                    On-demand analysis — results show here and are not saved.
-                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleAnalyzeAndSave}
+                    disabled={
+                      busy ||
+                      analyzing ||
+                      savingSnapshot ||
+                      selected.tickers.length === 0
+                    }
+                  >
+                    {savingSnapshot ? 'Saving…' : 'Analyze & save snapshot'}
+                  </button>
                 </div>
+                <span className="action-hint">
+                  “Analyze watchlist” shows results here without saving. “Analyze
+                  &amp; save snapshot” also records a historical snapshot.
+                </span>
                 {selected.tickers.length === 0 && (
                   <p className="empty-state">
                     Add at least one ticker to analyze.
@@ -418,7 +479,7 @@ export function WatchlistsPage() {
 
                 <p className="watchlist-future-note">
                   <span className="soon-tag">Soon</span> Per-ticker mini price
-                  charts and saved analysis snapshots are planned for a later
+                  charts and snapshot score trends are planned for a later
                   milestone.
                 </p>
 
@@ -477,6 +538,44 @@ export function WatchlistsPage() {
                       </div>
                     )}
                   </div>
+                )}
+              </div>
+
+              <div className="watchlist-snapshots">
+                <h3 className="section-title">Saved snapshots</h3>
+                <p className="action-hint">
+                  Historical records of manually triggered analysis runs.
+                </p>
+                {snapshotError && <ErrorMessage message={snapshotError} />}
+                {snapshotsLoading && (
+                  <LoadingState message="Loading snapshots…" />
+                )}
+                {!snapshotsLoading && snapshots.length === 0 && (
+                  <p className="empty-state">
+                    No saved snapshots yet — use “Analyze &amp; save snapshot”.
+                  </p>
+                )}
+                {snapshots.length > 0 && (
+                  <ul className="snapshot-list">
+                    {snapshots.map((snap) => (
+                      <li key={snap.id} className="snapshot-row">
+                        <span className="snapshot-date">
+                          {formatTimestamp(snap.analyzed_at)}
+                        </span>
+                        <span className="snapshot-counts">
+                          <span>{snap.total_tickers} tickers</span>
+                          <span className="snapshot-ok">
+                            {snap.success_count} ok
+                          </span>
+                          {snap.failure_count > 0 && (
+                            <span className="snapshot-fail">
+                              {snap.failure_count} failed
+                            </span>
+                          )}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
             </div>

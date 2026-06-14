@@ -10,7 +10,14 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import analysis, health, market_data, reports, watchlists
+from app.api.routes import (
+    analysis,
+    health,
+    market_data,
+    reports,
+    watchlist_snapshots,
+    watchlists,
+)
 
 # Allowed origins for local frontend development (Vite default port).
 # Keep this list narrow — do not use allow_origins=["*"].
@@ -37,6 +44,7 @@ def create_app() -> FastAPI:
     _app.include_router(analysis.router, prefix="/api")
     _app.include_router(reports.router, prefix="/api")
     _app.include_router(watchlists.router, prefix="/api")
+    _app.include_router(watchlist_snapshots.router, prefix="/api")
     _app.include_router(market_data.router, prefix="/api")
     return _app
 
