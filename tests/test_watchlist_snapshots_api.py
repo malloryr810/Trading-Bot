@@ -22,11 +22,11 @@ from app.models.stock_report import StockReport
 _ANALYZE = "app.services.watchlist_analysis_service.analyze_stock"
 
 
-def _report_for(ticker: str) -> StockReport:
+def _report_for(ticker: str, score: float = 60.0) -> StockReport:
     return StockReport(
         ticker=ticker,
         final_category=RatingCategory.WATCHLIST,
-        score=60.0,
+        score=score,
         confidence_level=ConfidenceLevel.MEDIUM,
         company_name=f"{ticker} Inc.",
         current_price=100.0,
@@ -39,6 +39,15 @@ def _analyze_ok(*ok_tickers):
     def _side_effect(ticker: str) -> StockReport:
         if ticker in ok:
             return _report_for(ticker)
+        raise RuntimeError(f"no data for {ticker}")
+
+    return _side_effect
+
+
+def _analyze_scores(scores: dict[str, float]):
+    def _side_effect(ticker: str) -> StockReport:
+        if ticker in scores:
+            return _report_for(ticker, score=scores[ticker])
         raise RuntimeError(f"no data for {ticker}")
 
     return _side_effect
@@ -133,6 +142,23 @@ class TestListSnapshots:
 
     def test_missing_watchlist_returns_404(self, client):
         assert client.get("/api/watchlists/999/analysis-snapshots").status_code == 404
+
+    def test_list_includes_average_score(self, client):
+        wl_id = _make_watchlist(client, ["AAPL", "MSFT", "BADX"])
+        with patch(
+            _ANALYZE, side_effect=_analyze_scores({"AAPL": 40.0, "MSFT": 70.0})
+        ):
+            client.post(f"/api/watchlists/{wl_id}/analysis-snapshots")
+        data = client.get(f"/api/watchlists/{wl_id}/analysis-snapshots").json()
+        # (40 + 70) / 2; the failed BADX row is ignored.
+        assert data[0]["average_score"] == 55.0
+
+    def test_list_average_score_null_without_successful_results(self, client):
+        wl_id = _make_watchlist(client, ["BADX"])
+        with patch(_ANALYZE, side_effect=_analyze_ok()):
+            client.post(f"/api/watchlists/{wl_id}/analysis-snapshots")
+        data = client.get(f"/api/watchlists/{wl_id}/analysis-snapshots").json()
+        assert data[0]["average_score"] is None
 
 
 # ---------------------------------------------------------------------------

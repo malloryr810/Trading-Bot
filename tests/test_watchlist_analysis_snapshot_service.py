@@ -41,11 +41,11 @@ def engine(tmp_path) -> Engine:
     return build_engine(tmp_path / "test.db")
 
 
-def _make_report(ticker: str) -> StockReport:
+def _make_report(ticker: str, score: float = 60.0) -> StockReport:
     return StockReport(
         ticker=ticker,
         final_category=RatingCategory.WATCHLIST,
-        score=60.0,
+        score=score,
         confidence_level=ConfidenceLevel.MEDIUM,
         company_name=f"{ticker} Inc.",
         current_price=100.0,
@@ -65,6 +65,17 @@ def _fake_analyze(*ok_tickers):
     def _side_effect(ticker: str) -> StockReport:
         if ticker in ok:
             return _make_report(ticker)
+        raise RuntimeError(f"no data for {ticker}")
+
+    return _side_effect
+
+
+def _fake_analyze_scores(scores: dict[str, float]):
+    """Succeed with a specific score per ticker; any other ticker fails."""
+
+    def _side_effect(ticker: str) -> StockReport:
+        if ticker in scores:
+            return _make_report(ticker, score=scores[ticker])
         raise RuntimeError(f"no data for {ticker}")
 
     return _side_effect
@@ -181,3 +192,76 @@ class TestGetSnapshot:
             saved = analyze_and_save_snapshot(wl_id, engine=engine)
         detail = get_watchlist_snapshot(saved["id"], engine=engine)
         assert detail["watchlist_name"] == "Original"
+
+
+# ---------------------------------------------------------------------------
+# average_score (backend-derived; from successful scored rows only)
+# ---------------------------------------------------------------------------
+
+
+class TestAverageScore:
+    def test_list_average_is_mean_of_successful_scores(self, engine):
+        wl_id = _make_watchlist(engine, ["AAPL", "MSFT"])
+        with patch(
+            _ANALYZE,
+            side_effect=_fake_analyze_scores({"AAPL": 40.0, "MSFT": 70.0}),
+        ):
+            analyze_and_save_snapshot(wl_id, engine=engine)
+        summary = list_watchlist_snapshots(wl_id, engine=engine)[0]
+        assert summary["average_score"] == 55.0
+
+    def test_average_ignores_failed_tickers(self, engine):
+        wl_id = _make_watchlist(engine, ["AAPL", "MSFT", "BADX"])
+        with patch(
+            _ANALYZE,
+            side_effect=_fake_analyze_scores({"AAPL": 50.0, "MSFT": 80.0}),
+        ):
+            analyze_and_save_snapshot(wl_id, engine=engine)
+        summary = list_watchlist_snapshots(wl_id, engine=engine)[0]
+        # BADX failed: its (absent) score must not drag the mean. (50 + 80) / 2.
+        assert summary["average_score"] == 65.0
+
+    def test_average_rounds_to_two_decimals(self, engine):
+        wl_id = _make_watchlist(engine, ["AAPL", "MSFT", "GOOG"])
+        with patch(
+            _ANALYZE,
+            side_effect=_fake_analyze_scores(
+                {"AAPL": 10.0, "MSFT": 20.0, "GOOG": 25.0}
+            ),
+        ):
+            analyze_and_save_snapshot(wl_id, engine=engine)
+        summary = list_watchlist_snapshots(wl_id, engine=engine)[0]
+        assert summary["average_score"] == 18.33  # 55/3 = 18.333...
+
+    def test_average_is_none_when_no_successful_results(self, engine):
+        wl_id = _make_watchlist(engine, ["BADX"])
+        with patch(_ANALYZE, side_effect=_fake_analyze_scores({})):
+            analyze_and_save_snapshot(wl_id, engine=engine)
+        summary = list_watchlist_snapshots(wl_id, engine=engine)[0]
+        assert summary["average_score"] is None
+
+    def test_detail_includes_average_score(self, engine):
+        wl_id = _make_watchlist(engine, ["AAPL", "MSFT"])
+        with patch(
+            _ANALYZE,
+            side_effect=_fake_analyze_scores({"AAPL": 30.0, "MSFT": 90.0}),
+        ):
+            saved = analyze_and_save_snapshot(wl_id, engine=engine)
+        detail = get_watchlist_snapshot(saved["id"], engine=engine)
+        assert detail["average_score"] == 60.0
+
+    def test_average_is_per_snapshot_not_global(self, engine):
+        wl_id = _make_watchlist(engine, ["AAPL", "MSFT"])
+        with patch(
+            _ANALYZE,
+            side_effect=_fake_analyze_scores({"AAPL": 20.0, "MSFT": 20.0}),
+        ):
+            analyze_and_save_snapshot(wl_id, engine=engine)
+        with patch(
+            _ANALYZE,
+            side_effect=_fake_analyze_scores({"AAPL": 80.0, "MSFT": 80.0}),
+        ):
+            analyze_and_save_snapshot(wl_id, engine=engine)
+        snaps = list_watchlist_snapshots(wl_id, engine=engine)
+        # Newest first: second snapshot (80) then first (20).
+        assert [s["average_score"] for s in snaps] == [80.0, 20.0]

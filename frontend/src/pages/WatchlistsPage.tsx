@@ -556,8 +556,7 @@ export function WatchlistsPage() {
                     <div className="snapshot-trend-head">
                       <h4 className="snapshot-trend-title">Snapshot trend</h4>
                       <span className="snapshot-trend-meta">
-                        Successful tickers across saved snapshots · historical
-                        data, not live
+                        Historical saved snapshot data — not live
                       </span>
                     </div>
                     <WatchlistSnapshotTrendChart snapshots={snapshots} />

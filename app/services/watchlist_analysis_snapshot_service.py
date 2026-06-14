@@ -29,6 +29,7 @@ Errors (reused from watchlist_service so the API maps them consistently):
 from __future__ import annotations
 
 import json
+import math
 from datetime import datetime, timezone
 from typing import Any
 
@@ -175,9 +176,41 @@ def list_watchlist_snapshots(
         .where(watchlist_analysis_snapshots.c.watchlist_id == watchlist_id)
         .order_by(watchlist_analysis_snapshots.c.id.desc())
     )
+    # One extra query collects the successful-result scores for every snapshot
+    # in this watchlist so we can compute average_score without an N+1 loop.
+    score_stmt = (
+        select(
+            watchlist_analysis_snapshot_results.c.snapshot_id,
+            watchlist_analysis_snapshot_results.c.score,
+        )
+        .select_from(
+            watchlist_analysis_snapshot_results.join(
+                watchlist_analysis_snapshots,
+                watchlist_analysis_snapshot_results.c.snapshot_id
+                == watchlist_analysis_snapshots.c.id,
+            )
+        )
+        .where(
+            watchlist_analysis_snapshots.c.watchlist_id == watchlist_id,
+            watchlist_analysis_snapshot_results.c.status == "success",
+        )
+    )
     with _e.connect() as conn:
         rows = conn.execute(stmt).all()
-    return [_summary_from_row(row) for row in rows]
+        score_rows = conn.execute(score_stmt).all()
+
+    scores_by_snapshot: dict[int, list[float]] = {}
+    for score_row in score_rows:
+        scores_by_snapshot.setdefault(score_row.snapshot_id, []).append(
+            score_row.score
+        )
+
+    return [
+        _summary_from_row(
+            row, average_score=_mean_score(scores_by_snapshot.get(row.id, []))
+        )
+        for row in rows
+    ]
 
 
 def get_watchlist_snapshot(
@@ -195,7 +228,26 @@ def get_watchlist_snapshot(
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _summary_from_row(row: Any) -> dict:
+def _mean_score(scores: list[Any]) -> float | None:
+    """Average of present numeric scores, rounded to 2 decimals.
+
+    Failed-ticker rows carry no score and are passed in as ``None``; they are
+    ignored here. Returns ``None`` when there are no successful scored rows so
+    the response distinguishes "no data" from a real zero average.
+    """
+    valid = [
+        float(s)
+        for s in scores
+        if isinstance(s, (int, float))
+        and not isinstance(s, bool)
+        and math.isfinite(s)
+    ]
+    if not valid:
+        return None
+    return round(sum(valid) / len(valid), 2)
+
+
+def _summary_from_row(row: Any, *, average_score: float | None = None) -> dict:
     return {
         "id": row.id,
         "watchlist_id": row.watchlist_id,
@@ -204,6 +256,7 @@ def _summary_from_row(row: Any) -> dict:
         "total_tickers": row.total_tickers,
         "success_count": row.success_count,
         "failure_count": row.failure_count,
+        "average_score": average_score,
         "created_at": _as_utc(row.created_at),
     }
 
@@ -226,13 +279,15 @@ def _detail_for(conn: Any, snapshot_id: int) -> dict | None:
 
     results: list[dict] = []
     errors: list[dict] = []
+    success_scores: list[Any] = []
     for row in rows:
         if row.status == "success" and row.summary_json:
             results.append(json.loads(row.summary_json))
+            success_scores.append(row.score)
         else:
             errors.append({"ticker": row.ticker, "error": row.error_message or ""})
 
-    detail = _summary_from_row(head)
+    detail = _summary_from_row(head, average_score=_mean_score(success_scores))
     detail["results"] = results
     detail["errors"] = errors
     return detail

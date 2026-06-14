@@ -30,6 +30,9 @@ class WatchlistSnapshotSummary(BaseModel):
     total_tickers: int
     success_count: int
     failure_count: int
+    # Mean score across successful ticker results, computed in the service from
+    # already-stored scores. Null when no successful scored rows exist.
+    average_score: float | None = None
     created_at: datetime
 
 

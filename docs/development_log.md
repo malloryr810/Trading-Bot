@@ -1,5 +1,55 @@
 # Development Log
 
+## 2026-06-13 — Phase 6: Average Score Trend Enhancement
+
+**Goal:** let the user view average score over time alongside successful-ticker
+count, using saved snapshot data only. Average score is **backend-derived** —
+never computed in React.
+
+**Backend (small, service-layer)**
+
+- `app/services/watchlist_analysis_snapshot_service.py` — added `_mean_score`
+  (pure: averages present numeric scores, ignores `None`/non-finite, rounds to 2
+  decimals, returns `None` when there are no successful scored rows). `_summary_from_row`
+  now carries `average_score`. `list_watchlist_snapshots` computes it with one
+  extra grouped query over success result rows (no N+1) joined on `watchlist_id`;
+  `_detail_for` computes it from the snapshot's own success rows. No new column,
+  no schema migration — averages are derived from the existing `score` column on
+  `watchlist_analysis_snapshot_results` (`status == "success"`).
+- `app/api/schemas/watchlist_snapshots.py` — `WatchlistSnapshotSummary` gains
+  `average_score: float | None` (inherited by the detail model).
+
+**Frontend**
+
+- `frontend/src/types/watchlist.ts` — `WatchlistSnapshotSummary.average_score:
+  number | null`.
+- `frontend/src/lib/snapshotTrend.ts` — refactored a shared `buildTrend` core and
+  added `toSnapshotAverageScoreTrendData` (drops null/non-finite averages; same
+  sort/dedup/no-mutate guarantees as the success helper).
+- `frontend/src/lib/snapshotTrend.test.ts` — 7 new cases for the average helper
+  (14 total in the file).
+- `frontend/src/components/charts/WatchlistSnapshotTrendChart.tsx` — added an
+  in-card "Success count" / "Average score" toggle (single line at a time,
+  defaults to Success count). Each metric has its own color, caption, and empty
+  state; average score is labeled "Average score from saved successful ticker
+  results." Still historical-only, still one chart instance with the
+  StockPriceChart cleanup pattern.
+- `frontend/src/pages/WatchlistsPage.tsx` — trend-card meta simplified to
+  "Historical saved snapshot data — not live" (per-metric caption moved into the
+  component). No new API calls; the toggle reuses the already-loaded summaries.
+- `frontend/src/styles.css` — `.snapshot-trend-toggle`/`-btn`/`-caption` styles.
+
+**Behavior**
+
+- Default view unchanged (Success count); toggle switches to Average score.
+- < 2 plottable points for the active metric → metric-specific helpful message.
+- Average score line appears once ≥ 2 snapshots have successful scored results.
+- No extra fetches, no per-ticker price history, no analysis triggered by viewing
+  or toggling the chart. No React-side score computation.
+
+**Checks:** `pytest` (1638 passed, +8), `npm test` (51 passed, +7),
+`npm run build` (clean), `npm run lint` (clean).
+
 ## 2026-06-13 — Phase 6: Snapshot Score Trend Chart
 
 **Goal:** visualize saved watchlist analysis snapshots as a trend over time.

@@ -329,11 +329,14 @@ on-demand analysis run. It is **storage-separate** from watchlist CRUD and from
 - Frontend: an "Analyze & save snapshot" button plus a saved-snapshots list on
   the selected watchlist. A snapshot **detail page** (Milestone 2,
   `/watchlists/:watchlistId/snapshots/:snapshotId`) reuses the detail endpoint to
-  review a saved run read-only. A **snapshot trend chart** (Lightweight Charts
-  line of `success_count` over `analyzed_at`) now sits above the saved-snapshots
-  list, built purely from the already-loaded snapshot summaries — no extra API
-  calls, no backend change. Average-score trend remains deferred (it would need a
-  small, explicit backend summary enhancement with tests).
+  review a saved run read-only. A **snapshot trend chart** (Lightweight Charts)
+  now sits above the saved-snapshots list, built purely from the already-loaded
+  snapshot summaries — no extra API calls. An in-card toggle switches between
+  `success_count` over `analyzed_at` and a backend-derived **`average_score`**
+  over `analyzed_at` (one line at a time; defaults to success count).
+  `average_score` (`float | null`) is computed in the snapshot service from the
+  stored scores of successful result rows only (failed rows ignored; `null` when
+  none) and returned on the snapshot summary — the frontend never computes it.
 - **Tag watchlists** for lightweight categorization.
 - **Add notes per ticker** within a watchlist.
 - **Mock simulation** only much later, and only after the core research workflow

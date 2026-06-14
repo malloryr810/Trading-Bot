@@ -82,6 +82,9 @@ export interface WatchlistSnapshotSummary {
   total_tickers: number
   success_count: number
   failure_count: number
+  // Backend-derived mean score across successful ticker results; null when no
+  // successful scored rows exist. Never recomputed in the frontend.
+  average_score: number | null
   created_at: string
 }
 

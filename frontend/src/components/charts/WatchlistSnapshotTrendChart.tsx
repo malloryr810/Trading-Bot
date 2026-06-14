@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ColorType,
   LineSeries,
   createChart,
   type UTCTimestamp,
 } from 'lightweight-charts'
-import { toSnapshotSuccessTrendData } from '../../lib/snapshotTrend'
+import {
+  toSnapshotAverageScoreTrendData,
+  toSnapshotSuccessTrendData,
+} from '../../lib/snapshotTrend'
 import type { WatchlistSnapshotSummary } from '../../types/watchlist'
 
 interface WatchlistSnapshotTrendChartProps {
@@ -13,14 +16,41 @@ interface WatchlistSnapshotTrendChartProps {
   height?: number
 }
 
+type TrendMetric = 'success' | 'average'
+
+interface MetricConfig {
+  label: string
+  caption: string
+  color: string
+  emptyMessage: string
+}
+
+const METRICS: Record<TrendMetric, MetricConfig> = {
+  success: {
+    label: 'Success count',
+    caption: 'Successful ticker count from saved snapshots.',
+    color: '#3fb98a',
+    emptyMessage: 'Save at least two snapshots to see a trend.',
+  },
+  average: {
+    label: 'Average score',
+    caption: 'Average score from saved successful ticker results.',
+    color: '#4f8cff',
+    emptyMessage:
+      'Save at least two snapshots with successful results to see an average-score trend.',
+  },
+}
+
 const DEFAULT_HEIGHT = 240
 const MIN_POINTS = 2
 
 /**
- * Line chart of successful-ticker count across saved watchlist snapshots
- * (Lightweight Charts), themed for the dark dashboard. It plots only the
- * `success_count` already saved on each snapshot summary — no new fetches, no
- * analysis. Historical data only; it never refreshes on its own.
+ * Trend chart for saved watchlist snapshots (Lightweight Charts), themed for the
+ * dark dashboard. A toggle switches between two single-line views — successful
+ * ticker count and backend-derived average score — so the two units never share
+ * an axis. It plots only values already saved on each snapshot summary: no new
+ * fetches, no analysis, no average computed in the frontend. Historical data
+ * only; it never refreshes on its own.
  *
  * The chart instance is created on mount/update and removed on unmount; it
  * resizes to its container width via a ResizeObserver, mirroring StockPriceChart.
@@ -29,14 +59,22 @@ export function WatchlistSnapshotTrendChart({
   snapshots,
   height = DEFAULT_HEIGHT,
 }: WatchlistSnapshotTrendChartProps) {
+  const [metric, setMetric] = useState<TrendMetric>('success')
   const containerRef = useRef<HTMLDivElement>(null)
+
   const data = useMemo(
-    () => toSnapshotSuccessTrendData(snapshots),
-    [snapshots],
+    () =>
+      metric === 'success'
+        ? toSnapshotSuccessTrendData(snapshots)
+        : toSnapshotAverageScoreTrendData(snapshots),
+    [snapshots, metric],
   )
 
+  const config = METRICS[metric]
+  const hasTrend = data.length >= MIN_POINTS
+
   useEffect(() => {
-    if (data.length < MIN_POINTS) return
+    if (!hasTrend) return
     const el = containerRef.current
     if (!el) return
 
@@ -61,7 +99,7 @@ export function WatchlistSnapshotTrendChart({
     })
 
     const series = chart.addSeries(LineSeries, {
-      color: '#3fb98a',
+      color: config.color,
       lineWidth: 2,
       priceLineVisible: false,
       pointMarkersVisible: true,
@@ -81,15 +119,35 @@ export function WatchlistSnapshotTrendChart({
       observer.disconnect()
       chart.remove()
     }
-  }, [data, height])
+  }, [data, hasTrend, height, config.color])
 
-  if (data.length < MIN_POINTS) {
-    return (
-      <p className="empty-state">
-        Save at least two snapshots to see a trend.
-      </p>
-    )
-  }
+  return (
+    <div className="snapshot-trend">
+      <div
+        className="snapshot-trend-toggle"
+        role="group"
+        aria-label="Trend metric"
+      >
+        {(Object.keys(METRICS) as TrendMetric[]).map((key) => (
+          <button
+            key={key}
+            type="button"
+            className="snapshot-trend-toggle-btn"
+            aria-pressed={metric === key}
+            onClick={() => setMetric(key)}
+          >
+            {METRICS[key].label}
+          </button>
+        ))}
+      </div>
 
-  return <div ref={containerRef} className="snapshot-trend-chart" />
+      <p className="snapshot-trend-caption">{config.caption}</p>
+
+      {hasTrend ? (
+        <div ref={containerRef} className="snapshot-trend-chart" />
+      ) : (
+        <p className="empty-state">{config.emptyMessage}</p>
+      )}
+    </div>
+  )
 }
