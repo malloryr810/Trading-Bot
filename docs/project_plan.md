@@ -87,6 +87,11 @@ later phases, in rough priority order.
 
 ### Near-Term
 
+- **Frontend redesign — dark AI research dashboard.** Evolve the functional MVP
+  into a dark, left-sidebar dashboard focused on researching stocks and (later)
+  tracking a manually entered portfolio. Direction and phased UI roadmap are in
+  `docs/ui_dashboard_vision.md`. Display/input layer only — no backend scoring,
+  trading, alerts, or portfolio automation.
 - Improved scoring calibration — better-tuned weights and thresholds, validated
   against historical data (see `docs/scoring_calibration_plan.md`)
 - Better data validation — richer error messages for missing or stale data fields

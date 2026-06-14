@@ -6,6 +6,13 @@
 > report history + detail pages originally scoped as "Milestone 2" are complete.
 > The sections below are retained as the original design plan; see `CLAUDE.md`
 > and `docs/development_log.md` for the current implemented state.
+>
+> **Direction update:** The frontend is evolving from this functional MVP into a
+> dark, sidebar-driven AI stock research dashboard (with optional manual
+> portfolio tracking later). The visual/layout direction and the phased UI
+> roadmap now live in **`docs/ui_dashboard_vision.md`**. The API contract,
+> endpoint behavior, and data-ownership rules in this document remain the binding
+> reference for those concerns.
 
 ---
 

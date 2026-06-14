@@ -1,5 +1,27 @@
 # Development Log
 
+## 2026-06-13 — UI vision & dashboard redesign planning doc
+
+**Goal:** define the new frontend direction before any UI code changes.
+Documentation only — no frontend, backend, schema, route, API, or scoring
+changes.
+
+- Added `docs/ui_dashboard_vision.md`: product vision (AI stock research
+  dashboard + optional manual portfolio later), what the app is/is not, dark
+  finance visual direction, permanent left-sidebar navigation model, target page
+  structure, dashboard information architecture (with per-block real vs
+  Demo/Coming-Soon data status), component/layout plan, real-vs-placeholder data
+  rules, chart roadmap (daily history → sparklines → score trend → intraday),
+  manual portfolio roadmap (manual holdings only, no broker), live-data
+  considerations, a 9-phase UI roadmap, explicit guardrails, and a first-
+  milestone recommendation (Phase 2 — App Shell Redesign).
+- Updated `docs/frontend_plan.md`: added a direction-update note pointing to the
+  new UI vision doc; existing API contract and data-ownership rules unchanged.
+- Updated `docs/project_plan.md`: added a near-term "Frontend redesign — dark AI
+  research dashboard" entry referencing the vision doc.
+- Verified `git diff --stat` touches docs only; no code/backend/schema/API/
+  scoring behavior changed.
+
 ## 2026-06-13 — Frontend tooling hygiene (Node version + npm audit review)
 
 **Goal:** clean up frontend tooling/docs around the Node engine warning and npm
