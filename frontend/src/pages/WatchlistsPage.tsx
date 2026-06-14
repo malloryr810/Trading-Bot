@@ -15,6 +15,7 @@ import {
 import { ErrorMessage } from '../components/ErrorMessage'
 import { LoadingState } from '../components/LoadingState'
 import { PageHeader } from '../components/layout/PageHeader'
+import { WatchlistSnapshotTrendChart } from '../components/charts/WatchlistSnapshotTrendChart'
 import { AnalysisResultCard } from '../components/watchlist/AnalysisResultCard'
 import { WatchlistCard } from '../components/watchlist/WatchlistCard'
 import { getErrorMessage } from '../lib/errors'
@@ -479,8 +480,7 @@ export function WatchlistsPage() {
 
                 <p className="watchlist-future-note">
                   <span className="soon-tag">Soon</span> Per-ticker mini price
-                  charts and snapshot score trends are planned for a later
-                  milestone.
+                  charts are planned for a later milestone.
                 </p>
 
                 {analyzing && (
@@ -550,6 +550,20 @@ export function WatchlistsPage() {
                 {snapshotsLoading && (
                   <LoadingState message="Loading snapshots…" />
                 )}
+
+                {!snapshotsLoading && snapshots.length > 0 && (
+                  <div className="snapshot-trend-card">
+                    <div className="snapshot-trend-head">
+                      <h4 className="snapshot-trend-title">Snapshot trend</h4>
+                      <span className="snapshot-trend-meta">
+                        Successful tickers across saved snapshots · historical
+                        data, not live
+                      </span>
+                    </div>
+                    <WatchlistSnapshotTrendChart snapshots={snapshots} />
+                  </div>
+                )}
+
                 {!snapshotsLoading && snapshots.length === 0 && (
                   <p className="empty-state">
                     No saved snapshots yet — use “Analyze &amp; save snapshot”.

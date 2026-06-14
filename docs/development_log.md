@@ -1,5 +1,44 @@
 # Development Log
 
+## 2026-06-13 — Phase 6: Snapshot Score Trend Chart
+
+**Goal:** visualize saved watchlist analysis snapshots as a trend over time.
+Frontend only — reuses the snapshot summaries already returned by
+`GET /api/watchlists/{id}/analysis-snapshots`. No new API calls, no backend,
+schema, scoring, scheduling, or trading changes.
+
+**What changed**
+
+- `frontend/src/lib/snapshotTrend.ts` — pure helper `toSnapshotSuccessTrendData`
+  converts snapshot summaries into a chronological `success_count` series
+  (epoch seconds + value). Drops unparseable timestamps / non-finite counts,
+  sorts ascending (the list endpoint returns newest first), collapses duplicate
+  timestamps (Lightweight Charts requires strictly ascending, unique times), and
+  never mutates its input.
+- `frontend/src/lib/snapshotTrend.test.ts` — 7 Vitest cases.
+- `frontend/src/components/charts/WatchlistSnapshotTrendChart.tsx` — Lightweight
+  Charts line chart of successful-ticker count across saved snapshots, themed for
+  the dark dashboard. Follows the StockPriceChart cleanup pattern (create on
+  mount/update, ResizeObserver, remove on unmount). Shows "Save at least two
+  snapshots to see a trend." when fewer than 2 plottable points exist.
+- `frontend/src/pages/WatchlistsPage.tsx` — added a "Snapshot trend" card above
+  the saved-snapshots list, rendered only when snapshots have loaded for the
+  selected watchlist. Uses the already-loaded summaries (no extra fetch). Removed
+  the "snapshot score trends" line from the future-feature note. Existing
+  analyze-only, analyze-and-save, and snapshot detail links are unchanged.
+- `frontend/src/styles.css` — styles for `.snapshot-trend-card` and
+  `.snapshot-trend-chart`.
+
+**Behavior**
+
+- Chart is labeled "historical data, not live" and never refreshes on its own.
+- Data source: only `analyzed_at` + `success_count` from snapshot summaries.
+- < 2 snapshots: helpful in-card message. 0 snapshots: trend card is hidden and
+  the existing "No saved snapshots yet" empty state shows.
+
+**Checks:** `npm test` (44 passed), `npm run build` (clean), `npm run lint`
+(clean), `pytest` (1630 passed).
+
 ## 2026-06-13 — Phase 6: Snapshot Detail UI (Milestone 2)
 
 **Goal:** let the user open a saved watchlist analysis snapshot and review the
