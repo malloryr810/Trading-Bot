@@ -558,21 +558,29 @@ export function WatchlistsPage() {
                 {snapshots.length > 0 && (
                   <ul className="snapshot-list">
                     {snapshots.map((snap) => (
-                      <li key={snap.id} className="snapshot-row">
-                        <span className="snapshot-date">
-                          {formatTimestamp(snap.analyzed_at)}
-                        </span>
-                        <span className="snapshot-counts">
-                          <span>{snap.total_tickers} tickers</span>
-                          <span className="snapshot-ok">
-                            {snap.success_count} ok
+                      <li key={snap.id}>
+                        <Link
+                          to={`/watchlists/${snap.watchlist_id}/snapshots/${snap.id}`}
+                          className="snapshot-row"
+                        >
+                          <span className="snapshot-date">
+                            {formatTimestamp(snap.analyzed_at)}
                           </span>
-                          {snap.failure_count > 0 && (
-                            <span className="snapshot-fail">
-                              {snap.failure_count} failed
+                          <span className="snapshot-counts">
+                            <span>{snap.total_tickers} tickers</span>
+                            <span className="snapshot-ok">
+                              {snap.success_count} ok
                             </span>
-                          )}
-                        </span>
+                            {snap.failure_count > 0 && (
+                              <span className="snapshot-fail">
+                                {snap.failure_count} failed
+                              </span>
+                            )}
+                            <span className="snapshot-open" aria-hidden="true">
+                              →
+                            </span>
+                          </span>
+                        </Link>
                       </li>
                     ))}
                   </ul>

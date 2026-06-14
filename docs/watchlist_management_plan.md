@@ -327,8 +327,10 @@ on-demand analysis run. It is **storage-separate** from watchlist CRUD and from
   - `GET  /api/watchlists/{id}/analysis-snapshots` — list summaries (newest first).
   - `GET  /api/watchlist-analysis-snapshots/{snapshot_id}` — full detail.
 - Frontend: an "Analyze & save snapshot" button plus a saved-snapshots list on
-  the selected watchlist. Snapshot detail page and score-trend charts are
-  deferred to a later milestone.
+  the selected watchlist. A snapshot **detail page** (Milestone 2,
+  `/watchlists/:watchlistId/snapshots/:snapshotId`) reuses the detail endpoint to
+  review a saved run read-only. Score-trend charts are deferred to a later
+  milestone.
 - **Tag watchlists** for lightweight categorization.
 - **Add notes per ticker** within a watchlist.
 - **Mock simulation** only much later, and only after the core research workflow

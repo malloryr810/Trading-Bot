@@ -1,5 +1,52 @@
 # Development Log
 
+## 2026-06-13 — Phase 6: Snapshot Detail UI (Milestone 2)
+
+**Goal:** let the user open a saved watchlist analysis snapshot and review the
+historical run without re-running analysis. Frontend only — reuses the existing
+`GET /api/watchlist-analysis-snapshots/{id}` endpoint. No backend/schema/API,
+scoring, scheduling, or trading changes.
+
+**New route / page**
+
+- Route `/watchlists/:watchlistId/snapshots/:snapshotId` registered in
+  `App.tsx`.
+- `frontend/src/pages/WatchlistSnapshotDetailPage.tsx` — fetches detail via the
+  existing `getWatchlistSnapshot` client function (mounted per-id; state set only
+  in async callbacks). Loading / error / invalid-id / empty states. Back link to
+  Watchlists.
+
+**Detail page sections**
+
+- Header: watchlist name + "Historical record of a manually triggered watchlist
+  analysis."
+- Historical-data notice stating the data is saved/point-in-time and does not
+  refresh or show current prices.
+- Summary tiles: total / successful / failed / analyzed timestamp.
+- Successful results: reuses `AnalysisResultCard`, sorted best-score-first
+  (display-only via existing `sortByScoreDesc`; nothing recomputed in React).
+- Failed results: ticker + error, visually separated (reuses existing
+  `analysis-errors` styles).
+
+**Watchlists page integration**
+
+- Each saved-snapshot row is now a `Link` to the detail route (uses the row's
+  `watchlist_id` + `id`). Analyze-only and analyze-and-save behavior unchanged.
+
+**Other**
+
+- CSS for the detail layout + snapshot-row link hover in `styles.css`.
+- No new dependencies, no charts/sparklines/trend views, no new API calls beyond
+  the existing snapshot-detail fetch.
+
+**Checks**
+
+- `npm run lint` clean · `npm test` 37/37 · `npm run build` green ·
+  `pytest` 1630 passed (no backend touched).
+- Live smoke (temp `DATABASE_PATH`): saved a snapshot with one success (AAPL) and
+  one failure; the detail endpoint returned name, counts, full per-ticker report,
+  and the error; invalid id → 404. Vite dev served the new route with 200.
+
 ## 2026-06-13 — Phase 6: Saved Watchlist Analysis Snapshots (Milestone 1)
 
 **Goal:** let an explicitly user-triggered watchlist analysis run be saved as a
