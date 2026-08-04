@@ -105,7 +105,9 @@ is documented in `docs/development_log.md`; do not run `npm audit fix --force`
 | `app/reports/templates.py` | Three public formatters: `format_plain_text_report()` (terminal), `format_report_markdown()` (single-ticker Markdown), `format_watchlist_markdown()` (watchlist Markdown) |
 | `app/watchlist.py` | Loads watchlist files, scans multiple tickers, formats ranked summary tables, and serializes results |
 | `app/utils/helpers.py` | Shared low-level helpers: `safe_float` and `normalize_ticker` |
-| `app/services/stock_analysis_service.py` | `analyze_stock` — public entry point for all callers (CLI and API); `_analyze_ticker` is internal |
+| `app/models/universe.py` | Typed `UniverseEntry` / `UniverseInfo` Pydantic models; one row of a stock-universe file and universe metadata |
+| `app/models/discovery.py` | Typed discovery models: `DiscoveryMode` enum, `DiscoveryModeInfo`, `DiscoveryCandidate`, `DiscoveryStage`, `DiscoveryWarning`, `DiscoveryRun`. Every scored field is copied from `Rating`; discovery owns only `rank` + `match_reason` |
+| `app/services/stock_analysis_service.py` | `analyze_stock` — public entry point for all callers (CLI and API); `analyze_stock_rating` — same pipeline returning the raw `Rating` (sub-scores) for discovery ranking; `_analyze_ticker` is internal |
 | `app/services/report_persistence_service.py` | `save_stock_report`, `list_saved_reports`, `get_saved_report` — SQLite persistence boundary |
 | `app/services/watchlist_service.py` | Watchlist + ticker CRUD over SQLite (storage only); `WatchlistValidationError`/`WatchlistNotFoundError`; optional `engine` kwarg for tests |
 | `app/services/watchlist_analysis_service.py` | `analyze_watchlist` — reuses `get_watchlist` + `analyze_stock` to analyze every ticker in a saved watchlist; partial success (per-ticker errors captured); analysis-only, nothing saved. Surfaced in the UI via the Watchlists page "Analyze watchlist" button |
@@ -113,6 +115,11 @@ is documented in `docs/development_log.md`; do not run `npm audit fix --force`
 | `app/services/market_data_service.py` | `get_price_history_response` — builds the read-only price-history response (JSON-safe nullable OHLCV) from `market_data`; no analysis/scoring |
 | `app/services/portfolio_service.py` | Portfolio + holding CRUD over SQLite (storage only; no market data). Decimal-safe `shares`/`average_cost` validation; `PortfolioValidationError`/`PortfolioNotFoundError`/`HoldingNotFoundError`/`DuplicateHoldingError`; one ticker per portfolio; cascade-deletes holdings; optional `engine` kwarg for tests |
 | `app/services/portfolio_summary_service.py` | `get_portfolio_summary` — enriches a portfolio with current prices (reuses `market_data`) and computes holding + portfolio values with `Decimal` math. Prices fetched only here, never during CRUD. Partial/complete price failure is non-fatal (per-holding `price_available` + `warnings`); market-value-dependent totals exclude unpriced holdings and are `None` (never zero) when nothing is priced. Optional `price_lookup`/`engine` kwargs for tests |
+| `app/services/discovery_screening.py` | `prescreen_ticker` — stage-1 lightweight validity check (fetchable history, ≥60 daily bars, positive last close, usable average volume). Returns a `PrescreenResult`; never raises, never scores |
+| `app/services/discovery_ranking.py` | Pure per-mode ranking strategies over existing `Rating` objects (`rank_ratings`, `match_reason`, `valuation_lean`, `list_mode_info`). Ordering only — no scoring, ties broken by ticker |
+| `app/services/discovery_service.py` | `run_discovery`, `list_discovery_modes`, `list_discovery_universes` — universe → bounded pre-screen → `analyze_stock_rating` → mode ranking → `DiscoveryRun`. Bounded by `max_full_analysis`; per-ticker failures become warnings; `DiscoveryValidationError` → 400. Optional `analyze`/`prescreen` kwargs for tests. Nothing saved, nothing scheduled |
+| `app/data/universe_loader.py` | Loads the static, versioned universe CSVs in `app/data/universes/` (`load_universe`, `load_universe_file`, `list_universes`); validates ticker uniqueness/normalization; caches per key. No network access |
+| `app/data/universes/starter_large_cap.csv` | The only universe today: a hand-maintained set of liquid large-cap U.S. equities (`ticker,company_name,sector,industry`) |
 | `app/data/database.py` | SQLAlchemy Core engine factory (`build_engine`) and table definitions: `analysis_reports`, `watchlists`, `watchlist_tickers`, `watchlist_analysis_snapshots`, `watchlist_analysis_snapshot_results`, `portfolios`, `portfolio_holdings` |
 | `app/api/main.py` | FastAPI app factory; `uvicorn app.api.main:app` entry point |
 | `app/api/routes/health.py` | `GET /api/health` |
@@ -122,7 +129,9 @@ is documented in `docs/development_log.md`; do not run `npm audit fix --force`
 | `app/api/routes/watchlist_snapshots.py` | `POST`/`GET /api/watchlists/{id}/analysis-snapshots`, `GET /api/watchlist-analysis-snapshots/{id}` — saved snapshot save/list/detail; thin, delegate to snapshot service |
 | `app/api/routes/market_data.py` | `GET /api/market-data/{ticker}/history` — read-only daily OHLCV history |
 | `app/api/routes/portfolios.py` | Portfolio + holding CRUD — `GET/POST /api/portfolios`, `GET/PATCH/DELETE /api/portfolios/{id}`, `POST /api/portfolios/{id}/holdings`, `PATCH`/`DELETE` `/api/portfolios/{id}/holdings/{holding_id}`, `GET /api/portfolios/{id}/summary` (priced). Thin; validation→400, duplicate ticker→409, missing→404; summary stays 200 on price failure |
+| `app/api/routes/discovery.py` | `GET /api/discovery` (ranked candidates; `mode`, `universe`, `limit`, `max_full_analysis`), `GET /api/discovery/modes`, `GET /api/discovery/universes`. Thin; invalid params → 400, partial ticker failures stay 200 with `warnings` |
 | `app/api/schemas/analysis.py` | `AnalyzeRequest` — validates and normalizes ticker at the API boundary |
+| `app/api/schemas/discovery.py` | Names the discovery domain models for the HTTP layer (`DiscoveryResponse`, `DiscoveryModeResponse`, `DiscoveryUniverseResponse`); no duplicate field definitions |
 | `app/api/schemas/reports.py` | `SavedReportSummary`, `SavedReportDetail` — response schemas for persistence endpoints |
 | `app/api/schemas/watchlists.py` | Watchlist request/response schemas (`CreateWatchlistRequest`, `UpdateWatchlistRequest`, `AddTickerRequest`, `WatchlistSummary`, `WatchlistDetail`, `DeleteResponse`, plus analyze-watchlist: `WatchlistAnalysisResponse`/`Result`/`Error`) |
 | `app/api/schemas/watchlist_snapshots.py` | `WatchlistSnapshotSummary` (incl. `average_score: float \| null`), `WatchlistSnapshotDetail` |
@@ -137,10 +146,11 @@ is documented in `docs/development_log.md`; do not run `npm audit fix --force`
 | `frontend/src/api/reportsApi.ts` | `listSavedReports`, `getSavedReport` — read-only saved-report history |
 | `frontend/src/api/marketDataApi.ts` | `getPriceHistory` — read-only daily price history |
 | `frontend/src/api/portfolioApi.ts` | Portfolio + holding CRUD and `getPortfolioSummary` — one per `/api/portfolios*` endpoint |
-| `frontend/src/components/` | Presentational only: `LoadingState`, `ErrorMessage`, `StockReportView`; `layout/` (`AppShell`, `Sidebar`, `PageHeader`); `charts/` (`StockPriceChart`, `WatchlistSnapshotTrendChart`); `dashboard/` (`ComingSoonCard`); `watchlist/` (`WatchlistCard`, `AnalysisResultCard`); `portfolio/` (`PortfolioPanel` container + `PortfolioSelector`, `PortfolioSummaryCards`, `HoldingsTable`, `HoldingForm`) |
-| `frontend/src/lib/` | Pure, tested helpers: `format`, `errors`, `sort`, `dashboard`, `watchlist`, `chartData`, `snapshotTrend`, `portfolio` (money/percent/share formatting + holding-form validation). Display-only — never recompute scores/categories/averages/portfolio totals |
-| `frontend/src/pages/` | `DashboardPage` (portfolio panel, summary cards, health/source status), `AnalyzePage` (analyze + report + price chart), `WatchlistsPage` (CRUD + on-demand analyze + save snapshot + snapshot list/trend chart), `WatchlistSnapshotDetailPage` (`/watchlists/:watchlistId/snapshots/:snapshotId`), `SavedReportsPage` (`/reports`), `ReportDetailPage` (`/reports/:id`) |
-| `frontend/src/types/` | `report.ts`, `watchlist.ts` (incl. snapshot summary/detail + `average_score`), `marketData.ts`, `portfolio.ts` — mirror backend schemas |
+| `frontend/src/api/discoveryApi.ts` | `listDiscoveryModes`, `listDiscoveryUniverses`, `runDiscovery` — one per `/api/discovery*` endpoint |
+| `frontend/src/components/` | Presentational only: `LoadingState`, `ErrorMessage`, `StockReportView`; `layout/` (`AppShell`, `Sidebar`, `PageHeader`); `charts/` (`StockPriceChart`, `WatchlistSnapshotTrendChart`); `dashboard/` (`ComingSoonCard`); `watchlist/` (`WatchlistCard`, `AnalysisResultCard`); `portfolio/` (`PortfolioPanel` container + `PortfolioSelector`, `PortfolioSummaryCards`, `HoldingsTable`, `HoldingForm`); `discovery/` (`DiscoveryControls`, `DiscoveryCandidateCard`, `DiscoveryWarnings`) |
+| `frontend/src/lib/` | Pure, tested helpers: `format`, `errors`, `sort`, `dashboard`, `watchlist`, `chartData`, `snapshotTrend`, `portfolio` (money/percent/share formatting + holding-form validation), `discovery` (query building, mode labels, score/price formatting, run + warning summaries). Display-only — never recompute scores/categories/averages/portfolio totals/discovery ranking |
+| `frontend/src/pages/` | `DashboardPage` (portfolio panel, summary cards, health/source status), `DiscoverPage` (`/discover` — mode/universe/limit controls + ranked candidates), `AnalyzePage` (analyze + report + price chart), `WatchlistsPage` (CRUD + on-demand analyze + save snapshot + snapshot list/trend chart), `WatchlistSnapshotDetailPage` (`/watchlists/:watchlistId/snapshots/:snapshotId`), `SavedReportsPage` (`/reports`), `ReportDetailPage` (`/reports/:id`) |
+| `frontend/src/types/` | `report.ts`, `watchlist.ts` (incl. snapshot summary/detail + `average_score`), `marketData.ts`, `portfolio.ts`, `discovery.ts` — mirror backend schemas |
 
 ## Architecture
 
@@ -164,6 +174,13 @@ data/ → analysis/ → scoring.py → reports/ → services/ → CLI / API
 
 `app/watchlist.py` orchestrates the single-stock pipeline across multiple tickers.
 
+Stock discovery wraps the same pipeline in one extra flow:
+
+```
+universes/*.csv → universe_loader → discovery pre-screen → bounded shortlist
+    → analyze_stock_rating (existing pipeline) → discovery_ranking → /api/discovery → Discover page
+```
+
 ## Layer Rules
 
 - **Data modules** fetch and clean data only. No analysis or scoring logic.
@@ -180,7 +197,8 @@ data/ → analysis/ → scoring.py → reports/ → services/ → CLI / API
 - **Persistence service functions** accept an optional `engine` keyword argument for test injection. Production callers omit it; a shared engine is lazily initialised on first call.
 - **Watchlist management** (`watchlist_service` + `/api/watchlists`) is storage/CRUD only — it never runs analysis, scans, alerts, or trades. It is separate from `app/watchlist.py`, which is the CLI multi-ticker analysis scanner. Do not merge the two; do not add analysis to the watchlist CRUD layer without an explicitly scoped task.
 - **Portfolio holdings** (`portfolio_service` + `/api/portfolios`) are manually entered, real holdings for tracking only. `portfolio_service` is storage/CRUD and fetches no market data; `portfolio_summary_service` is the only place current prices are fetched (reusing `app/data/market_data`) and the only place portfolio math runs. Keep these two separate — do not fetch prices during CRUD, and do not put calculations in routes. This is decision-support only: never add broker links, order execution, cash balances, realized gains, dividends, tax lots, or automatic trading.
-- **Frontend** owns no business logic: it calls the typed API client and formats results for display. It must not recalculate scores, categories, weights, portfolio totals, or re-validate domain rules the backend already enforces (the holding-form check in `lib/portfolio` is pre-submit UX only; the backend stays authoritative).
+- **Stock discovery** (`discovery_service` + `/api/discovery`) is a layer *around* the existing analysis engine, never a second one. It must not define scores, weights, thresholds, categories, or confidence logic — `discovery_ranking` may only reorder existing `Rating` objects and explain the ordering. Every run stays bounded by `max_full_analysis` (ceiling 50) and is synchronous, on-demand, and unsaved: no scheduled scans, no background jobs, no persistence. Universes are static CSVs in `app/data/universes/` — never scraped or fetched at runtime. Per-ticker failures become `warnings`, never a failed request.
+- **Frontend** owns no business logic: it calls the typed API client and formats results for display. It must not recalculate scores, categories, weights, portfolio totals, discovery ranking, or re-validate domain rules the backend already enforces (the holding-form check in `lib/portfolio` is pre-submit UX only; the backend stays authoritative).
 
 ## Scoring Weights
 
@@ -224,6 +242,7 @@ Each analysis module follows the same pattern:
 | 6 | Research notes and report history UI | **Report history UI done** — Saved Reports list (`/reports`) and Report Detail (`/reports/:id`) over the existing read endpoints. Research notes not started |
 | — | Market-data chart (read-only) | **Done** — `market_data_service` + `GET /api/market-data/{ticker}/history`; daily price chart on the Analyze page (Lightweight Charts) |
 | — | Personal portfolio holdings (manual) | **Milestone 1 complete** — `portfolios`/`portfolio_holdings` tables, `portfolio_service` (CRUD) + `portfolio_summary_service` (priced summary), `/api/portfolios` CRUD + `GET /{id}/summary`, Dashboard `PortfolioPanel`. Manual entry only; current-price valuation via existing market-data layer; partial-price-failure tolerant. No broker links, cash, realized gains, dividends, tax lots, or trading |
+| — | Stock discovery engine | **Milestone 1 complete** — static `starter_large_cap` universe + `universe_loader`, stage-1 pre-screen, bounded full analysis (`max_full_analysis`, default 25/ceiling 50), six deterministic ranking modes (`overall`, `momentum`, `quality`, `value`, `defensive`, `avoid`), `GET /api/discovery(+/modes,/universes)`, Discover page. Rule-based and explainable; no ML, no LLM picks, no scoring changes, nothing saved or scheduled |
 | 7 | Mock trading simulation (`app/simulation/`) | Not started |
 | 8 | ML research layer (`app/ml/`) | Not started |
 | 9 | Deployment and hardening | Not started |
@@ -233,7 +252,10 @@ See `docs/full_stack_product_architecture.md` for full scope of each phase.
 **Current priority: code quality and research quality, not more dashboard polish.**
 Do not start the next visual feature (e.g. per-ticker sparklines, batch
 price-history endpoint) without an explicitly scoped task.
-Snapshot/report/watchlist/portfolio concerns are separate and must stay separate.
+Snapshot/report/watchlist/portfolio/discovery concerns are separate and must stay separate.
+Discovery is a bounded, on-demand research surface — do not extend it toward
+scheduled scans, alerts, saved discovery runs, larger universes, ML, or
+LLM-generated picks without an explicitly scoped task.
 Portfolio holdings are manual-entry tracking only — do not extend them toward
 paper trading, cash, realized P&L, dividends, tax lots, or broker links without
 an explicitly scoped task.
@@ -247,6 +269,8 @@ These apply to every phase and every task:
 - **No order execution** — no scheduled or triggered buy/sell of any kind
 - **No options or margin** — equities only; no derivatives or leveraged positions
 - **Portfolio is manual + read-only** — holdings are hand-entered for tracking; never connect a brokerage account, sync positions, or trade. No cash balances, realized gains, dividends, or tax lots
+- **Discovery is research, not advice** — discovery output is a rule-based, explainable candidate list. Never generate picks with an LLM or ML model, never change scoring rules to make discovery "work", and never let a discovery run trigger an order, an alert, or a scheduled scan
+- **No unbounded scans** — a single discovery request may never analyze more than `MAX_FULL_ANALYSIS_CEILING` tickers
 - **No route-handler logic** — API routes call services; they never contain pipeline logic
 - **No CLI regression** — `python -m app.main` must always work after any change
 - **No premature ML** — do not add `app/ml/` until Phase 8 is explicitly scoped

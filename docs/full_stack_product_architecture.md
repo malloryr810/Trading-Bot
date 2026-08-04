@@ -158,6 +158,21 @@ POST /api/mock-trades              — record a simulated trade decision
 GET  /api/mock-portfolio           — current simulated positions and performance
 ```
 
+### Discovery routes (built)
+
+```
+GET  /api/discovery                — ranked candidates from a controlled universe
+                                     (mode, universe, limit, max_full_analysis)
+GET  /api/discovery/modes          — supported ranking modes and their rules
+GET  /api/discovery/universes      — registered stock universes and their sizes
+```
+
+Discovery wraps the existing pipeline rather than extending it: a static
+universe CSV is pre-screened for usable price data, a bounded shortlist is run
+through `analyze_stock_rating`, and the results are ordered by a deterministic
+per-mode sort. It defines no scores, weights, thresholds, or categories of its
+own, saves nothing, and schedules nothing.
+
 ### Route handler rules
 
 - Route handlers must be thin. Validate the request, call the service, return the result.
@@ -334,6 +349,12 @@ Vite frontend, watchlist management (CRUD + on-demand analysis), and the report
 history/detail UI are all built and tested. See `docs/development_log.md` for the
 per-milestone history and `docs/project_plan.md` for the full completed list.
 
+The stock discovery engine (Milestone 1) is also built: a static starter
+universe plus universe loader, a stage-1 pre-screen, bounded full analysis, six
+deterministic ranking modes, the `/api/discovery*` routes, and the Discover
+page. It is rule-based, explainable, on-demand, and unsaved — no ML, no
+LLM-generated picks, and no change to the scoring rules.
+
 No code milestone is currently in progress. The remaining phases are gated and
 require explicit scoping and approval before any implementation begins:
 
@@ -348,4 +369,5 @@ saved watchlist-analysis snapshots, and scoring calibration improvements.
 
 **Do not add** without an explicitly scoped task: broker/trading integration,
 order execution, scheduled scans, alerts, background jobs, mock trading, ML
-scoring, or portfolio logic.
+scoring, portfolio logic, or an expansion of discovery (larger universes, saved
+discovery runs, scheduled scans, or ML/LLM-driven picks).

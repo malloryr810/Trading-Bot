@@ -7,6 +7,7 @@ Provides reusable analysis functions that can be called by both the CLI
 Functions:
     _analyze_ticker — internal; run the full pipeline; return a Rating.
     analyze_stock   — run the full pipeline; return a StockReport.
+    analyze_stock_rating — run the full pipeline; return the raw Rating.
     analyze_watchlist_file — load a watchlist file and analyze all tickers.
 """
 
@@ -99,6 +100,26 @@ def analyze_stock(ticker: str) -> StockReport:
     """
     rating = _analyze_ticker(ticker)
     return build_stock_report(rating)
+
+
+def analyze_stock_rating(ticker: str) -> Rating:
+    """Run the full analysis pipeline and return the raw Rating.
+
+    Same pipeline as ``analyze_stock`` — this is simply the entry point for
+    callers that need the scoring engine's per-category sub-scores (which the
+    StockReport contract does not carry), such as the discovery service's mode
+    ranking. It performs no analysis or scoring of its own.
+
+    Args:
+        ticker: Stock ticker symbol (e.g. "AAPL").
+
+    Returns:
+        The composite Rating produced by the scoring engine.
+
+    Raises:
+        Same exceptions as _analyze_ticker.
+    """
+    return _analyze_ticker(ticker)
 
 
 def analyze_watchlist_file(path: str) -> list[WatchlistResult]:

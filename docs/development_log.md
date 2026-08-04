@@ -1,5 +1,125 @@
 # Development Log
 
+## 2026-08-03 — Stock discovery engine (Milestone 1)
+
+Added the first version of the stock discovery engine: the app can now surface
+and rank candidate stocks from a controlled universe instead of only analyzing
+tickers the user types in. Full-stack: universe layer, screening, ranking, API,
+Discover page, tests, docs.
+
+Deterministic and rule-based end to end. **No ML, no LLM-generated picks, no
+scoring-rule changes, no broker/trading behavior, no scheduled scans, no
+persistence, and no new dependencies.** Discovery is a layer *around* the
+existing analysis engine — it never scores anything itself.
+
+Backend:
+
+- `app/data/universes/starter_large_cap.csv` — the one universe for now: 48
+  liquid large-cap U.S. equities (`ticker,company_name,sector,industry`), static
+  and versioned in the repo. Nothing is scraped or fetched at runtime.
+- `app/data/universe_loader.py` — `load_universe(key)` / `load_universe_file(path)`
+  / `list_universes()`. Validates the header, normalizes tickers through the
+  shared `normalize_ticker`, rejects duplicates (case-insensitive), skips blank
+  padding rows, and caches per key. A small registry maps keys to files so future
+  universes (S&P 500, Nasdaq 100, sector lists, a watchlist, portfolio holdings)
+  can be added without touching the loading logic.
+- `app/models/universe.py` — `UniverseEntry`, `UniverseInfo`.
+- `app/models/discovery.py` — `DiscoveryMode` enum, `DiscoveryModeInfo`,
+  `DiscoveryCandidate`, `DiscoveryStage`, `DiscoveryWarning`, `DiscoveryRun`.
+  Every scored field on a candidate is copied verbatim from the `Rating`;
+  discovery owns only `rank` and `match_reason`.
+- `app/services/discovery_screening.py` — stage-1 pre-screen: fetchable price
+  history, >= 60 daily bars, positive latest close, usable average volume. Never
+  raises; a provider failure becomes a failed `PrescreenResult` with a reason.
+- `app/services/discovery_ranking.py` — pure per-mode ordering over existing
+  `Rating` objects plus a plain-text `match_reason`. Six modes: `overall`
+  (score, then confidence), `momentum` (technical sub-score), `quality`
+  (fundamental sub-score), `value` (the existing fundamental "Valuation" signal's
+  score impact, then fundamentals), `defensive` (risk sub-score — higher means
+  calmer — then confidence), `avoid` (negative categories first, then lowest
+  score, then least favorable risk). Ties always break on ticker so runs are
+  reproducible.
+- `app/services/discovery_service.py` — `run_discovery` orchestrates
+  universe → bounded pre-screen → `analyze_stock_rating` → ranking →
+  `DiscoveryRun`, plus `list_discovery_modes` / `list_discovery_universes`.
+  The pre-screen stops as soon as the shortlist is full, so a healthy universe
+  costs one pre-screen per shortlisted ticker. `limit` (max 50) may not exceed
+  `max_full_analysis` (default 25, ceiling 50). Per-ticker failures at either
+  stage become `warnings` and never abort the run; `DiscoveryValidationError`
+  covers every invalid parameter. `analyze`/`prescreen` are injectable for tests.
+- `app/services/stock_analysis_service.py` — added `analyze_stock_rating`, a thin
+  public wrapper over the existing `_analyze_ticker` that returns the raw
+  `Rating`. Discovery needs the scoring engine's per-category sub-scores, which
+  the `StockReport` contract does not carry. `analyze_stock` and the CLI path are
+  unchanged.
+- `app/api/routes/discovery.py` + `app/api/schemas/discovery.py` — `GET
+  /api/discovery` (`mode`, `universe`, `limit`, `max_full_analysis`),
+  `GET /api/discovery/modes`, `GET /api/discovery/universes`. Thin routes;
+  invalid params → 400, partial ticker failures stay 200 with `warnings`. The
+  schema module names the domain models for the HTTP layer rather than
+  redefining their fields.
+
+Frontend:
+
+- `frontend/src/types/discovery.ts`, `api/discoveryApi.ts` — mirrors of the
+  backend schemas and one function per endpoint.
+- `frontend/src/lib/discovery.ts` (+ tests) — pure helpers only: query building,
+  mode labels, limit clamping, score/price formatting, category tone, run and
+  warning summaries. No ranking is recomputed client-side.
+- `frontend/src/components/discovery/` — `DiscoveryControls` (mode / universe /
+  result-count selectors + run button, with the active mode's ranking rule shown
+  inline), `DiscoveryCandidateCard` (rank, ticker, sector, score, category,
+  confidence, price, match reason, the four sub-scores, key positives, key risks,
+  confirm/invalidate triggers, and an Analyze link), `DiscoveryWarnings`
+  (per-ticker skips grouped by stage).
+- `frontend/src/pages/DiscoverPage.tsx` — `/discover`, added to the sidebar and
+  route table. Handles the initial empty state, loading, results, partial failure
+  with warnings, complete API failure, and a run that produced no candidates. The
+  header states plainly that results are rule-based research candidates, not
+  financial advice.
+
+Tests (all deterministic; the analysis pipeline and market-data layer are mocked
+or injected, so nothing touches the network):
+
+- `tests/test_universe_loader.py` — starter-universe integrity, ticker
+  uniqueness/normalization, registry lookup, unknown-universe errors, and CSV
+  parsing edge cases (duplicates, blank rows, missing column, empty file).
+- `tests/test_discovery_screening.py` — pass/fail paths and the guarantee that no
+  provider error escapes the pre-screen.
+- `tests/test_discovery_ranking.py` — per-mode ordering, tie-breaking, and the
+  content of each mode's match reason.
+- `tests/test_discovery_service.py` — parameter validation, response shape,
+  bounding (`max_full_analysis` cap, early pre-screen stop, limit truncation),
+  partial and total failure, and each mode wired end to end.
+- `tests/test_discovery_api.py` — status codes (200 / 400 / 422 / 500), response
+  shape, defaults, bounded analysis, and partial/total failure behavior.
+
+Known limitations (documented deliberately):
+
+- The universe is one hand-maintained 48-ticker file. Discovery cannot surface
+  anything outside it, and the list will drift as companies change.
+- A run is synchronous and bounded; with the default `max_full_analysis=25` it
+  can take a minute or more because each analyzed ticker costs several provider
+  round-trips.
+- The pre-screen fetches price history that the full pipeline then fetches again
+  (a 6-month window, then the pipeline's own 1-year window). Removing that double
+  fetch would mean restructuring the pipeline's data access — out of scope here.
+- `value` mode leans on a single existing fundamental "Valuation" signal; when
+  fundamentals are unavailable that signal is neutral and the candidate ranks
+  between favorable and unfavorable names rather than being excluded.
+- `avoid` mode ranks the weakest names in the screened shortlist; it does not
+  assert that they are bad in absolute terms.
+- Rankings are point-in-time and never validated historically — there is no
+  backtesting, and none is planned in this milestone.
+- **Pre-existing, observed during this work (not changed here):** while a
+  trading session is in progress, yfinance returns a row for the current day
+  whose OHLC values are still null. `_analyze_ticker` reads `close.iloc[-1]`, so
+  `current_price` comes back `None` and discovery cards (and the Analyze page)
+  render the price as an em dash until the session settles. The discovery
+  pre-screen works around this by using the last *settled* close; fixing the
+  pipeline's `current_price` would change existing single-ticker analysis
+  behavior and belongs in its own scoped task.
+
 ## 2026-08-03 — Personal portfolio holdings (Milestone 1)
 
 Added manually managed portfolios and holdings — the first "current portfolio

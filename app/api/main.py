@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import (
     analysis,
+    discovery,
     health,
     market_data,
     portfolios,
@@ -48,6 +49,7 @@ def create_app() -> FastAPI:
     _app.include_router(watchlist_snapshots.router, prefix="/api")
     _app.include_router(market_data.router, prefix="/api")
     _app.include_router(portfolios.router, prefix="/api")
+    _app.include_router(discovery.router, prefix="/api")
     return _app
 
 

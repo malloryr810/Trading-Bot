@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
 import { AnalyzePage } from './pages/AnalyzePage'
 import { DashboardPage } from './pages/DashboardPage'
+import { DiscoverPage } from './pages/DiscoverPage'
 import { ReportDetailPage } from './pages/ReportDetailPage'
 import { SavedReportsPage } from './pages/SavedReportsPage'
 import { WatchlistSnapshotDetailPage } from './pages/WatchlistSnapshotDetailPage'
@@ -13,6 +14,7 @@ export default function App() {
       <AppShell>
         <Routes>
           <Route path="/" element={<DashboardPage />} />
+          <Route path="/discover" element={<DiscoverPage />} />
           <Route path="/analyze" element={<AnalyzePage />} />
           <Route path="/watchlists" element={<WatchlistsPage />} />
           <Route

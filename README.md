@@ -43,6 +43,7 @@ This tool prints reports. It does not place trades.
 - **Snapshot trend charts** — Lightweight Charts line of successful-ticker count or backend-derived average score across saved snapshots (toggle; historical data only)
 - **Daily price chart** — read-only market-data history endpoint rendered as a daily closing-price chart on the Analyze page
 - **Personal portfolios** — create named portfolios and manually enter the holdings you own (ticker, shares, average cost, optional purchase date/notes); a priced summary values each holding at the current end-of-day price and computes cost basis, market value, unrealized gain/loss, return %, and portfolio weight. Manual entry only — no brokerage connection and no trading
+- **Stock discovery** — a Discover page that ranks research candidates from a controlled, static stock universe instead of only tickers you type in. Six deterministic modes (`overall`, `momentum`, `quality`, `value`, `defensive`, `avoid`), each result showing the score, category, confidence, sub-scores, key positives, key risks, and a plain-text reason it surfaced. Rule-based and bounded — no ML, no LLM picks, nothing scheduled or saved
 - **Dark dashboard** — app shell with sidebar; dashboard summary cards over real saved reports and watchlists, plus the portfolio panel
 
 ## What Is Not Included (By Design)
@@ -173,6 +174,9 @@ CORS is configured to allow `http://localhost:5173` and `http://127.0.0.1:5173`
 | `PATCH` | `/api/portfolios/{id}/holdings/{holding_id}` | Update a holding (partial; duplicate-ticker validation preserved) |
 | `DELETE` | `/api/portfolios/{id}/holdings/{holding_id}` | Remove one holding |
 | `GET` | `/api/portfolios/{id}/summary` | Priced summary — holding + portfolio valuations at current prices (200 even on partial price failure; unavailable prices listed in `warnings`) |
+| `GET` | `/api/discovery` | Ranked discovery candidates. Query: `mode` (default `overall`), `universe` (default `starter_large_cap`), `limit` (default 10, max 50), `max_full_analysis` (default 25, max 50) |
+| `GET` | `/api/discovery/modes` | List supported discovery modes with their descriptions and ranking rules |
+| `GET` | `/api/discovery/universes` | List registered stock universes with their sizes |
 
 > **Watchlist CRUD is storage only.** The list/ticker endpoints persist named
 > ticker lists; they do not run analysis. `POST /api/watchlists/{id}/analyze`
@@ -191,6 +195,18 @@ CORS is configured to allow `http://localhost:5173` and `http://127.0.0.1:5173`
 > in `warnings`, and market-value-dependent totals exclude it — `total_cost_basis`
 > still reflects every holding. There is no brokerage connection, order execution,
 > cash, realized gain, dividend, or tax-lot logic anywhere in this feature.
+
+> **Discovery is bounded, on-demand research.** A discovery run pre-screens the
+> selected universe for usable price data, runs the **existing** analysis
+> pipeline on a shortlist of at most `max_full_analysis` tickers, and ranks the
+> results with a deterministic per-mode sort. It introduces no scoring of its
+> own: every score, sub-score, category, confidence level, factor, and trigger
+> shown is the scoring engine's own output. Universes are static CSV files
+> committed to the repository (`app/data/universes/`) — nothing is scraped at
+> runtime. Tickers that fail the pre-screen or the analysis are returned in
+> `warnings`; the request still succeeds with `200`. Invalid parameters return
+> `400`. Nothing is saved, scheduled, alerted on, or traded, and results are
+> research candidates — **not** financial advice.
 
 **Analysis only (no persistence):**
 
@@ -348,6 +364,7 @@ app/
       watchlist_snapshots.py       # POST/GET /api/watchlists/{id}/analysis-snapshots, GET /api/watchlist-analysis-snapshots/{id}
       market_data.py               # GET /api/market-data/{ticker}/history
       portfolios.py                # GET/POST/PATCH/DELETE /api/portfolios, /holdings, /summary
+      discovery.py                 # GET /api/discovery, /api/discovery/modes, /api/discovery/universes
     schemas/
       analysis.py                  # AnalyzeRequest Pydantic schema
       reports.py                   # SavedReportSummary, SavedReportDetail schemas
@@ -355,6 +372,7 @@ app/
       watchlist_snapshots.py       # WatchlistSnapshotSummary/Detail (incl. average_score)
       market_data.py               # PricePoint, PriceHistoryResponse schemas
       portfolios.py                # Portfolio/holding CRUD + priced-summary schemas
+      discovery.py                 # Names the discovery domain models for the HTTP layer
     errors.py                      # Shared KNOWN_ANALYSIS_ERRORS tuple
   services/
     stock_analysis_service.py      # analyze_stock — public entry point for CLI and API
@@ -365,12 +383,18 @@ app/
     market_data_service.py         # build read-only price-history responses
     portfolio_service.py           # portfolio + holding CRUD (storage only; decimal-safe)
     portfolio_summary_service.py   # priced portfolio summary; current prices + Decimal math
+    discovery_service.py           # run_discovery — universe → pre-screen → bounded analysis → ranking
+    discovery_screening.py         # stage-1 lightweight price-data validity check
+    discovery_ranking.py           # deterministic per-mode ordering + match reasons (no scoring)
   data/
     market_data.py                 # OHLCV price history
     fundamentals.py                # Company fundamentals
     news_data.py                   # Recent news headlines
     storage.py                     # Saves reports and JSON results to disk
     database.py                    # SQLAlchemy Core engine; analysis_reports, watchlists, watchlist_tickers, watchlist_analysis_snapshots(+_results), portfolios, portfolio_holdings
+    universe_loader.py             # Loads/validates the static stock universes
+    universes/
+      starter_large_cap.csv        # Starter universe (liquid large-cap U.S. equities)
   analysis/
     technicals.py                  # Technical indicators and signals
     fundamentals_analysis.py       # Fundamental signals
@@ -384,6 +408,8 @@ app/
     signal.py                      # Signal Pydantic model
     rating.py                      # Rating Pydantic model
     stock_report.py                # StockReport Pydantic model
+    universe.py                    # UniverseEntry, UniverseInfo Pydantic models
+    discovery.py                   # DiscoveryMode, DiscoveryCandidate, DiscoveryWarning, DiscoveryRun
     fundamentals.py                # CompanyFundamentals Pydantic model
     news.py                        # NewsItem Pydantic model
   utils/
@@ -404,6 +430,7 @@ frontend/                          # React + Vite + TypeScript frontend
       reportsApi.ts                # listSavedReports, getSavedReport (read-only history)
       marketDataApi.ts             # getPriceHistory (read-only)
       portfolioApi.ts              # Portfolio + holding CRUD + getPortfolioSummary
+      discoveryApi.ts              # listDiscoveryModes, listDiscoveryUniverses, runDiscovery
     components/
       LoadingState.tsx             # Spinner with accessible role/aria attributes
       ErrorMessage.tsx             # Accessible error display
@@ -413,15 +440,17 @@ frontend/                          # React + Vite + TypeScript frontend
       dashboard/                   # ComingSoonCard
       watchlist/                   # WatchlistCard, AnalysisResultCard
       portfolio/                   # PortfolioPanel, PortfolioSelector, PortfolioSummaryCards, HoldingsTable, HoldingForm
-    lib/                           # Pure, tested helpers: format, errors, sort, dashboard, watchlist, chartData, snapshotTrend, portfolio
+      discovery/                   # DiscoveryControls, DiscoveryCandidateCard, DiscoveryWarnings
+    lib/                           # Pure, tested helpers: format, errors, sort, dashboard, watchlist, chartData, snapshotTrend, portfolio, discovery
     pages/
       DashboardPage.tsx            # Portfolio panel + summary cards over saved reports/watchlists; health/source status
+      DiscoverPage.tsx             # Discovery controls + ranked candidate list (/discover)
       AnalyzePage.tsx              # Ticker input, analyze/save actions, report result + price chart
       WatchlistsPage.tsx           # Watchlist CRUD, on-demand analyze, save snapshot, snapshot list + trend chart
       WatchlistSnapshotDetailPage.tsx  # One saved snapshot rendered in full
       SavedReportsPage.tsx         # List of saved report snapshots (/reports)
       ReportDetailPage.tsx         # One saved report rendered in full (/reports/:id)
-    types/                         # report.ts, watchlist.ts, marketData.ts, portfolio.ts (mirror backend schemas)
+    types/                         # report.ts, watchlist.ts, marketData.ts, portfolio.ts, discovery.ts (mirror backend schemas)
     App.tsx                        # BrowserRouter + AppShell (sidebar) + route table
     main.tsx                       # Vite entry point
     styles.css                     # Plain CSS — no framework

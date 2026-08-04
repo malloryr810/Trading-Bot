@@ -1,6 +1,7 @@
 # Frontend Plan — Investment Bot
 
-> **Status:** Built and in active use. Live pages: Dashboard (`/`), Analyze
+> **Status:** Built and in active use. Live pages: Dashboard (`/`), Discover
+> (`/discover`, ranked candidates from a controlled stock universe), Analyze
 > (`/analyze`), Watchlists (`/watchlists`, including on-demand watchlist
 > analysis), Saved Reports (`/reports`), and Report Detail (`/reports/:id`). The
 > report history + detail pages originally scoped as "Milestone 2" are complete.

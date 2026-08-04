@@ -8,6 +8,7 @@ import { checkHealth } from '../../api/analysisApi'
  */
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', end: true },
+  { to: '/discover', label: 'Discover', end: false },
   { to: '/analyze', label: 'Analyze', end: false },
   { to: '/watchlists', label: 'Watchlists', end: false },
   { to: '/reports', label: 'Reports', end: false },

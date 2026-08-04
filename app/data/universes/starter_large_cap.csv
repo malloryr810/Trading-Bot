@@ -1,0 +1,49 @@
+ticker,company_name,sector,industry
+AAPL,Apple Inc.,Technology,Consumer Electronics
+MSFT,Microsoft Corporation,Technology,Software - Infrastructure
+NVDA,NVIDIA Corporation,Technology,Semiconductors
+AVGO,Broadcom Inc.,Technology,Semiconductors
+AMD,Advanced Micro Devices Inc.,Technology,Semiconductors
+CRM,Salesforce Inc.,Technology,Software - Application
+ADBE,Adobe Inc.,Technology,Software - Infrastructure
+ORCL,Oracle Corporation,Technology,Software - Infrastructure
+CSCO,Cisco Systems Inc.,Technology,Communication Equipment
+TXN,Texas Instruments Incorporated,Technology,Semiconductors
+GOOGL,Alphabet Inc.,Communication Services,Internet Content & Information
+META,Meta Platforms Inc.,Communication Services,Internet Content & Information
+NFLX,Netflix Inc.,Communication Services,Entertainment
+DIS,The Walt Disney Company,Communication Services,Entertainment
+VZ,Verizon Communications Inc.,Communication Services,Telecom Services
+AMZN,Amazon.com Inc.,Consumer Cyclical,Internet Retail
+TSLA,Tesla Inc.,Consumer Cyclical,Auto Manufacturers
+HD,The Home Depot Inc.,Consumer Cyclical,Home Improvement Retail
+MCD,McDonald's Corporation,Consumer Cyclical,Restaurants
+NKE,NIKE Inc.,Consumer Cyclical,Footwear & Accessories
+COST,Costco Wholesale Corporation,Consumer Defensive,Discount Stores
+WMT,Walmart Inc.,Consumer Defensive,Discount Stores
+PG,The Procter & Gamble Company,Consumer Defensive,Household & Personal Products
+KO,The Coca-Cola Company,Consumer Defensive,Beverages - Non-Alcoholic
+PEP,PepsiCo Inc.,Consumer Defensive,Beverages - Non-Alcoholic
+JNJ,Johnson & Johnson,Healthcare,Drug Manufacturers - General
+UNH,UnitedHealth Group Incorporated,Healthcare,Healthcare Plans
+LLY,Eli Lilly and Company,Healthcare,Drug Manufacturers - General
+ABBV,AbbVie Inc.,Healthcare,Drug Manufacturers - General
+MRK,Merck & Co. Inc.,Healthcare,Drug Manufacturers - General
+TMO,Thermo Fisher Scientific Inc.,Healthcare,Diagnostics & Research
+JPM,JPMorgan Chase & Co.,Financial Services,Banks - Diversified
+BAC,Bank of America Corporation,Financial Services,Banks - Diversified
+V,Visa Inc.,Financial Services,Credit Services
+MA,Mastercard Incorporated,Financial Services,Credit Services
+BRK-B,Berkshire Hathaway Inc.,Financial Services,Insurance - Diversified
+GS,The Goldman Sachs Group Inc.,Financial Services,Capital Markets
+CAT,Caterpillar Inc.,Industrials,Farm & Heavy Construction Machinery
+HON,Honeywell International Inc.,Industrials,Conglomerates
+UNP,Union Pacific Corporation,Industrials,Railroads
+GE,GE Aerospace,Industrials,Aerospace & Defense
+XOM,Exxon Mobil Corporation,Energy,Oil & Gas Integrated
+CVX,Chevron Corporation,Energy,Oil & Gas Integrated
+NEE,NextEra Energy Inc.,Utilities,Utilities - Regulated Electric
+DUK,Duke Energy Corporation,Utilities,Utilities - Regulated Electric
+LIN,Linde plc,Basic Materials,Specialty Chemicals
+AMT,American Tower Corporation,Real Estate,REIT - Specialty
+PLD,Prologis Inc.,Real Estate,REIT - Industrial
