@@ -42,7 +42,8 @@ This tool prints reports. It does not place trades.
 - **Saved watchlist analysis snapshots** — explicitly save a watchlist analysis run as a historical record, with a snapshot-detail view
 - **Snapshot trend charts** — Lightweight Charts line of successful-ticker count or backend-derived average score across saved snapshots (toggle; historical data only)
 - **Daily price chart** — read-only market-data history endpoint rendered as a daily closing-price chart on the Analyze page
-- **Dark dashboard** — app shell with sidebar; dashboard summary cards over real saved reports and watchlists
+- **Personal portfolios** — create named portfolios and manually enter the holdings you own (ticker, shares, average cost, optional purchase date/notes); a priced summary values each holding at the current end-of-day price and computes cost basis, market value, unrealized gain/loss, return %, and portfolio weight. Manual entry only — no brokerage connection and no trading
+- **Dark dashboard** — app shell with sidebar; dashboard summary cards over real saved reports and watchlists, plus the portfolio panel
 
 ## What Is Not Included (By Design)
 
@@ -163,6 +164,15 @@ CORS is configured to allow `http://localhost:5173` and `http://127.0.0.1:5173`
 | `GET` | `/api/watchlists/{id}/analysis-snapshots` | List saved snapshot summaries for a watchlist (newest first; includes `average_score`) |
 | `GET` | `/api/watchlist-analysis-snapshots/{id}` | Return one saved snapshot's full detail (results + errors) |
 | `GET` | `/api/market-data/{ticker}/history` | Read-only daily historical OHLCV price series (for the price chart) |
+| `GET` | `/api/portfolios` | List portfolios (id, name, description, timestamps, holdings_count) |
+| `POST` | `/api/portfolios` | Create a portfolio (`{name, description?}`) |
+| `GET` | `/api/portfolios/{id}` | Return one portfolio with its holdings |
+| `PATCH` | `/api/portfolios/{id}` | Update a portfolio's name and/or description |
+| `DELETE` | `/api/portfolios/{id}` | Delete a portfolio and all its holdings |
+| `POST` | `/api/portfolios/{id}/holdings` | Add a holding (`{ticker, shares, average_cost, purchase_date?, notes?}`); duplicate ticker → 409 |
+| `PATCH` | `/api/portfolios/{id}/holdings/{holding_id}` | Update a holding (partial; duplicate-ticker validation preserved) |
+| `DELETE` | `/api/portfolios/{id}/holdings/{holding_id}` | Remove one holding |
+| `GET` | `/api/portfolios/{id}/summary` | Priced summary — holding + portfolio valuations at current prices (200 even on partial price failure; unavailable prices listed in `warnings`) |
 
 > **Watchlist CRUD is storage only.** The list/ticker endpoints persist named
 > ticker lists; they do not run analysis. `POST /api/watchlists/{id}/analyze`
@@ -170,6 +180,17 @@ CORS is configured to allow `http://localhost:5173` and `http://127.0.0.1:5173`
 > returns the results — it does **not** save them, schedule scans, or trade. The
 > Watchlists page has an "Analyze watchlist" button that calls this endpoint and
 > displays the results on demand (results are not persisted).
+
+> **Portfolios are manual, read-only holdings.** Portfolio and holding CRUD is
+> storage only and never touches market data. Current prices are fetched (via the
+> existing yfinance market-data layer) **only** when `GET /api/portfolios/{id}/summary`
+> is requested. `shares` and `average_cost` are validated decimal-safe
+> (`shares > 0`, `average_cost ≥ 0`) and a portfolio holds each ticker at most
+> once. If a ticker's price cannot be fetched, that holding is marked
+> `price_available: false` (its market value is `null`, never `0`), it is listed
+> in `warnings`, and market-value-dependent totals exclude it — `total_cost_basis`
+> still reflects every holding. There is no brokerage connection, order execution,
+> cash, realized gain, dividend, or tax-lot logic anywhere in this feature.
 
 **Analysis only (no persistence):**
 
@@ -230,7 +251,7 @@ The app opens at `http://localhost:5173`.
 
 **Current frontend scope:**
 - Dark app shell with a left sidebar; routing via React Router
-- Dashboard page — backend health/source status, disclaimer, and summary cards over real saved reports and watchlists (rating breakdown, top candidates, recent reports). Market Overview and Portfolio are clearly labeled "coming soon" placeholders
+- Dashboard page — a personal **Portfolio panel** (create/select/edit/delete portfolios; add/edit/remove holdings; summary cards for market value, cost basis, unrealized gain/loss, return, and holdings count; a holdings table valued at current prices with per-row Analyze/Edit/Remove; explicit loading, empty, partial-price-failure, and error states) plus backend health/source status, disclaimer, and summary cards over real saved reports and watchlists (rating breakdown, top candidates, recent reports). The Market Overview strip remains a clearly labeled "coming soon" placeholder
 - Analyze page — enter a ticker, choose "Analyze only" (POST /api/analyze) or "Analyze and save" (POST /api/reports/analyze), view the StockReport result and a daily closing-price chart
 - Watchlists page — create, rename, and delete named watchlists; add and remove tickers (CRUD over the watchlist API). "Analyze watchlist" runs the pipeline on demand and shows per-ticker results/failures (not saved); "Analyze & save snapshot" records a historical snapshot. Saved snapshots list with a snapshot-trend chart (success count / average score toggle)
 - Snapshot Detail page (`/watchlists/:watchlistId/snapshots/:snapshotId`) — full read-only view of one saved watchlist analysis snapshot
@@ -326,12 +347,14 @@ app/
       watchlists.py                # GET/POST/PATCH/DELETE /api/watchlists, /tickers, /analyze
       watchlist_snapshots.py       # POST/GET /api/watchlists/{id}/analysis-snapshots, GET /api/watchlist-analysis-snapshots/{id}
       market_data.py               # GET /api/market-data/{ticker}/history
+      portfolios.py                # GET/POST/PATCH/DELETE /api/portfolios, /holdings, /summary
     schemas/
       analysis.py                  # AnalyzeRequest Pydantic schema
       reports.py                   # SavedReportSummary, SavedReportDetail schemas
       watchlists.py                # Watchlist + analyze request/response schemas
       watchlist_snapshots.py       # WatchlistSnapshotSummary/Detail (incl. average_score)
       market_data.py               # PricePoint, PriceHistoryResponse schemas
+      portfolios.py                # Portfolio/holding CRUD + priced-summary schemas
     errors.py                      # Shared KNOWN_ANALYSIS_ERRORS tuple
   services/
     stock_analysis_service.py      # analyze_stock — public entry point for CLI and API
@@ -340,12 +363,14 @@ app/
     watchlist_analysis_service.py  # analyze_watchlist — run analyze_stock over a saved watchlist
     watchlist_analysis_snapshot_service.py  # save/list/get snapshots; derives average_score
     market_data_service.py         # build read-only price-history responses
+    portfolio_service.py           # portfolio + holding CRUD (storage only; decimal-safe)
+    portfolio_summary_service.py   # priced portfolio summary; current prices + Decimal math
   data/
     market_data.py                 # OHLCV price history
     fundamentals.py                # Company fundamentals
     news_data.py                   # Recent news headlines
     storage.py                     # Saves reports and JSON results to disk
-    database.py                    # SQLAlchemy Core engine; analysis_reports, watchlists, watchlist_tickers, watchlist_analysis_snapshots(+_results)
+    database.py                    # SQLAlchemy Core engine; analysis_reports, watchlists, watchlist_tickers, watchlist_analysis_snapshots(+_results), portfolios, portfolio_holdings
   analysis/
     technicals.py                  # Technical indicators and signals
     fundamentals_analysis.py       # Fundamental signals
@@ -378,6 +403,7 @@ frontend/                          # React + Vite + TypeScript frontend
       watchlistApi.ts              # Watchlist CRUD + analyze + snapshot client functions
       reportsApi.ts                # listSavedReports, getSavedReport (read-only history)
       marketDataApi.ts             # getPriceHistory (read-only)
+      portfolioApi.ts              # Portfolio + holding CRUD + getPortfolioSummary
     components/
       LoadingState.tsx             # Spinner with accessible role/aria attributes
       ErrorMessage.tsx             # Accessible error display
@@ -386,15 +412,16 @@ frontend/                          # React + Vite + TypeScript frontend
       charts/                      # StockPriceChart, WatchlistSnapshotTrendChart (Lightweight Charts)
       dashboard/                   # ComingSoonCard
       watchlist/                   # WatchlistCard, AnalysisResultCard
-    lib/                           # Pure, tested helpers: format, errors, sort, dashboard, watchlist, chartData, snapshotTrend
+      portfolio/                   # PortfolioPanel, PortfolioSelector, PortfolioSummaryCards, HoldingsTable, HoldingForm
+    lib/                           # Pure, tested helpers: format, errors, sort, dashboard, watchlist, chartData, snapshotTrend, portfolio
     pages/
-      DashboardPage.tsx            # Summary cards over saved reports/watchlists; health/source status
+      DashboardPage.tsx            # Portfolio panel + summary cards over saved reports/watchlists; health/source status
       AnalyzePage.tsx              # Ticker input, analyze/save actions, report result + price chart
       WatchlistsPage.tsx           # Watchlist CRUD, on-demand analyze, save snapshot, snapshot list + trend chart
       WatchlistSnapshotDetailPage.tsx  # One saved snapshot rendered in full
       SavedReportsPage.tsx         # List of saved report snapshots (/reports)
       ReportDetailPage.tsx         # One saved report rendered in full (/reports/:id)
-    types/                         # report.ts, watchlist.ts, marketData.ts (mirror backend schemas)
+    types/                         # report.ts, watchlist.ts, marketData.ts, portfolio.ts (mirror backend schemas)
     App.tsx                        # BrowserRouter + AppShell (sidebar) + route table
     main.tsx                       # Vite entry point
     styles.css                     # Plain CSS — no framework
@@ -424,6 +451,16 @@ the pipeline over saved tickers (partial success, not saved), and the
 analyze-and-save snapshot flow persists historical runs to two snapshot tables,
 surfaced through the snapshot list, snapshot-detail view, and snapshot-trend
 charts. A read-only market-data history endpoint backs the daily price chart.
+
+Personal portfolio tracking (Milestone 1) is implemented across all layers:
+SQLite tables (`portfolios`, `portfolio_holdings`), a storage-only
+`portfolio_service` (decimal-safe holding validation, one ticker per portfolio,
+cascade delete), a separate `portfolio_summary_service` that prices holdings via
+the existing market-data layer and computes cost basis, market value, unrealized
+gain/loss, return, and weight, the `/api/portfolios` CRUD + summary endpoints,
+and a Dashboard portfolio panel. Holdings are entered manually for tracking;
+there is no brokerage connection and no trading. Partial price failures degrade
+gracefully (per-holding `price_available` + summary `warnings`).
 
 A React + Vite frontend (`frontend/`) is in active development with a dark app
 shell and sidebar. The Dashboard, Analyze, Watchlists, Snapshot Detail, Saved

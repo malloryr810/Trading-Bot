@@ -307,11 +307,19 @@ These constraints apply to all phases and all contributors:
 | **4** | Frontend foundation | Built with **React + Vite + TypeScript** (not Next.js): scaffold, typed API client, Dashboard + Analyze pages. ✓ Done |
 | **5** | Watchlist management | Watchlist CRUD (backend + frontend) **plus** on-demand `POST /api/watchlists/{id}/analyze` with results displayed on the Watchlists page (analysis-only, not saved). ✓ Done |
 | **6** | Report history UI | Saved Reports list (`/reports`) and Report Detail (`/reports/:id`) pages over the existing read endpoints. ✓ Done (research notes not started) |
+| **6.5** | Personal portfolio holdings (manual) | `portfolios`/`portfolio_holdings` tables, `portfolio_service` (storage) + `portfolio_summary_service` (priced), `/api/portfolios` CRUD + `GET /{id}/summary`, Dashboard portfolio panel. Manual entry of real holdings for tracking; current-price valuation via the existing market-data layer. ✓ Done (Milestone 1) |
 | **7** | Mock trading simulation | `app/simulation/`, mock trade recording, portfolio summary, performance metrics. Not started — gated, requires explicit scoping |
 | **8** | ML research layer | `app/ml/`, feature engineering from historical snapshots, signal evaluation models. Not started — gated, requires explicit scoping |
 | **9** | Deployment and hardening | Environment config, containerization, auth if needed, PostgreSQL migration if needed. Not started |
 
 Each phase must be completable independently. A phase is not started until the previous phase's core functionality is tested and stable.
+
+> Note: the **manual personal portfolio** (Milestone 6.5, `/api/portfolios`,
+> `portfolio_service` + `portfolio_summary_service`) is distinct from the future
+> **mock/simulated portfolio** (Phase 7, `app/simulation/`, `/api/mock-portfolio`).
+> The former tracks real, hand-entered holdings for valuation only — no trades,
+> no cash, no simulation. Keep them separate; do not merge manual tracking into
+> the simulation layer.
 
 > Note: the original plan named Next.js for the frontend; the project was built
 > with React + Vite + TypeScript instead. `CLAUDE.md` and `docs/frontend_plan.md`

@@ -111,7 +111,9 @@ is documented in `docs/development_log.md`; do not run `npm audit fix --force`
 | `app/services/watchlist_analysis_service.py` | `analyze_watchlist` — reuses `get_watchlist` + `analyze_stock` to analyze every ticker in a saved watchlist; partial success (per-ticker errors captured); analysis-only, nothing saved. Surfaced in the UI via the Watchlists page "Analyze watchlist" button |
 | `app/services/watchlist_analysis_snapshot_service.py` | `analyze_and_save_snapshot`, `save_watchlist_analysis_snapshot`, `list_watchlist_snapshots`, `get_watchlist_snapshot` — saves/reads historical snapshots of explicit analyze-and-save runs; derives `average_score` from stored success-row scores (`_mean_score`). Not a scheduled scan |
 | `app/services/market_data_service.py` | `get_price_history_response` — builds the read-only price-history response (JSON-safe nullable OHLCV) from `market_data`; no analysis/scoring |
-| `app/data/database.py` | SQLAlchemy Core engine factory (`build_engine`) and table definitions: `analysis_reports`, `watchlists`, `watchlist_tickers`, `watchlist_analysis_snapshots`, `watchlist_analysis_snapshot_results` |
+| `app/services/portfolio_service.py` | Portfolio + holding CRUD over SQLite (storage only; no market data). Decimal-safe `shares`/`average_cost` validation; `PortfolioValidationError`/`PortfolioNotFoundError`/`HoldingNotFoundError`/`DuplicateHoldingError`; one ticker per portfolio; cascade-deletes holdings; optional `engine` kwarg for tests |
+| `app/services/portfolio_summary_service.py` | `get_portfolio_summary` — enriches a portfolio with current prices (reuses `market_data`) and computes holding + portfolio values with `Decimal` math. Prices fetched only here, never during CRUD. Partial/complete price failure is non-fatal (per-holding `price_available` + `warnings`); market-value-dependent totals exclude unpriced holdings and are `None` (never zero) when nothing is priced. Optional `price_lookup`/`engine` kwargs for tests |
+| `app/data/database.py` | SQLAlchemy Core engine factory (`build_engine`) and table definitions: `analysis_reports`, `watchlists`, `watchlist_tickers`, `watchlist_analysis_snapshots`, `watchlist_analysis_snapshot_results`, `portfolios`, `portfolio_holdings` |
 | `app/api/main.py` | FastAPI app factory; `uvicorn app.api.main:app` entry point |
 | `app/api/routes/health.py` | `GET /api/health` |
 | `app/api/routes/analysis.py` | `POST /api/analyze` — analysis only; calls `analyze_stock`, does not save |
@@ -119,11 +121,13 @@ is documented in `docs/development_log.md`; do not run `npm audit fix --force`
 | `app/api/routes/watchlists.py` | Watchlist CRUD routes — `GET/POST /api/watchlists`, `GET/PATCH/DELETE /api/watchlists/{id}`, `POST` / `DELETE` `/api/watchlists/{id}/tickers[/{ticker}]`, `POST /api/watchlists/{id}/analyze` (analyze-watchlist, partial success); thin, delegate to services |
 | `app/api/routes/watchlist_snapshots.py` | `POST`/`GET /api/watchlists/{id}/analysis-snapshots`, `GET /api/watchlist-analysis-snapshots/{id}` — saved snapshot save/list/detail; thin, delegate to snapshot service |
 | `app/api/routes/market_data.py` | `GET /api/market-data/{ticker}/history` — read-only daily OHLCV history |
+| `app/api/routes/portfolios.py` | Portfolio + holding CRUD — `GET/POST /api/portfolios`, `GET/PATCH/DELETE /api/portfolios/{id}`, `POST /api/portfolios/{id}/holdings`, `PATCH`/`DELETE` `/api/portfolios/{id}/holdings/{holding_id}`, `GET /api/portfolios/{id}/summary` (priced). Thin; validation→400, duplicate ticker→409, missing→404; summary stays 200 on price failure |
 | `app/api/schemas/analysis.py` | `AnalyzeRequest` — validates and normalizes ticker at the API boundary |
 | `app/api/schemas/reports.py` | `SavedReportSummary`, `SavedReportDetail` — response schemas for persistence endpoints |
 | `app/api/schemas/watchlists.py` | Watchlist request/response schemas (`CreateWatchlistRequest`, `UpdateWatchlistRequest`, `AddTickerRequest`, `WatchlistSummary`, `WatchlistDetail`, `DeleteResponse`, plus analyze-watchlist: `WatchlistAnalysisResponse`/`Result`/`Error`) |
 | `app/api/schemas/watchlist_snapshots.py` | `WatchlistSnapshotSummary` (incl. `average_score: float \| null`), `WatchlistSnapshotDetail` |
 | `app/api/schemas/market_data.py` | `PricePoint`, `PriceHistoryResponse` — nullable OHLCV transport shapes |
+| `app/api/schemas/portfolios.py` | Portfolio/holding request+response schemas (`CreatePortfolioRequest`, `UpdatePortfolioRequest`, `AddHoldingRequest`, `UpdateHoldingRequest`, `PortfolioSummary`, `PortfolioDetail`, `HoldingResponse`, `DeleteResponse`) plus priced summary (`PortfolioSummaryResponse`, `HoldingValuation`, `PortfolioSummaryWarning`). Shares/avg-cost accepted as `Decimal` |
 | `app/api/errors.py` | `KNOWN_ANALYSIS_ERRORS` — shared tuple of pipeline error types used by both API routes for 422 mapping |
 | `app/main.py` | Thin argparse CLI shell — delegates entirely to `app/services/` |
 | `frontend/` | React + Vite + TypeScript browser frontend; dark app shell with sidebar |
@@ -132,10 +136,11 @@ is documented in `docs/development_log.md`; do not run `npm audit fix --force`
 | `frontend/src/api/watchlistApi.ts` | Watchlist CRUD + `analyzeWatchlist`, `analyzeAndSaveSnapshot`, `listWatchlistSnapshots`, `getWatchlistSnapshot` — one per `/api/watchlists*` endpoint |
 | `frontend/src/api/reportsApi.ts` | `listSavedReports`, `getSavedReport` — read-only saved-report history |
 | `frontend/src/api/marketDataApi.ts` | `getPriceHistory` — read-only daily price history |
-| `frontend/src/components/` | Presentational only: `LoadingState`, `ErrorMessage`, `StockReportView`; `layout/` (`AppShell`, `Sidebar`, `PageHeader`); `charts/` (`StockPriceChart`, `WatchlistSnapshotTrendChart`); `dashboard/` (`ComingSoonCard`); `watchlist/` (`WatchlistCard`, `AnalysisResultCard`) |
-| `frontend/src/lib/` | Pure, tested helpers: `format`, `errors`, `sort`, `dashboard`, `watchlist`, `chartData`, `snapshotTrend`. Display-only — never recompute scores/categories/averages |
-| `frontend/src/pages/` | `DashboardPage` (summary cards, health/source status), `AnalyzePage` (analyze + report + price chart), `WatchlistsPage` (CRUD + on-demand analyze + save snapshot + snapshot list/trend chart), `WatchlistSnapshotDetailPage` (`/watchlists/:watchlistId/snapshots/:snapshotId`), `SavedReportsPage` (`/reports`), `ReportDetailPage` (`/reports/:id`) |
-| `frontend/src/types/` | `report.ts`, `watchlist.ts` (incl. snapshot summary/detail + `average_score`), `marketData.ts` — mirror backend schemas |
+| `frontend/src/api/portfolioApi.ts` | Portfolio + holding CRUD and `getPortfolioSummary` — one per `/api/portfolios*` endpoint |
+| `frontend/src/components/` | Presentational only: `LoadingState`, `ErrorMessage`, `StockReportView`; `layout/` (`AppShell`, `Sidebar`, `PageHeader`); `charts/` (`StockPriceChart`, `WatchlistSnapshotTrendChart`); `dashboard/` (`ComingSoonCard`); `watchlist/` (`WatchlistCard`, `AnalysisResultCard`); `portfolio/` (`PortfolioPanel` container + `PortfolioSelector`, `PortfolioSummaryCards`, `HoldingsTable`, `HoldingForm`) |
+| `frontend/src/lib/` | Pure, tested helpers: `format`, `errors`, `sort`, `dashboard`, `watchlist`, `chartData`, `snapshotTrend`, `portfolio` (money/percent/share formatting + holding-form validation). Display-only — never recompute scores/categories/averages/portfolio totals |
+| `frontend/src/pages/` | `DashboardPage` (portfolio panel, summary cards, health/source status), `AnalyzePage` (analyze + report + price chart), `WatchlistsPage` (CRUD + on-demand analyze + save snapshot + snapshot list/trend chart), `WatchlistSnapshotDetailPage` (`/watchlists/:watchlistId/snapshots/:snapshotId`), `SavedReportsPage` (`/reports`), `ReportDetailPage` (`/reports/:id`) |
+| `frontend/src/types/` | `report.ts`, `watchlist.ts` (incl. snapshot summary/detail + `average_score`), `marketData.ts`, `portfolio.ts` — mirror backend schemas |
 
 ## Architecture
 
@@ -171,10 +176,11 @@ data/ → analysis/ → scoring.py → reports/ → services/ → CLI / API
 - **API persistence routes** (`/api/reports/*`) call `analyze_stock` from `stock_analysis_service` and the persistence functions from `report_persistence_service`. They never duplicate pipeline logic.
 - **`POST /api/analyze`** is analysis-only and must never save to the database. Saving is exclusively done via `POST /api/reports/analyze`.
 - **CLI** must remain functional. Adding API or frontend layers must not break `python -m app.main`.
-- **Database** uses SQLAlchemy Core (not ORM). The `analysis_reports` table stores full `StockReport` JSON snapshots alongside indexed summary columns. The `watchlists` and `watchlist_tickers` tables store named ticker lists. The database file lives at `data/investment_bot.db` (configurable via `DATABASE_PATH` env var).
+- **Database** uses SQLAlchemy Core (not ORM). The `analysis_reports` table stores full `StockReport` JSON snapshots alongside indexed summary columns. The `watchlists` and `watchlist_tickers` tables store named ticker lists. The `portfolios` and `portfolio_holdings` tables store manually entered holdings (`shares`/`average_cost` persisted as canonical decimal strings for exact precision; one ticker per portfolio via a unique constraint). The database file lives at `data/investment_bot.db` (configurable via `DATABASE_PATH` env var). Schema is created directly via `metadata.create_all()`; there are no migrations (do not add Alembic without a scoped task).
 - **Persistence service functions** accept an optional `engine` keyword argument for test injection. Production callers omit it; a shared engine is lazily initialised on first call.
 - **Watchlist management** (`watchlist_service` + `/api/watchlists`) is storage/CRUD only — it never runs analysis, scans, alerts, or trades. It is separate from `app/watchlist.py`, which is the CLI multi-ticker analysis scanner. Do not merge the two; do not add analysis to the watchlist CRUD layer without an explicitly scoped task.
-- **Frontend** owns no business logic: it calls the typed API client and formats results for display. It must not recalculate scores, categories, weights, or re-validate domain rules the backend already enforces.
+- **Portfolio holdings** (`portfolio_service` + `/api/portfolios`) are manually entered, real holdings for tracking only. `portfolio_service` is storage/CRUD and fetches no market data; `portfolio_summary_service` is the only place current prices are fetched (reusing `app/data/market_data`) and the only place portfolio math runs. Keep these two separate — do not fetch prices during CRUD, and do not put calculations in routes. This is decision-support only: never add broker links, order execution, cash balances, realized gains, dividends, tax lots, or automatic trading.
+- **Frontend** owns no business logic: it calls the typed API client and formats results for display. It must not recalculate scores, categories, weights, portfolio totals, or re-validate domain rules the backend already enforces (the holding-form check in `lib/portfolio` is pre-submit UX only; the backend stays authoritative).
 
 ## Scoring Weights
 
@@ -217,6 +223,7 @@ Each analysis module follows the same pattern:
 | 5 | Watchlist management (frontend + backend routes) | **Complete (CRUD + analyze + snapshots)** — `watchlists`/`watchlist_tickers` tables, `watchlist_service`, `/api/watchlists` CRUD, Watchlists page. Analyze-watchlist (`watchlist_analysis_service` + `POST /api/watchlists/{id}/analyze`, partial success, not saved). Saved snapshots (`watchlist_analysis_snapshots(+_results)` tables, `watchlist_analysis_snapshot_service`, snapshot save/list/detail endpoints) with snapshot-detail page and success/average-score trend charts (`average_score` derived in the service) |
 | 6 | Research notes and report history UI | **Report history UI done** — Saved Reports list (`/reports`) and Report Detail (`/reports/:id`) over the existing read endpoints. Research notes not started |
 | — | Market-data chart (read-only) | **Done** — `market_data_service` + `GET /api/market-data/{ticker}/history`; daily price chart on the Analyze page (Lightweight Charts) |
+| — | Personal portfolio holdings (manual) | **Milestone 1 complete** — `portfolios`/`portfolio_holdings` tables, `portfolio_service` (CRUD) + `portfolio_summary_service` (priced summary), `/api/portfolios` CRUD + `GET /{id}/summary`, Dashboard `PortfolioPanel`. Manual entry only; current-price valuation via existing market-data layer; partial-price-failure tolerant. No broker links, cash, realized gains, dividends, tax lots, or trading |
 | 7 | Mock trading simulation (`app/simulation/`) | Not started |
 | 8 | ML research layer (`app/ml/`) | Not started |
 | 9 | Deployment and hardening | Not started |
@@ -225,8 +232,11 @@ See `docs/full_stack_product_architecture.md` for full scope of each phase.
 
 **Current priority: code quality and research quality, not more dashboard polish.**
 Do not start the next visual feature (e.g. per-ticker sparklines, batch
-price-history endpoint, portfolio tracking) without an explicitly scoped task.
-Snapshot/report/watchlist concerns are separate and must stay separate.
+price-history endpoint) without an explicitly scoped task.
+Snapshot/report/watchlist/portfolio concerns are separate and must stay separate.
+Portfolio holdings are manual-entry tracking only — do not extend them toward
+paper trading, cash, realized P&L, dividends, tax lots, or broker links without
+an explicitly scoped task.
 
 ## Non-Negotiable Guardrails
 
@@ -236,6 +246,7 @@ These apply to every phase and every task:
 - **No broker APIs** — no Alpaca, Robinhood, IBKR, or any brokerage integration
 - **No order execution** — no scheduled or triggered buy/sell of any kind
 - **No options or margin** — equities only; no derivatives or leveraged positions
+- **Portfolio is manual + read-only** — holdings are hand-entered for tracking; never connect a brokerage account, sync positions, or trade. No cash balances, realized gains, dividends, or tax lots
 - **No route-handler logic** — API routes call services; they never contain pipeline logic
 - **No CLI regression** — `python -m app.main` must always work after any change
 - **No premature ML** — do not add `app/ml/` until Phase 8 is explicitly scoped

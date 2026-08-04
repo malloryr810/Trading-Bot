@@ -1,5 +1,66 @@
 # Development Log
 
+## 2026-08-03 — Personal portfolio holdings (Milestone 1)
+
+Added manually managed portfolios and holdings — the first "current portfolio
+tracking" pillar. Full-stack: backend, API, persistence, frontend, tests, docs.
+Decision-support only: holdings are hand-entered for tracking; **no brokerage
+connection, order execution, paper trading, cash, realized gains, dividends, or
+tax lots**. No scoring/analysis behavior changed.
+
+Backend:
+
+- `app/data/database.py` — new `portfolios` and `portfolio_holdings` tables
+  (SQLAlchemy Core, direct `create_all` — no migrations, no Alembic). Existing
+  tables untouched. `shares`/`average_cost` stored as canonical decimal strings
+  (TEXT) so exact user-entered precision survives the SQLite round-trip; a
+  `uq_portfolio_ticker` unique constraint enforces one ticker per portfolio.
+- `app/services/portfolio_service.py` — storage-only CRUD (create/list/get/
+  update/delete portfolio; add/update/remove holding). Decimal-safe validation
+  (`shares > 0`, `average_cost >= 0`, parsed via `Decimal(str(...))` to avoid
+  float artifacts), ticker normalization via the shared `normalize_ticker`,
+  duplicate-ticker rejection (preserved on update), cascade delete of holdings.
+  Errors: `PortfolioValidationError`/`PortfolioNotFoundError`/
+  `HoldingNotFoundError`/`DuplicateHoldingError`. Fetches no market data.
+- `app/services/portfolio_summary_service.py` — the only place current prices
+  are fetched (reuses `app/data/market_data.get_price_history`, latest close) and
+  the only place portfolio math runs. Exact `Decimal` arithmetic, rounded only at
+  the output boundary (money/percent to 2dp). Per holding: cost basis, market
+  value, unrealized gain/loss, return %, weight %. Portfolio totals: cost basis
+  (all holdings), market value / gain-loss / return (priced holdings only).
+  Partial/complete price failure is non-fatal — the affected holding is marked
+  `price_available: false` (market value `None`, never `0`), added to `warnings`,
+  and excluded from market-value-dependent totals (which are `None` when nothing
+  is priced). A `price_lookup` DI kwarg keeps tests deterministic.
+- `app/api/schemas/portfolios.py`, `app/api/routes/portfolios.py` — thin CRUD +
+  `GET /{id}/summary` routes; validation→400, duplicate ticker→409, missing→404;
+  summary stays 200 on price failure. Router registered in `app/api/main.py`.
+
+Frontend:
+
+- `types/portfolio.ts`, `api/portfolioApi.ts` (one fn per endpoint),
+  `lib/portfolio.ts` (money/percent/share formatting + gain/loss tone +
+  holding-form validation — pure, tested; never recomputes totals).
+- `components/portfolio/` — `PortfolioPanel` container (all state/handlers) plus
+  presentational `PortfolioSelector`, `PortfolioSummaryCards`, `HoldingsTable`
+  (per-row Analyze link / Edit / Remove), and a reusable `HoldingForm`.
+  `DashboardPage` now renders the panel in place of the old Portfolio
+  "coming soon" card; the Market Overview placeholder stays, still labeled.
+  Distinct loading / empty / success / partial-price-warning / error states.
+- CSS added to `styles.css` reusing the existing dark finance tokens.
+
+Testing:
+
+- Backend: `tests/test_portfolio_service.py`, `tests/test_portfolio_summary_service.py`,
+  `tests/test_portfolio_api.py` (74 new tests). All market data mocked/injected;
+  temp SQLite via the `engine` kwarg. Full suite **1712 passed**.
+- Frontend: `src/lib/portfolio.test.ts` (18 new). Full suite **69 passed**;
+  `npm run build` and `npm run lint` clean. Component-render tests remain out of
+  scope for the existing node-only Vitest harness (no jsdom / testing-library —
+  see `vitest.config.ts`); the behavior those would assert is covered by the
+  pure `lib/portfolio` helpers instead, so no new dependencies were added.
+- CLI unaffected (`python -m app.main --help` verified).
+
 ## 2026-06-13 — Code review & documentation refresh
 
 Senior-level review pass after the recent UI/snapshot milestones. No feature

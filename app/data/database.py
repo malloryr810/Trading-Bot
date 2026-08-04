@@ -131,6 +131,50 @@ watchlist_analysis_snapshot_results = Table(
 )
 
 
+# --- Personal portfolio holdings (Phase: current-portfolio tracking) ------
+# Manually entered, real holdings the user tracks by hand.  Storage only:
+# no broker links, no order execution, no cash balances, no realized gains,
+# no tax lots.  Current-price enrichment and all portfolio calculations happen
+# in the service layer at read time (the portfolio-summary endpoint) — never
+# stored here.  ``shares`` and ``average_cost`` are stored as canonical decimal
+# strings (TEXT) so exact user-entered precision survives the SQLite round-trip
+# rather than being coerced to a lossy float.
+
+portfolios = Table(
+    "portfolios",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("name", String, nullable=False),
+    Column("description", String, nullable=True),
+    Column("created_at", DateTime, nullable=False),
+    Column("updated_at", DateTime, nullable=False),
+)
+
+portfolio_holdings = Table(
+    "portfolio_holdings",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column(
+        "portfolio_id",
+        Integer,
+        ForeignKey("portfolios.id"),
+        nullable=False,
+    ),
+    Column("ticker", String, nullable=False),
+    # Decimal-safe: stored as the canonical string form of a Decimal.
+    Column("shares", String, nullable=False),
+    Column("average_cost", String, nullable=False),
+    # Optional ISO date string (YYYY-MM-DD); no time component.
+    Column("purchase_date", String, nullable=True),
+    Column("notes", String, nullable=True),
+    Column("created_at", DateTime, nullable=False),
+    Column("updated_at", DateTime, nullable=False),
+    # A ticker appears at most once per portfolio in this first version; the
+    # service also guards this in application code for a clear domain error.
+    UniqueConstraint("portfolio_id", "ticker", name="uq_portfolio_ticker"),
+)
+
+
 def build_engine(db_path: Path | str | None = None) -> Engine:
     """Create a SQLite engine and ensure the schema exists.
 

@@ -6,6 +6,7 @@ import { listWatchlists } from '../api/watchlistApi'
 import { ComingSoonCard } from '../components/dashboard/ComingSoonCard'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { LoadingState } from '../components/LoadingState'
+import { PortfolioPanel } from '../components/portfolio/PortfolioPanel'
 import { PageHeader } from '../components/layout/PageHeader'
 import { countByCategory, sumBy } from '../lib/dashboard'
 import { getErrorMessage } from '../lib/errors'
@@ -110,6 +111,9 @@ export function DashboardPage() {
         should be treated as a starting point for your own due diligence — not as
         a recommendation to buy, sell, or hold any security.
       </div>
+
+      {/* ── Personal portfolio (real, manual holdings) ─────────────── */}
+      <PortfolioPanel />
 
       <div className="dashboard-grid">
         {/* ── Market overview (not connected yet) ──────────────────── */}
@@ -268,12 +272,6 @@ export function DashboardPage() {
             </>
           )}
         </section>
-
-        {/* ── Portfolio (not built yet) ────────────────────────────── */}
-        <ComingSoonCard
-          title="Portfolio"
-          description="Manual portfolio tracking is planned but not connected yet. You'll be able to enter holdings by hand — no broker linking, no automated trading."
-        />
 
         {/* ── Source status (informational, not a sidebar duplicate) ─ */}
         <section className="dashboard-card" aria-label="Source status">
