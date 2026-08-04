@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
 import pytest
 
 from app.analysis.fundamentals_analysis import FundamentalAnalysisError
@@ -80,6 +81,38 @@ def _make_mock_fundamentals(
     return m
 
 
+def _make_price_history(closes: list[float]) -> pd.DataFrame:
+    """Build a normalized OHLCV frame with the given closes (volume always set)."""
+    index = pd.date_range("2024-01-01", periods=len(closes), freq="D")
+    return pd.DataFrame(
+        {
+            "open": closes,
+            "high": closes,
+            "low": closes,
+            "close": closes,
+            "volume": [1_000_000] * len(closes),
+        },
+        index=index,
+    )
+
+
+def _analyze_with_price_history(price_data: pd.DataFrame) -> Rating:
+    """Run _analyze_ticker over a locally built price history; rest of pipeline mocked."""
+    with (
+        patch(f"{_SVC}.get_price_history",              return_value=price_data),
+        patch(f"{_SVC}.get_company_fundamentals",       return_value=_make_mock_fundamentals()),
+        patch(f"{_SVC}.get_recent_news",                return_value=[]),
+        patch(f"{_SVC}.calculate_technical_indicators", return_value=MagicMock()),
+        patch(f"{_SVC}.summarize_technical_signals",    return_value=MagicMock()),
+        patch(f"{_SVC}.build_technical_signals",        return_value=[_make_signal()]),
+        patch(f"{_SVC}.build_fundamental_signals",      return_value=[]),
+        patch(f"{_SVC}.analyze_risk_conditions",        return_value=[]),
+        patch(f"{_SVC}.analyze_news",                   return_value=[]),
+        patch(f"{_SVC}.score_signals",                  return_value=_make_rating()),
+    ):
+        return _analyze_ticker("AAPL")
+
+
 def _mock_pipeline(rating: Rating | None = None):
     """Context manager patching the full analysis pipeline at the service level."""
     import contextlib
@@ -136,22 +169,28 @@ class TestAnalyzeTicker:
         assert result.company_name == "Apple Inc."
 
     def test_current_price_attached_from_price_data(self):
-        price_mock = MagicMock()
-        price_mock.__getitem__.return_value.iloc.__getitem__.return_value = 185.50
-        with (
-            patch(f"{_SVC}.get_price_history",              return_value=price_mock),
-            patch(f"{_SVC}.get_company_fundamentals",       return_value=_make_mock_fundamentals()),
-            patch(f"{_SVC}.get_recent_news",                return_value=[]),
-            patch(f"{_SVC}.calculate_technical_indicators", return_value=MagicMock()),
-            patch(f"{_SVC}.summarize_technical_signals",    return_value=MagicMock()),
-            patch(f"{_SVC}.build_technical_signals",        return_value=[_make_signal()]),
-            patch(f"{_SVC}.build_fundamental_signals",      return_value=[]),
-            patch(f"{_SVC}.analyze_risk_conditions",        return_value=[]),
-            patch(f"{_SVC}.analyze_news",                   return_value=[]),
-            patch(f"{_SVC}.score_signals",                  return_value=_make_rating()),
-        ):
-            result = _analyze_ticker("AAPL")
+        price_data = _make_price_history(closes=[180.0, 182.0, 185.50])
+        result = _analyze_with_price_history(price_data)
         assert result.current_price == pytest.approx(185.50)
+
+    def test_current_price_falls_back_past_an_in_progress_session_row(self):
+        # The provider posts a current-day row with a volume but null OHLC while
+        # the session is open; the last settled close is the right answer.
+        price_data = _make_price_history(closes=[180.0, 184.75, float("nan")])
+        result = _analyze_with_price_history(price_data)
+        assert result.current_price == pytest.approx(184.75)
+
+    def test_current_price_skips_several_trailing_null_closes(self):
+        price_data = _make_price_history(
+            closes=[180.0, 191.25, float("nan"), float("nan")]
+        )
+        result = _analyze_with_price_history(price_data)
+        assert result.current_price == pytest.approx(191.25)
+
+    def test_current_price_is_none_when_no_close_is_usable(self):
+        price_data = _make_price_history(closes=[float("nan"), float("nan")])
+        result = _analyze_with_price_history(price_data)
+        assert result.current_price is None
 
     def test_passes_beta_to_risk_analysis(self):
         fund_mock = _make_mock_fundamentals(beta=1.5)

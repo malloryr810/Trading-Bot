@@ -33,7 +33,7 @@ from typing import Any
 
 from sqlalchemy.engine import Engine
 
-from app.data.market_data import get_price_history
+from app.data.market_data import get_price_history, latest_valid_close
 from app.services.portfolio_service import get_portfolio
 from app.utils.helpers import safe_float
 
@@ -47,15 +47,16 @@ _PERCENT = Decimal("0.01")
 
 
 def _default_price_lookup(ticker: str) -> float | None:
-    """Return the latest close for a ticker via the existing market-data layer.
+    """Return the latest valid close for a ticker via the existing market-data layer.
 
-    Reuses ``get_price_history`` (no second provider, no scraping).  Returns the
-    most recent close as the current price, or ``None`` if it is not usable.
+    Reuses ``get_price_history`` (no second provider, no scraping) and the shared
+    ``latest_valid_close`` reader, so an in-progress session — whose final row
+    can carry a volume but null OHLC values — falls back to the last settled
+    close instead of reporting no price.  Returns ``None`` when nothing usable
+    is available.
     """
     df = get_price_history(ticker, period="5d", interval="1d")
-    if df.empty:
-        return None
-    return safe_float(df["close"].iloc[-1])
+    return latest_valid_close(df)
 
 
 def _round_money(value: Decimal) -> float:

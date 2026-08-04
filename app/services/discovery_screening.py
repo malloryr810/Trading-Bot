@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.data.market_data import DataFetchError, get_price_history
+from app.data.market_data import DataFetchError, get_price_history, latest_valid_close
 from app.utils.helpers import safe_float
 
 # Enough daily bars for the technical layer to produce non-degenerate signals.
@@ -65,18 +65,19 @@ def prescreen_ticker(ticker: str) -> PrescreenResult:
         )
 
     # The provider often returns a partially formed row for the current session
-    # (volume present, OHLC still null), so work from the settled closes only.
-    closes = history["close"].dropna()
+    # (volume present, OHLC still null), so count settled closes rather than rows.
+    settled_close_count = int(history["close"].notna().sum())
 
-    if len(closes) < MIN_HISTORY_ROWS:
+    if settled_close_count < MIN_HISTORY_ROWS:
         return PrescreenResult(
             ticker,
             False,
-            f"Only {len(closes)} settled price rows available; "
+            f"Only {settled_close_count} settled price rows available; "
             f"{MIN_HISTORY_ROWS} required for analysis.",
         )
 
-    last_close = safe_float(closes.iloc[-1])
+    # Price selection itself goes through the shared market-data reader.
+    last_close = latest_valid_close(history)
     if last_close is None or last_close <= 0:
         return PrescreenResult(
             ticker, False, "Most recent settled close price is not positive."

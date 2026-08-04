@@ -4,6 +4,12 @@ Market data fetcher.
 Responsible for retrieving OHLCV price history from yfinance.
 Returns a normalized, validated pandas DataFrame consumed by the analysis layer.
 
+Also owns ``latest_valid_close`` — the single, canonical way to read a "current
+price" out of a price-history DataFrame. Use it instead of indexing the final
+row: while a trading session is in progress the provider can return a row for
+the current day whose OHLC values are still null, and taking that row literally
+turns a perfectly good price into "unavailable".
+
 Validation pipeline (in order):
     1. Normalize and validate the ticker symbol.
     2. Call yfinance, wrapping any exception as DataFetchError.
@@ -21,7 +27,7 @@ from __future__ import annotations
 import pandas as pd
 import yfinance as yf
 
-from app.utils.helpers import normalize_ticker
+from app.utils.helpers import normalize_ticker, safe_float
 
 
 REQUIRED_COLUMNS: frozenset[str] = frozenset({"open", "high", "low", "close", "volume"})
@@ -29,6 +35,40 @@ REQUIRED_COLUMNS: frozenset[str] = frozenset({"open", "high", "low", "close", "v
 
 class DataFetchError(Exception):
     """Raised when market data cannot be fetched or validated."""
+
+
+def latest_valid_close(price_data: pd.DataFrame) -> float | None:
+    """Return the most recent usable close price from a price-history DataFrame.
+
+    This is the canonical "what is it trading at right now" reader. Rows are
+    scanned newest-first and the first close that is a finite number wins;
+    missing, null, NaN, infinite, and non-numeric closes are skipped. That
+    matters because while a session is in progress the provider commonly returns
+    a row for the current day with a volume but null OHLC values — the settled
+    close from the previous session is the right answer there, not "no price".
+
+    Zero and negative closes are returned as-is rather than skipped: they are
+    numerically valid, and callers that require a positive price (portfolio
+    valuation, the discovery pre-screen) already check for that themselves.
+
+    Args:
+        price_data: A normalized price-history DataFrame (lowercase columns).
+
+    Returns:
+        The most recent finite close, or ``None`` when the frame is empty, has
+        no ``close`` column, or contains no usable close at all. ``None`` is the
+        explicit "unavailable" state used throughout this project (see
+        ``safe_float``) — it is never substituted with zero.
+    """
+    if not isinstance(price_data, pd.DataFrame) or "close" not in price_data.columns:
+        return None
+
+    for value in reversed(price_data["close"].tolist()):
+        close = safe_float(value)
+        if close is not None:
+            return close
+
+    return None
 
 
 def get_price_history(

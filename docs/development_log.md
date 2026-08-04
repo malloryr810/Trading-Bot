@@ -1,5 +1,73 @@
 # Development Log
 
+## 2026-08-04 — Fix: current price lost to in-progress trading-day rows
+
+Narrow bug fix for the current-price issue flagged in the discovery milestone
+entry below. No new features, no behavior change for normal data.
+
+The bug: while a trading session is in progress, yfinance returns a row for the
+current day that carries a volume but null OHLC values. Code that read the
+current price as `close.iloc[-1]` therefore got `NaN`, which `safe_float`
+correctly turned into `None` — so `current_price` came back unavailable and the
+Analyze page, Discover cards, and portfolio summaries rendered an em dash until
+the session settled, even though a perfectly good settled close existed one row
+back.
+
+The fix: one canonical reader, `latest_valid_close(df)`, in
+`app/data/market_data.py` — the module that already owns the normalized OHLCV
+contract. It scans rows newest-first and returns the first close that is a
+finite number, skipping missing, null, NaN, infinite, and non-numeric values.
+It returns `None` (never `0`) when nothing usable exists, matching the
+`safe_float` convention already used across the project, and it is non-raising
+because all three call sites already have a graceful unavailable path
+(`StockReport.current_price` is optional, the portfolio marks the holding
+`price_available: false` with a warning, the pre-screen returns a reason).
+Zero and negative closes are returned rather than skipped — they are
+numerically valid, and the callers that need a positive price already check.
+
+Call sites, all now routed through the one helper:
+
+- `app/services/stock_analysis_service.py` — `_analyze_ticker` attaches
+  `current_price` via the helper (was `safe_float(price_data["close"].iloc[-1])`).
+  This covers single-ticker Analyze, saved reports, watchlist analysis and
+  snapshots, and Discover, since every one of them goes through this pipeline.
+- `app/services/portfolio_summary_service.py` — `_default_price_lookup` uses the
+  helper (was the same last-row read); its redundant `df.empty` guard is gone
+  because the helper handles an empty frame.
+- `app/services/discovery_screening.py` — replaced its local duplicate
+  (`close.dropna().iloc[-1]`, added as a workaround during the discovery
+  milestone) with the shared helper. The separate "enough settled closes"
+  sufficiency count stays, now expressed as `close.notna().sum()`.
+
+Deliberately unchanged: the analysis modules still read the final row
+(`technicals.py` latest indicator row, `risk_analysis.py` 30-day return). Those
+are analysis inputs, not current price, and touching them would alter signals
+and scoring. Scoring weights, thresholds, categories, confidence logic, and
+recommendation behavior are untouched.
+
+Verified live (AAPL, mid-session): the raw final row's close is `nan`, while
+`latest_valid_close` and the portfolio lookup both return 308.91, and
+`analyze_stock("MSFT")` now returns a populated `current_price` where it
+previously returned `None`.
+
+Tests (+26, all deterministic; no live yfinance calls):
+
+- `tests/test_market_data.py` — new `TestLatestValidClose`: valid final row,
+  normal-data parity with plain last-row access, null / NaN / infinite /
+  non-numeric final close, the real in-progress shape (volume present, OHLC
+  null), multiple trailing invalid rows, no valid close at all, empty frame,
+  missing `close` column, non-DataFrame input, "missing is not zero", zero close
+  returned as-is, and non-mutation of the input frame.
+- `tests/test_stock_analysis_service.py` — the analyze path now returns the last
+  settled close past one or several null trailing rows, and `None` only when no
+  close is usable. The pre-existing current-price test was rebuilt on a real
+  DataFrame (it had mocked `df["close"].iloc[-1]` directly).
+- `tests/test_portfolio_summary_service.py` — `_default_price_lookup` behavior
+  across the same cases, plus an end-to-end summary showing a holding priced
+  from the last settled close with no warning raised.
+- `tests/test_discovery_screening.py` — several trailing null rows still pass,
+  and the pre-screen delegates price selection to the shared reader.
+
 ## 2026-08-03 — Stock discovery engine (Milestone 1)
 
 Added the first version of the stock discovery engine: the app can now surface
@@ -119,6 +187,8 @@ Known limitations (documented deliberately):
   pre-screen works around this by using the last *settled* close; fixing the
   pipeline's `current_price` would change existing single-ticker analysis
   behavior and belongs in its own scoped task.
+  **Resolved 2026-08-04** — see the current-price fix entry at the top of this
+  log; all three call sites now share `market_data.latest_valid_close`.
 
 ## 2026-08-03 — Personal portfolio holdings (Milestone 1)
 

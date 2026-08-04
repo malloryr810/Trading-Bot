@@ -188,7 +188,9 @@ CORS is configured to allow `http://localhost:5173` and `http://127.0.0.1:5173`
 > **Portfolios are manual, read-only holdings.** Portfolio and holding CRUD is
 > storage only and never touches market data. Current prices are fetched (via the
 > existing yfinance market-data layer) **only** when `GET /api/portfolios/{id}/summary`
-> is requested. `shares` and `average_cost` are validated decimal-safe
+> is requested. "Current price" everywhere in this project means the latest
+> *valid* close from historical daily data — not necessarily the provider's final
+> raw row, which during an open session can carry a volume with null OHLC values. `shares` and `average_cost` are validated decimal-safe
 > (`shares > 0`, `average_cost ≥ 0`) and a portfolio holds each ticker at most
 > once. If a ticker's price cannot be fetched, that holding is marked
 > `price_available: false` (its market value is `null`, never `0`), it is listed
@@ -387,7 +389,7 @@ app/
     discovery_screening.py         # stage-1 lightweight price-data validity check
     discovery_ranking.py           # deterministic per-mode ordering + match reasons (no scoring)
   data/
-    market_data.py                 # OHLCV price history
+    market_data.py                 # OHLCV price history + latest_valid_close (current-price reader)
     fundamentals.py                # Company fundamentals
     news_data.py                   # Recent news headlines
     storage.py                     # Saves reports and JSON results to disk

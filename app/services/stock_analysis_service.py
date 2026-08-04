@@ -25,12 +25,11 @@ from app.analysis.technicals import (
     summarize_technical_signals,
 )
 from app.data.fundamentals import get_company_fundamentals
-from app.data.market_data import get_price_history
+from app.data.market_data import get_price_history, latest_valid_close
 from app.data.news_data import get_recent_news
 from app.models.rating import Rating
 from app.models.stock_report import StockReport
 from app.reports.report_generator import build_stock_report
-from app.utils.helpers import safe_float
 from app.watchlist import WatchlistResult, load_watchlist, scan_watchlist
 
 
@@ -79,7 +78,9 @@ def _analyze_ticker(ticker: str) -> Rating:
     )
     return rating.model_copy(update={
         "company_name": fundamentals.company_name,
-        "current_price": safe_float(price_data["close"].iloc[-1]),
+        # Latest *valid* close — an in-progress session can leave the final row's
+        # OHLC null, which must not read as "no price".
+        "current_price": latest_valid_close(price_data),
     })
 
 

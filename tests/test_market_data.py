@@ -18,6 +18,7 @@ from app.data.market_data import (
     _validate_price_history,
     _validate_required_columns,
     get_price_history,
+    latest_valid_close,
 )
 
 
@@ -479,3 +480,93 @@ class TestValidatePriceHistory:
         df = _make_normalized_ohlcv().drop(columns=["close"])
         with pytest.raises(DataFetchError, match="missing required columns"):
             _validate_price_history(df, "AAPL")
+
+
+# ---------------------------------------------------------------------------
+# latest_valid_close — the canonical current-price reader
+# ---------------------------------------------------------------------------
+
+class TestLatestValidClose:
+    def test_returns_latest_close_when_final_row_is_valid(self):
+        df = _make_normalized_ohlcv(rows=5)
+        df.loc[df.index[-1], "close"] = 187.25
+        assert latest_valid_close(df) == pytest.approx(187.25)
+
+    def test_normal_data_is_unaffected(self):
+        # Every row valid and identical — behavior must match plain last-row access.
+        df = _make_normalized_ohlcv(rows=5)
+        assert latest_valid_close(df) == pytest.approx(df["close"].iloc[-1])
+
+    def test_falls_back_when_final_close_is_none(self):
+        df = _make_normalized_ohlcv(rows=5)
+        df.loc[df.index[-2], "close"] = 150.0
+        df["close"] = df["close"].astype(object)
+        df.loc[df.index[-1], "close"] = None
+        assert latest_valid_close(df) == pytest.approx(150.0)
+
+    def test_falls_back_when_final_close_is_nan(self):
+        df = _make_normalized_ohlcv(rows=5)
+        df.loc[df.index[-2], "close"] = 150.0
+        df.loc[df.index[-1], "close"] = float("nan")
+        assert latest_valid_close(df) == pytest.approx(150.0)
+
+    def test_in_progress_session_row_keeps_volume_but_not_price(self):
+        # The real-world shape: the provider posts a current-day row with a
+        # volume while OHLC are still null.
+        df = _make_normalized_ohlcv(rows=5)
+        df.loc[df.index[-2], "close"] = 333.0
+        df.loc[df.index[-1], ["open", "high", "low", "close"]] = float("nan")
+        df.loc[df.index[-1], "volume"] = 71_988_041
+        assert latest_valid_close(df) == pytest.approx(333.0)
+
+    def test_skips_multiple_trailing_invalid_rows(self):
+        df = _make_normalized_ohlcv(rows=6)
+        df.loc[df.index[2], "close"] = 120.0
+        df.loc[df.index[3:], "close"] = float("nan")
+        assert latest_valid_close(df) == pytest.approx(120.0)
+
+    def test_skips_infinite_close(self):
+        df = _make_normalized_ohlcv(rows=3)
+        df.loc[df.index[-2], "close"] = 111.0
+        df.loc[df.index[-1], "close"] = float("inf")
+        assert latest_valid_close(df) == pytest.approx(111.0)
+
+    def test_skips_non_numeric_close(self):
+        df = _make_normalized_ohlcv(rows=3)
+        df["close"] = [101.0, 102.0, "n/a"]
+        assert latest_valid_close(df) == pytest.approx(102.0)
+
+    def test_returns_none_when_no_valid_close_exists(self):
+        df = _make_normalized_ohlcv(rows=4)
+        df["close"] = float("nan")
+        assert latest_valid_close(df) is None
+
+    def test_returns_none_for_an_empty_frame(self):
+        assert latest_valid_close(_make_normalized_ohlcv(rows=0)) is None
+
+    def test_returns_none_when_close_column_is_absent(self):
+        df = _make_normalized_ohlcv().drop(columns=["close"])
+        assert latest_valid_close(df) is None
+
+    def test_returns_none_for_a_non_dataframe(self):
+        assert latest_valid_close(None) is None
+
+    def test_missing_close_is_never_reported_as_zero(self):
+        df = _make_normalized_ohlcv(rows=3)
+        df["close"] = float("nan")
+        result = latest_valid_close(df)
+        assert result is None
+        assert result != 0
+
+    def test_zero_close_is_returned_rather_than_skipped(self):
+        # Zero is numerically valid; callers that need a positive price check it.
+        df = _make_normalized_ohlcv(rows=3)
+        df.loc[df.index[-1], "close"] = 0.0
+        assert latest_valid_close(df) == 0.0
+
+    def test_does_not_mutate_the_frame(self):
+        df = _make_normalized_ohlcv(rows=4)
+        df.loc[df.index[-1], "close"] = float("nan")
+        before = df.copy()
+        latest_valid_close(df)
+        pd.testing.assert_frame_equal(df, before)

@@ -59,6 +59,23 @@ class TestPrescreenPasses:
         with patch(_FETCH, return_value=history):
             assert prescreen_ticker("AAPL").passed is True
 
+    def test_several_trailing_null_close_rows_are_ignored(self):
+        history = _history(rows=MIN_HISTORY_ROWS + 3)
+        history.iloc[-3:, history.columns.get_indexer(["open", "high", "low", "close"])] = (
+            float("nan")
+        )
+        with patch(_FETCH, return_value=history):
+            assert prescreen_ticker("AAPL").passed is True
+
+    def test_price_selection_delegates_to_the_shared_reader(self):
+        # The pre-screen must not carry its own copy of latest-close logic.
+        with patch(_FETCH, return_value=_history()):
+            with patch(
+                "app.services.discovery_screening.latest_valid_close", return_value=150.0
+            ) as reader:
+                assert prescreen_ticker("AAPL").passed is True
+        reader.assert_called_once()
+
     def test_settled_rows_must_still_meet_the_minimum(self):
         history = _history(rows=MIN_HISTORY_ROWS)
         history.iloc[-1, history.columns.get_indexer(["close"])] = float("nan")
