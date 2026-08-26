@@ -15,6 +15,7 @@ from app.api.routes import (
     discovery,
     health,
     market_data,
+    paper_trading,
     portfolios,
     reports,
     watchlist_snapshots,
@@ -50,6 +51,7 @@ def create_app() -> FastAPI:
     _app.include_router(market_data.router, prefix="/api")
     _app.include_router(portfolios.router, prefix="/api")
     _app.include_router(discovery.router, prefix="/api")
+    _app.include_router(paper_trading.router, prefix="/api")
     return _app
 
 

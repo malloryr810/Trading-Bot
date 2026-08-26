@@ -9,22 +9,30 @@ computes signals, scores them, and produces structured plain-text research repor
 for individual stocks and watchlists. **It is not an automated trading system.**
 
 Do not implement any of the following:
-- Broker API calls or integrations
-- Order execution of any kind
-- Live or paper trading
-- Automatic position management
-- Margin or options trading
+- Broker API calls or integrations (Vanguard, Schwab, Plaid, Alpaca, Robinhood, IBKR, or any other)
+- Real order execution of any kind
+- Live trading
+- Real account linking or position syncing
+- Automatic trading, automatic rebalancing, or automatic position management
+- Trade alerts or allocation advice
+- Margin, options, or short selling
 - Portfolio automation
 - ML/LLM sentiment models
 - Backtesting (unless explicitly scoped and approved)
+
+**Paper trading is the one exception, and it is a simulation.** Phase 7 shipped a
+self-contained paper trading vertical: hand-entered buys and sells against a
+made-up cash balance, at prices the caller supplies. It contacts no market and
+places no real order. Everything in the list above still applies to it — see
+the paper trading entries in **Layer Rules** and **Non-Negotiable Guardrails**.
 
 ## Current State (read this first)
 
 Everything in **Currently Implemented** below is built and tested. Concretely,
 as of 2026-08-26:
 
-- **Backend:** the full analysis pipeline, 8 API route modules, 11 service
-  modules, and a SQLite layer with 7 tables. `pytest` runs 1876 deterministic
+- **Backend:** the full analysis pipeline, 9 API route modules, 13 service
+  modules, and a SQLite layer with 10 tables. `pytest` runs 2056 deterministic
   tests, all passing.
 - **Frontend:** 7 pages wired to the API. `npm test` runs 93 Vitest tests over
   `src/lib/` and `src/api/client.ts` only — the pure helpers. There are **no**
@@ -39,7 +47,12 @@ What is *not* built, so you do not go looking for it:
   `docs/*calibration*` files are **proposals**, not shipped behavior.
 - Market-data staleness detection (a deliberate `TODO` in `app/data/market_data.py`).
 - Any second discovery universe. `starter_large_cap` is the only one.
-- `app/simulation/` and `app/ml/` (Phases 7 and 8 — do not create them).
+- Any **paper trading frontend**. The backend vertical is complete and tested,
+  but there is no Paper Trading page and no `paperTradingApi.ts` — the feature
+  is API-only today.
+- `app/ml/` (Phase 8 — do not create it). `app/simulation/` was never created
+  either: Phase 7 shipped as a service vertical (`paper_trading_service`), not
+  as a new top-level package.
 
 Tooling notes: there is **no** Python linter or formatter configured (no ruff,
 black, or mypy) and no pre-commit hooks. There are no database migrations —
@@ -160,10 +173,12 @@ cd frontend && npm run lint
 | `app/services/portfolio_summary_service.py` | `get_portfolio_summary` — enriches a portfolio with current prices (reuses `market_data` + `latest_valid_close`) and computes holding + portfolio values with `Decimal` math. Prices fetched only here, never during CRUD. Partial/complete price failure is non-fatal (per-holding `price_available` + `warnings`); market-value-dependent totals exclude unpriced holdings and are `None` (never zero) when nothing is priced. Optional `price_lookup`/`engine` kwargs for tests |
 | `app/services/discovery_screening.py` | `prescreen_ticker` — stage-1 lightweight validity check (fetchable history, ≥60 settled closes, positive latest *valid* close via `latest_valid_close`, usable average volume). Returns a `PrescreenResult`; never raises, never scores |
 | `app/services/discovery_ranking.py` | Pure per-mode ranking strategies over existing `Rating` objects (`rank_ratings`, `match_reason`, `valuation_lean`, `list_mode_info`). Ordering only — no scoring, ties broken by ticker |
+| `app/services/paper_trading_service.py` | **Simulated** trading accounts, buys/sells, positions, and the transaction ledger over SQLite (storage + accounting only; no market data). Decimal-safe; money quantised to cents, weighted average cost to 8 dp. Cash, position, and ledger row are written in one DB transaction. `PaperTradingValidationError`/`PaperTradingAccountNotFoundError`/`InsufficientFundsError`/`InsufficientSharesError`; optional `engine` kwarg for tests. No broker, no real order |
+| `app/services/paper_trading_summary_service.py` | `get_account_summary`, `get_priced_positions` — values open paper positions at current prices (reuses `market_data` + `latest_valid_close`) and computes unrealized gain/loss, open-position value, total value, and total return with `Decimal` math. Prices fetched only here, never during account CRUD or trade recording. Partial price failure is non-fatal (per-position `price_available` + `warnings`); value-dependent totals are `None` (never zero) when a held position could not be priced. Optional `price_lookup`/`engine` kwargs for tests |
 | `app/services/discovery_service.py` | `run_discovery`, `list_discovery_modes`, `list_discovery_universes` — universe → bounded pre-screen → `analyze_stock_rating` → mode ranking → `DiscoveryRun`. Bounded by `max_full_analysis`; per-ticker failures become warnings; `DiscoveryValidationError` → 400. Optional `analyze`/`prescreen` kwargs for tests. Nothing saved, nothing scheduled |
 | `app/data/universe_loader.py` | Loads the static, versioned universe CSVs in `app/data/universes/` (`load_universe`, `load_universe_file`, `list_universes`); validates ticker uniqueness/normalization; caches per key. No network access |
 | `app/data/universes/starter_large_cap.csv` | The only universe today: a hand-maintained set of liquid large-cap U.S. equities (`ticker,company_name,sector,industry`) |
-| `app/data/database.py` | SQLAlchemy Core engine factory (`build_engine`), the shared `as_utc(dt)` reader (SQLite stores naive datetimes; every persistence service normalises through it), and table definitions: `analysis_reports`, `watchlists`, `watchlist_tickers`, `watchlist_analysis_snapshots`, `watchlist_analysis_snapshot_results`, `portfolios`, `portfolio_holdings` |
+| `app/data/database.py` | SQLAlchemy Core engine factory (`build_engine`), the shared `as_utc(dt)` reader (SQLite stores naive datetimes; every persistence service normalises through it), and table definitions: `analysis_reports`, `watchlists`, `watchlist_tickers`, `watchlist_analysis_snapshots`, `watchlist_analysis_snapshot_results`, `portfolios`, `portfolio_holdings`, `paper_trading_accounts`, `paper_trading_transactions`, `paper_trading_positions` |
 | `app/api/main.py` | FastAPI app factory; `uvicorn app.api.main:app` entry point |
 | `app/api/routes/health.py` | `GET /api/health` |
 | `app/api/routes/analysis.py` | `POST /api/analyze` — analysis only; calls `analyze_stock`, does not save |
@@ -173,6 +188,8 @@ cd frontend && npm run lint
 | `app/api/routes/market_data.py` | `GET /api/market-data/{ticker}/history` — read-only daily OHLCV history |
 | `app/api/routes/portfolios.py` | Portfolio + holding CRUD — `GET/POST /api/portfolios`, `GET/PATCH/DELETE /api/portfolios/{id}`, `POST /api/portfolios/{id}/holdings`, `PATCH`/`DELETE` `/api/portfolios/{id}/holdings/{holding_id}`, `GET /api/portfolios/{id}/summary` (priced). Thin; validation→400, duplicate ticker→409, missing→404; summary stays 200 on price failure |
 | `app/api/routes/discovery.py` | `GET /api/discovery` (ranked candidates; `mode`, `universe`, `limit`, `max_full_analysis`), `GET /api/discovery/modes`, `GET /api/discovery/universes`. Thin; invalid params → 400, partial ticker failures stay 200 with `warnings` |
+| `app/api/routes/paper_trading.py` | Paper trading — `POST`/`GET /api/paper-trading/accounts`, `GET /api/paper-trading/accounts/{id}` (`/summary`, `/positions`, `/transactions`), `POST` `/buy` and `/sell`. Thin; validation→400, account missing→404, state conflict (insufficient cash/shares)→409; priced reads stay 200 on price failure |
+| `app/api/schemas/paper_trading.py` | Paper trading request/response schemas (`CreateAccountRequest`, `TradeRequest`, `AccountSummary`, `AccountDetail`, `PositionResponse`, `TransactionResponse`) plus priced views (`PricedPosition`, `PositionsResponse`, `AccountSummaryResponse`, `PriceWarning`). Starting cash, quantity, and price accepted as `Decimal` |
 | `app/api/schemas/analysis.py` | `AnalyzeRequest` — validates and normalizes ticker at the API boundary |
 | `app/api/schemas/discovery.py` | Names the discovery domain models for the HTTP layer (`DiscoveryResponse`, `DiscoveryModeResponse`, `DiscoveryUniverseResponse`); no duplicate field definitions |
 | `app/api/schemas/reports.py` | `SavedReportSummary`, `SavedReportDetail` — response schemas for persistence endpoints |
@@ -242,6 +259,24 @@ universes/*.csv → universe_loader → discovery pre-screen → bounded shortli
 - **Watchlist management** (`watchlist_service` + `/api/watchlists`) is storage/CRUD only — it never runs analysis, scans, alerts, or trades. It is separate from `app/watchlist.py`, which is the CLI multi-ticker analysis scanner. Do not merge the two; do not add analysis to the watchlist CRUD layer without an explicitly scoped task.
 - **Portfolio holdings** (`portfolio_service` + `/api/portfolios`) are manually entered, real holdings for tracking only. `portfolio_service` is storage/CRUD and fetches no market data; `portfolio_summary_service` is the only place current prices are fetched (reusing `app/data/market_data`) and the only place portfolio math runs. Keep these two separate — do not fetch prices during CRUD, and do not put calculations in routes. This is decision-support only: never add broker links, order execution, cash balances, realized gains, dividends, tax lots, or automatic trading.
 - **Stock discovery** (`discovery_service` + `/api/discovery`) is a layer *around* the existing analysis engine, never a second one. It must not define scores, weights, thresholds, categories, or confidence logic — `discovery_ranking` may only reorder existing `Rating` objects and explain the ordering. Every run stays bounded by `max_full_analysis` (ceiling 50) and is synchronous, on-demand, and unsaved: no scheduled scans, no background jobs, no persistence. Universes are static CSVs in `app/data/universes/` — never scraped or fetched at runtime. Per-ticker failures become `warnings`, never a failed request.
+- **Paper trading** (`paper_trading_service` + `paper_trading_summary_service` +
+  `/api/paper-trading`) is a **simulation vertical that sits entirely outside the
+  research spine**. It must never affect — or be read by — ratings, scores,
+  reports, discovery ranking, watchlist analysis, or portfolio summaries, and
+  `analyze_stock` must never touch it. It shares **no tables and no code** with
+  manual portfolio tracking: `portfolios`/`portfolio_holdings` record real
+  holdings and carry no cash or ledger. Keep the same two-module split as
+  portfolios — `paper_trading_service` is storage + accounting and fetches **no**
+  market data; `paper_trading_summary_service` is the only place prices are
+  fetched and the only place valuation math runs. The transaction table is an
+  append-only ledger and the source of truth; the positions table is a derived
+  cache updated atomically in the same DB transaction as the cash movement. Two
+  invariants must hold after every trade and are covered by tests:
+  `cash_balance == starting_cash - Σ(buy gross) + Σ(sell gross)` and
+  `realized_gain_loss == Σ(transaction realized)`. Routes stay thin — no
+  accounting in a route handler. This is decision-support simulation only: never
+  add a broker API, a real account link, real order execution, automatic trading,
+  rebalancing, alerts, allocation advice, margin, options, or short selling.
 - **Frontend** owns no business logic: it calls the typed API client and formats results for display. It must not recalculate scores, categories, weights, portfolio totals, discovery ranking, or re-validate domain rules the backend already enforces (the holding-form check in `lib/portfolio` is pre-submit UX only; the backend stays authoritative).
 
 ## Scoring Weights
@@ -287,7 +322,7 @@ Each analysis module follows the same pattern:
 | — | Market-data chart (read-only) | **Done** — `market_data_service` + `GET /api/market-data/{ticker}/history`; daily price chart on the Analyze page (Lightweight Charts) |
 | — | Personal portfolio holdings (manual) | **Milestone 1 complete** — `portfolios`/`portfolio_holdings` tables, `portfolio_service` (CRUD) + `portfolio_summary_service` (priced summary), `/api/portfolios` CRUD + `GET /{id}/summary`, Dashboard `PortfolioPanel`. Manual entry only; current-price valuation via existing market-data layer; partial-price-failure tolerant. No broker links, cash, realized gains, dividends, tax lots, or trading |
 | — | Stock discovery engine | **Milestone 1 complete** — static `starter_large_cap` universe + `universe_loader`, stage-1 pre-screen, bounded full analysis (`max_full_analysis`, default 25/ceiling 50), six deterministic ranking modes (`overall`, `momentum`, `quality`, `value`, `defensive`, `avoid`), `GET /api/discovery(+/modes,/universes)`, Discover page. Rule-based and explainable; no ML, no LLM picks, no scoring changes, nothing saved or scheduled |
-| 7 | Mock trading simulation (`app/simulation/`) | Not started |
+| 7 | Paper trading simulation | **Milestone 1 complete (backend only)** — `paper_trading_accounts`/`_transactions`/`_positions` tables, `paper_trading_service` (accounts + buy/sell accounting + ledger, storage-only) and `paper_trading_summary_service` (priced positions + valued summary), 8 `/api/paper-trading` endpoints. Stored positions over an append-only ledger; Decimal-exact, cent-quantised money. Implemented as a service vertical, **not** as `app/simulation/`. Simulated only — no broker, no real order, no real account, nothing automatic. **No frontend UI yet** |
 | 8 | ML research layer (`app/ml/`) | Not started |
 | 9 | Deployment and hardening | Not started |
 
@@ -296,29 +331,34 @@ See `docs/full_stack_product_architecture.md` for full scope of each phase.
 **Current priority: code quality and research quality, not more dashboard polish.**
 Do not start the next visual feature (e.g. per-ticker sparklines, batch
 price-history endpoint) without an explicitly scoped task.
-Snapshot/report/watchlist/portfolio/discovery concerns are separate and must stay separate.
+Snapshot/report/watchlist/portfolio/discovery/paper-trading concerns are separate
+and must stay separate.
 Discovery is a bounded, on-demand research surface — do not extend it toward
 scheduled scans, alerts, saved discovery runs, larger universes, ML, or
 LLM-generated picks without an explicitly scoped task.
 Portfolio holdings are manual-entry tracking only — do not extend them toward
-paper trading, cash, realized P&L, dividends, tax lots, or broker links without
-an explicitly scoped task.
+cash, realized P&L, dividends, tax lots, or broker links without an explicitly
+scoped task. Cash and realized gains belong to the **paper trading** vertical,
+which is separate and shares no tables with it; do not merge the two.
+Paper trading is backend-only today — building its frontend is the next scoped
+task, not an excuse to widen the backend.
 
 ## Non-Negotiable Guardrails
 
 These apply to every phase and every task:
 
 - **No live trading** — never connect to a broker or execute a real order
-- **No broker APIs** — no Alpaca, Robinhood, IBKR, or any brokerage integration
-- **No order execution** — no scheduled or triggered buy/sell of any kind
-- **No options or margin** — equities only; no derivatives or leveraged positions
+- **No broker APIs** — no Vanguard, Schwab, Plaid, Alpaca, Robinhood, IBKR, or any brokerage integration, in the research pipeline or the paper trading vertical
+- **No real order execution** — no scheduled or triggered buy/sell of any kind. A paper trade is a database row, never an order
+- **No options, margin, or short selling** — equities only; no derivatives or leveraged positions, and a paper sell may never exceed the shares the account holds
 - **Portfolio is manual + read-only** — holdings are hand-entered for tracking; never connect a brokerage account, sync positions, or trade. No cash balances, realized gains, dividends, or tax lots
 - **Discovery is research, not advice** — discovery output is a rule-based, explainable candidate list. Never generate picks with an LLM or ML model, never change scoring rules to make discovery "work", and never let a discovery run trigger an order, an alert, or a scheduled scan
 - **No unbounded scans** — a single discovery request may never analyze more than `MAX_FULL_ANALYSIS_CEILING` tickers
 - **No route-handler logic** — API routes call services; they never contain pipeline logic
 - **No CLI regression** — `python -m app.main` must always work after any change
 - **No premature ML** — do not add `app/ml/` until Phase 8 is explicitly scoped
-- **No premature simulation** — do not add `app/simulation/` until Phase 7 is explicitly scoped
+- **Paper trading is a simulation, never a market connection** — every paper trade is a row the user submitted at a price the user supplied. Never fetch a price in order to "execute" a trade, never route an order, and never add a broker API (Vanguard, Schwab, Plaid, Alpaca, Robinhood, Interactive Brokers, or any other), a real account link, or position syncing. No automatic trading, automatic rebalancing, trade alerts, allocation advice, margin, options, or short selling — a sell may never exceed the shares the account holds
+- **Paper trading stays out of the research spine** — it may read no analysis output and influence no analysis output
 - **Frontend must not duplicate backend logic** — no scoring, signal calculation, category derivation, or persistence in frontend code; display only
 - **Frontend data ownership** — frontend formats dates/numbers for display; it must never recalculate ratings, categories, or weights; all analysis stays in the backend
 - **Frontend stack** — React + Vite + TypeScript; plain CSS; native fetch; React Router; see `docs/frontend_plan.md` for the full plan

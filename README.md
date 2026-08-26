@@ -52,20 +52,26 @@ This tool prints reports. It does not place trades.
 - **Daily price chart** — read-only market-data history endpoint rendered as a daily closing-price chart on the Analyze page
 - **Personal portfolios** — create named portfolios and manually enter the holdings you own (ticker, shares, average cost, optional purchase date/notes); a priced summary values each holding at the current end-of-day price and computes cost basis, market value, unrealized gain/loss, return %, and portfolio weight. Manual entry only — no brokerage connection and no trading
 - **Stock discovery** — a Discover page that ranks research candidates from a controlled, static stock universe instead of only tickers you type in. Six deterministic modes (`overall`, `momentum`, `quality`, `value`, `defensive`, `avoid`), each result showing the score, category, confidence, sub-scores, key positives, key risks, and a plain-text reason it surfaced. Rule-based and bounded — no ML, no LLM picks, nothing scheduled or saved
+- **Paper trading (backend only)** — open a **simulated** trading account with a made-up starting cash balance, record paper buys and sells at prices you supply, and read back positions, cash, realized and unrealized gain/loss, total value, and a full transaction ledger. Entirely simulated: there is no broker integration, no real account link, and no real order anywhere in this project. **No frontend UI yet** — this milestone is API + services + tests only
 - **Dark dashboard** — app shell with sidebar; dashboard summary cards over real saved reports and watchlists, plus the portfolio panel
 
 ## What Is Not Included (By Design)
 
 This project intentionally does not implement:
 
-- Live or paper trading
-- Broker API integrations
-- Order execution of any kind
-- Automatic position management
-- Margin or options trading
-- Portfolio automation
+- Live trading
+- Broker API integrations — no Vanguard, Schwab, Plaid, Alpaca, Robinhood, or Interactive Brokers
+- Real order execution of any kind
+- Real account linking or position syncing
+- Automatic trading, automatic rebalancing, or automated position management
+- Trade alerts or allocation advice
+- Margin, options, or short selling
 - ML/LLM sentiment models
 - Backtesting (planned for a future phase)
+
+Paper trading **is** implemented (see above), and it is a simulation: hand-entered
+trades against a made-up cash balance, at prices the user supplies. Nothing about
+it reaches a market.
 
 ---
 
@@ -192,6 +198,14 @@ CORS is configured to allow `http://localhost:5173` and `http://127.0.0.1:5173`
 | `GET` | `/api/discovery` | Ranked discovery candidates. Query: `mode` (default `overall`), `universe` (default `starter_large_cap`), `limit` (default 10, max 50), `max_full_analysis` (default 25, max 50) |
 | `GET` | `/api/discovery/modes` | List supported discovery modes with their descriptions and ranking rules |
 | `GET` | `/api/discovery/universes` | List registered stock universes with their sizes |
+| `POST` | `/api/paper-trading/accounts` | Open a simulated trading account (`{name, starting_cash}`) |
+| `GET` | `/api/paper-trading/accounts` | List simulated accounts (newest first; includes `positions_count`) |
+| `GET` | `/api/paper-trading/accounts/{id}` | Return one account with its open positions (no market data) |
+| `GET` | `/api/paper-trading/accounts/{id}/summary` | Valued summary — cash, realized + unrealized gain/loss, open-position value, total value and return |
+| `GET` | `/api/paper-trading/accounts/{id}/positions` | Open positions priced at the latest valid close |
+| `GET` | `/api/paper-trading/accounts/{id}/transactions` | Full transaction ledger, newest first |
+| `POST` | `/api/paper-trading/accounts/{id}/buy` | Record a simulated buy (`{ticker, quantity, price, executed_at?}`); insufficient cash → 409 |
+| `POST` | `/api/paper-trading/accounts/{id}/sell` | Record a simulated sell; insufficient/unowned shares → 409 |
 
 > **Watchlist CRUD is storage only.** The list/ticker endpoints persist named
 > ticker lists; they do not run analysis. `POST /api/watchlists/{id}/analyze`
@@ -224,6 +238,35 @@ CORS is configured to allow `http://localhost:5173` and `http://127.0.0.1:5173`
 > `warnings`; the request still succeeds with `200`. Invalid parameters return
 > `400`. Nothing is saved, scheduled, alerted on, or traded, and results are
 > research candidates — **not** financial advice.
+
+> **Paper trading is a simulation, and it is separate from your portfolio.**
+> A paper trading account has a made-up starting cash balance. Every buy and
+> sell is a row the user submitted, at a price the user supplied — the backend
+> never fetches a price in order to "execute" a trade, and it never contacts a
+> market. There is **no broker integration** (no Vanguard, Schwab, Plaid,
+> Alpaca, Robinhood, or Interactive Brokers), no real account link, no order
+> routing, no automatic trading or rebalancing, no alerts, no allocation advice,
+> and no margin, options, or short selling. A sell may never exceed the shares
+> the account holds.
+>
+> It shares **no tables and no code** with manual portfolio tracking:
+> `/api/portfolios` records real holdings you own and carries no cash or
+> ledger, while `/api/paper-trading` is a self-contained simulation. It also
+> sits entirely outside the research pipeline — it cannot affect a rating,
+> score, report, discovery ranking, watchlist analysis, or portfolio summary.
+>
+> Accounting is decimal-exact: `paper_trading_transactions` is an append-only
+> ledger, `paper_trading_positions` is the derived current-state cache updated
+> atomically with the cash movement, and two invariants hold after every trade —
+> `cash_balance == starting_cash - Σ(buy gross) + Σ(sell gross)` and
+> `realized_gain_loss == Σ(transaction realized)`. Current prices are fetched
+> only when a summary or positions read is requested (via the same
+> `latest_valid_close` reader the rest of the project uses); a per-ticker price
+> failure returns 200 with the position marked `price_available: false` and
+> listed in `warnings`.
+>
+> **Backend only in this milestone** — there is no Paper Trading page in the
+> frontend yet.
 
 **Analysis only (no persistence):**
 
@@ -330,8 +373,8 @@ app/data/ → app/analysis/ → app/analysis/scoring.py → app/reports/ → app
 | `app/analysis/` | Compute independent signal lists from data |
 | `app/analysis/scoring.py` | Aggregate signals into a composite Rating |
 | `app/reports/` | Format a Rating into a human-readable StockReport |
-| `app/services/` | Public service boundary — `analyze_stock` (analysis), `report_persistence_service` (saved-report I/O), `watchlist_service` (watchlist CRUD), `watchlist_analysis_service` (on-demand scan), `watchlist_analysis_snapshot_service` (saved snapshots + `average_score`), `market_data_service` (price-history responses), `portfolio_service` / `portfolio_summary_service` (manual holdings + priced summary), `discovery_service` / `discovery_screening` / `discovery_ranking` (bounded candidate discovery) |
-| `app/data/database.py` | SQLAlchemy Core schema, engine factory, and the shared `as_utc` datetime reader (`analysis_reports`, `watchlists`, `watchlist_tickers`, `watchlist_analysis_snapshots`, `watchlist_analysis_snapshot_results`, `portfolios`, `portfolio_holdings`); no business logic |
+| `app/services/` | Public service boundary — `analyze_stock` (analysis), `report_persistence_service` (saved-report I/O), `watchlist_service` (watchlist CRUD), `watchlist_analysis_service` (on-demand scan), `watchlist_analysis_snapshot_service` (saved snapshots + `average_score`), `market_data_service` (price-history responses), `portfolio_service` / `portfolio_summary_service` (manual holdings + priced summary), `discovery_service` / `discovery_screening` / `discovery_ranking` (bounded candidate discovery), `paper_trading_service` / `paper_trading_summary_service` (simulated accounting + valued summary) |
+| `app/data/database.py` | SQLAlchemy Core schema, engine factory, and the shared `as_utc` datetime reader (`analysis_reports`, `watchlists`, `watchlist_tickers`, `watchlist_analysis_snapshots`, `watchlist_analysis_snapshot_results`, `portfolios`, `portfolio_holdings`, `paper_trading_accounts`, `paper_trading_transactions`, `paper_trading_positions`); no business logic |
 | `app/watchlist.py` | Orchestrate the pipeline across multiple tickers |
 | `app/main.py` | Thin argparse CLI shell; delegates to `app/services/` |
 | `app/api/` | Thin FastAPI layer; delegates to `app/services/` |
@@ -387,6 +430,7 @@ app/
       market_data.py               # GET /api/market-data/{ticker}/history
       portfolios.py                # GET/POST/PATCH/DELETE /api/portfolios, /holdings, /summary
       discovery.py                 # GET /api/discovery, /api/discovery/modes, /api/discovery/universes
+      paper_trading.py             # POST/GET /api/paper-trading/accounts, /buy, /sell, /positions, /transactions, /summary
     schemas/
       analysis.py                  # AnalyzeRequest Pydantic schema
       reports.py                   # SavedReportSummary, SavedReportDetail schemas
@@ -395,6 +439,7 @@ app/
       market_data.py               # PricePoint, PriceHistoryResponse schemas
       portfolios.py                # Portfolio/holding CRUD + priced-summary schemas
       discovery.py                 # Names the discovery domain models for the HTTP layer
+      paper_trading.py             # Paper trading account/trade request + response schemas
   services/
     stock_analysis_service.py      # analyze_stock — public entry point for CLI and API
     report_persistence_service.py  # save_stock_report, list_saved_reports, get_saved_report
@@ -407,12 +452,14 @@ app/
     discovery_service.py           # run_discovery — universe → pre-screen → bounded analysis → ranking
     discovery_screening.py         # stage-1 lightweight price-data validity check
     discovery_ranking.py           # deterministic per-mode ordering + match reasons (no scoring)
+    paper_trading_service.py       # simulated accounts, buys/sells, positions, ledger (no market data)
+    paper_trading_summary_service.py  # valued paper account summary; current prices + Decimal math
   data/
     market_data.py                 # OHLCV price history + latest_valid_close (current-price reader)
     fundamentals.py                # Company fundamentals
     news_data.py                   # Recent news headlines
     storage.py                     # Saves reports and JSON results to disk
-    database.py                    # SQLAlchemy Core engine + as_utc; analysis_reports, watchlists, watchlist_tickers, watchlist_analysis_snapshots(+_results), portfolios, portfolio_holdings
+    database.py                    # SQLAlchemy Core engine + as_utc; analysis_reports, watchlists, watchlist_tickers, watchlist_analysis_snapshots(+_results), portfolios, portfolio_holdings, paper_trading_accounts, paper_trading_transactions, paper_trading_positions
     universe_loader.py             # Loads/validates the static stock universes
     universes/
       starter_large_cap.csv        # Starter universe (liquid large-cap U.S. equities)
@@ -497,6 +544,7 @@ end. The sections below summarise where each area stands.
 | Market-data chart | Read-only daily OHLCV history endpoint + Analyze-page price chart |
 | Personal portfolios | Manual holdings CRUD (storage-only) plus a separate priced-summary service; partial price failures degrade gracefully |
 | Stock discovery | Static universe → bounded pre-screen → existing analysis pipeline → deterministic per-mode ranking, surfaced on the Discover page. Nothing saved or scheduled |
+| Paper trading | **Backend only.** Simulated accounts, hand-entered buys/sells at caller-supplied prices, stored positions over an append-only ledger, cash, realized + unrealized gain/loss, and a valued summary. 8 endpoints under `/api/paper-trading`. **No frontend UI yet.** Simulation only — no broker, no real order, no real account |
 | React + Vite frontend | Dashboard, Discover, Analyze, Watchlists, Snapshot Detail, Saved Reports, and Report Detail pages, all wired to the API. Display-only |
 
 ### Known gaps and rough edges
@@ -505,6 +553,7 @@ end. The sections below summarise where each area stands.
 - **Scoring calibration** — weights and thresholds are still the original hand-picked values (see `docs/scoring_calibration_plan.md`).
 - **Staleness detection** — the market-data layer does not yet reject unreasonably old price history (a documented `TODO` in `app/data/market_data.py`).
 - **Discovery universe** — one static universe (`starter_large_cap`); adding more means dropping a CSV in `app/data/universes/` and registering it.
+- **Paper trading UI** — the backend is complete, but there is no Paper Trading page in the frontend and no `frontend/src/api/paperTradingApi.ts` yet. The feature is API-only today.
 - **Frontend tests** — Vitest covers the pure helpers in `src/lib/` and `src/api/client.ts` only. There are no component or end-to-end tests.
 - **Dashboard "Market Overview"** — still a clearly labelled "coming soon" placeholder.
 
@@ -515,10 +564,10 @@ These areas are on the roadmap but not yet built:
 - **Research notes** — free-text notes attached to saved reports and watchlists
 - **Improved scoring calibration** — better-calibrated weights and thresholds (see `docs/scoring_calibration_plan.md`)
 - **Better data validation** — richer error messages for missing or stale data fields
+- **Paper trading frontend UI** — a Paper Trading page over the existing `/api/paper-trading` endpoints: account picker, cash and value cards, positions table, buy/sell forms, and the transaction ledger. Backend-complete already; this is display + forms only
 - **Backtesting** — validate signals against historical outcomes (requires careful design)
-- **Paper trading simulation** — test signal-driven strategies without real capital (requires backtesting first)
 - **ML/LLM sentiment** — replace keyword matching with a trained model (later phase)
 
-Phases involving live or paper trading require additional review and explicit approval
-before any implementation begins. Live trading, broker integrations, and order
-execution remain permanently out of scope — see **What Is Not Included** above.
+Paper trading is built and is a **simulation** (see above). Anything involving real
+money — live trading, broker integrations, real account linking, and order
+execution — remains permanently out of scope; see **What Is Not Included** above.

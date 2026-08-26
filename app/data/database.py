@@ -5,6 +5,10 @@ Uses SQLAlchemy Core (no ORM). The ``analysis_reports`` table stores a full
 JSON snapshot of each StockReport alongside indexed summary columns so the
 history endpoint can query without unpacking the full JSON blob.
 
+Money and share quantities (portfolio holdings, paper-trading accounts,
+positions, and transactions) are stored as canonical decimal strings so exact
+values survive the SQLite round-trip rather than being coerced to lossy floats.
+
 Also owns ``as_utc`` — the shared reader-side fix for SQLite's lack of timezone
 storage. Every persistence service normalises datetimes read back from the
 database through it, so they never diverge.
@@ -177,6 +181,80 @@ portfolio_holdings = Table(
     # A ticker appears at most once per portfolio in this first version; the
     # service also guards this in application code for a clear domain error.
     UniqueConstraint("portfolio_id", "ticker", name="uq_portfolio_ticker"),
+)
+
+
+# --- Paper trading (Phase 7: simulated trading) ---------------------------
+# A self-contained SIMULATION vertical.  Nothing here touches a broker, places
+# a real order, or reads a real account: every trade is a row the user typed in.
+# It is deliberately separate from `portfolios`/`portfolio_holdings` (which
+# track real, manually entered holdings and carry no cash or realized gains)
+# and it never feeds the research pipeline.
+#
+# The ledger is the source of truth: `paper_trading_transactions` is an
+# append-only audit trail, and `paper_trading_positions` is the derived
+# current-state cache the service updates atomically in the same transaction.
+# Money and share quantities are stored as canonical decimal strings (TEXT),
+# matching the portfolio-holdings convention, so exact values survive the
+# SQLite round-trip instead of being coerced to lossy floats.
+
+paper_trading_accounts = Table(
+    "paper_trading_accounts",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("name", String, nullable=False),
+    # Decimal-safe: canonical string form of a Decimal, cent-quantised.
+    Column("starting_cash", String, nullable=False),
+    Column("cash_balance", String, nullable=False),
+    # Cumulative realized gain/loss across every SELL on this account.
+    Column("realized_gain_loss", String, nullable=False),
+    Column("created_at", DateTime, nullable=False),
+    Column("updated_at", DateTime, nullable=False),
+)
+
+paper_trading_transactions = Table(
+    "paper_trading_transactions",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column(
+        "account_id",
+        Integer,
+        ForeignKey("paper_trading_accounts.id"),
+        nullable=False,
+    ),
+    # "BUY" or "SELL".
+    Column("transaction_type", String, nullable=False),
+    Column("ticker", String, nullable=False),
+    Column("quantity", String, nullable=False),
+    Column("price", String, nullable=False),
+    # quantity * price, quantised to cents so the ledger reconciles exactly
+    # against cash_balance.
+    Column("gross_amount", String, nullable=False),
+    # Always "0" for BUY rows; the per-sell realized result for SELL rows.
+    Column("realized_gain_loss", String, nullable=False),
+    Column("executed_at", DateTime, nullable=False),
+    Column("created_at", DateTime, nullable=False),
+)
+
+paper_trading_positions = Table(
+    "paper_trading_positions",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column(
+        "account_id",
+        Integer,
+        ForeignKey("paper_trading_accounts.id"),
+        nullable=False,
+    ),
+    Column("ticker", String, nullable=False),
+    Column("quantity", String, nullable=False),
+    # Weighted average cost, quantised to 8 dp.
+    Column("average_cost", String, nullable=False),
+    Column("created_at", DateTime, nullable=False),
+    Column("updated_at", DateTime, nullable=False),
+    # One open position per ticker per account; a fully sold position is
+    # deleted, and the transaction ledger remains the audit trail.
+    UniqueConstraint("account_id", "ticker", name="uq_paper_account_ticker"),
 )
 
 

@@ -1,5 +1,116 @@
 # Development Log
 
+## 2026-08-26 — Paper trading backend (Phase 7, Milestone 1)
+
+Added a **simulated** trading vertical: hand-entered buys and sells against a
+made-up cash balance, at prices the caller supplies. Backend only — there is no
+Paper Trading page in the frontend yet, and no frontend file was touched.
+
+This is a simulation and nothing more. No broker API (Vanguard, Schwab, Plaid,
+Alpaca, Robinhood, Interactive Brokers, or any other), no real account link, no
+order routing, no automatic trading or rebalancing, no alerts, no allocation
+advice, no margin, no options, no short selling. The backend never fetches a
+price in order to "execute" a trade — the caller supplies it.
+
+**Accounting model**
+
+`paper_trading_transactions` is an append-only ledger and the source of truth.
+`paper_trading_positions` is a derived current-state cache so ordinary reads
+stay a single indexed lookup instead of a ledger replay. Cash, position, and
+ledger row are written inside **one** database transaction, so an account is
+never observable half-updated; a rejected trade leaves cash, positions, and the
+ledger completely untouched (covered by tests).
+
+- Buy: `gross = quantity * price`, rejected if it exceeds cash. Cash falls by
+  gross; a new position is created or the existing one gains quantity and a
+  recomputed weighted average cost,
+  `((old_qty * old_cost) + (buy_qty * buy_price)) / (old_qty + buy_qty)`.
+  BUY rows always carry `realized_gain_loss = 0`.
+- Sell: rejected if the ticker is not held or the quantity exceeds what is
+  owned. `realized = (sell_price - average_cost) * quantity`, added to the
+  account's cumulative `realized_gain_loss`. Cash rises by gross, the position
+  quantity falls, and average cost is unchanged. Selling the whole position
+  deletes the position row — the ledger keeps the history.
+
+Two invariants hold after every trade and are asserted directly in tests:
+
+    cash_balance       == starting_cash - sum(BUY gross) + sum(SELL gross)
+    realized_gain_loss == sum(transaction.realized_gain_loss)
+
+Money is `Decimal` throughout, persisted as canonical decimal strings (TEXT)
+like `portfolio_holdings`, and quantised to cents **at the point it is
+computed** — that is what makes the ledger reconcile exactly against the cash
+balance rather than approximately. Weighted average cost is quantised to 8 dp so
+repeated partial buys do not drift and the stored string stays readable.
+
+**Two deliberate deviations from the original task spec**
+
+1. *Two service modules, not one.* `paper_trading_service` is storage +
+   accounting and fetches no market data; `paper_trading_summary_service` is the
+   only place prices are fetched and the only place valuation math runs. Folding
+   them together would have broken the repo's sharpest existing design line
+   (`portfolio_service` / `portfolio_summary_service`), where adding a holding
+   must never trigger a network call.
+2. *Error codes follow the repo, not the suggested 422s.* Input validation →
+   **400** (matching `PortfolioValidationError`), missing account → **404**, and
+   state conflicts — insufficient cash, insufficient shares, selling an unowned
+   ticker — → **409**, matching the existing `DuplicateHoldingError` precedent
+   for "conflicts with current state" rather than "malformed input". Malformed
+   request bodies still return 422 automatically from FastAPI. Changing these to
+   422 is a one-line edit per handler if preferred.
+
+**Endpoints** (8, all thin, all delegating to the services)
+
+    POST /api/paper-trading/accounts                          open an account
+    GET  /api/paper-trading/accounts                          list accounts
+    GET  /api/paper-trading/accounts/{id}                     account + positions
+    GET  /api/paper-trading/accounts/{id}/summary             valued summary
+    GET  /api/paper-trading/accounts/{id}/positions           priced positions
+    GET  /api/paper-trading/accounts/{id}/transactions        ledger, newest first
+    POST /api/paper-trading/accounts/{id}/buy                 simulated buy
+    POST /api/paper-trading/accounts/{id}/sell                simulated sell
+
+Summary and positions reuse `latest_valid_close` through the existing
+market-data layer. A per-ticker price failure returns 200 with the position
+marked `price_available: false` and listed in `warnings`. Value-dependent
+totals are `None` — never zero — when a held position could not be priced;
+reporting cash alone would understate the account. An account with no open
+positions still values cleanly at zero.
+
+**Separation**
+
+Paper trading sits entirely outside the research spine: it reads no analysis
+output and influences none. It shares no tables and no code with manual
+portfolio tracking (`portfolios` / `portfolio_holdings` record real holdings and
+carry no cash or ledger); an API test points both services at the same temporary
+database to prove the isolation is real rather than an artifact of separate
+files. `analyze_stock`, `scoring.py`, and the analysis modules were not touched.
+
+A future "paper buy this candidate" action from Discover needs no new backend
+code: the buy endpoint already takes ticker + quantity + price, which is exactly
+what a candidate card displays. No coupling to discovery was added, and none is
+wanted.
+
+**Files**
+
+- `app/data/database.py` — three tables: `paper_trading_accounts`,
+  `paper_trading_transactions`, `paper_trading_positions` (unique constraint
+  `uq_paper_account_ticker`).
+- `app/services/paper_trading_service.py` (new) — accounts, trades, ledger.
+- `app/services/paper_trading_summary_service.py` (new) — pricing + valuation.
+- `app/api/schemas/paper_trading.py` (new), `app/api/routes/paper_trading.py`
+  (new), router registered in `app/api/main.py` (41 routes total).
+- `tests/test_paper_trading_service.py` (81), `test_paper_trading_summary_service.py`
+  (50), `test_paper_trading_api.py` (49) — 180 new tests, all offline and
+  deterministic, temporary SQLite, prices always injected or patched.
+
+**Verification**
+
+- `python -m pytest` — 2056 passed (was 1876).
+- `python -m app.main --help` — CLI unaffected.
+- `cd frontend && npm test` — 93 passed; `npm run build` and `npm run lint`
+  clean. No frontend file changed.
+
 ## 2026-08-26 — Code review: shared `as_utc`, dead-code removal, doc refresh
 
 Housekeeping pass over the whole repository. No behavior changes and no new
