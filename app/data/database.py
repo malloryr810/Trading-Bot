@@ -5,6 +5,10 @@ Uses SQLAlchemy Core (no ORM). The ``analysis_reports`` table stores a full
 JSON snapshot of each StockReport alongside indexed summary columns so the
 history endpoint can query without unpacking the full JSON blob.
 
+Also owns ``as_utc`` — the shared reader-side fix for SQLite's lack of timezone
+storage. Every persistence service normalises datetimes read back from the
+database through it, so they never diverge.
+
 Usage::
 
     from app.data.database import build_engine, analysis_reports
@@ -15,6 +19,7 @@ Usage::
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 from sqlalchemy import (
@@ -200,3 +205,21 @@ def build_engine(db_path: Path | str | None = None) -> Engine:
     engine = create_engine(url, connect_args={"check_same_thread": False})
     metadata.create_all(engine)
     return engine
+
+
+def as_utc(value: datetime) -> datetime:
+    """Return a timezone-aware UTC datetime.
+
+    SQLite does not store timezone information, so datetimes read back through
+    SQLAlchemy are naive.  This re-attaches UTC so every datetime a persistence
+    service returns is consistent regardless of which code path produced it.
+
+    Args:
+        value: A datetime read from the database (naive or aware).
+
+    Returns:
+        The same instant as a timezone-aware UTC datetime.
+    """
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)

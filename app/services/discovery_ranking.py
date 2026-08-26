@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from app.models.discovery import DiscoveryMode, DiscoveryModeInfo
 from app.models.rating import ConfidenceLevel, Rating
-from app.models.signal import SignalCategory
+from app.models.signal import Signal, SignalCategory
 
 # Name of the fundamental signal that carries valuation evidence. Produced by
 # app/analysis/fundamentals_analysis.py; used by the `value` mode only.
@@ -179,7 +179,7 @@ def _sort_key(mode: DiscoveryMode, rating: Rating) -> tuple:
     return (-rating.score, -confidence, rating.ticker)
 
 
-def _valuation_signal(rating: Rating):
+def _valuation_signal(rating: Rating) -> Signal | None:
     """Return the fundamental Valuation signal, or None when it is absent."""
     for signal in rating.signals_used:
         if (

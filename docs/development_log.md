@@ -1,5 +1,57 @@
 # Development Log
 
+## 2026-08-26 — Code review: shared `as_utc`, dead-code removal, doc refresh
+
+Housekeeping pass over the whole repository. No behavior changes and no new
+features — the goal was to remove real duplication and bring `README.md` and
+`CLAUDE.md` back in line with what the code actually does.
+
+**Code**
+
+- `app/data/database.py`: added `as_utc(value)`, the shared reader-side fix for
+  SQLite's lack of timezone storage. Four persistence services
+  (`watchlist_service`, `watchlist_analysis_snapshot_service`,
+  `report_persistence_service`, `portfolio_service`) each carried a private
+  `_as_utc` with an identical body and a docstring that literally said "mirrors
+  the helper in …". All four now import the one implementation. The lazy
+  `_get_engine()` singleton stays per-service on purpose — it is the injection
+  seam the API tests monkeypatch.
+- `app/data/universe_loader.py`: removed `OPTIONAL_COLUMNS`, a constant that was
+  defined and documented but never read; replaced it with a comment describing
+  how optional columns are actually handled (read per row, default `None`).
+- `app/config.py`: removed the unused `DEBUG` flag and labelled
+  `MARKET_DATA_API_KEY` / `NEWS_API_KEY` as reserved placeholders. Nothing reads
+  them — yfinance needs no key — and the old wording implied setup was required.
+- `app/services/discovery_ranking.py`: added the missing `-> Signal | None`
+  return annotation on `_valuation_signal`.
+- Tests: removed genuinely unused imports from seven test modules
+  (`FundamentalAnalysisError` in two API suites, `math`, `pytest`, `MagicMock`,
+  `datetime`/`timezone`/`Path`).
+- `frontend/src/types/watchlist.ts`: dropped a stale "(Phase 6)" section comment
+  — snapshots shipped under Phase 5.
+
+**Docs**
+
+- `README.md`: rewrote "Current Status" as a built/gaps split; removed "Manual
+  portfolio tracking" from Planned Future Work (it shipped) and added "Research
+  notes"; added the Discover page to the frontend scope list; added
+  portfolio/discovery services and the `portfolios`/`portfolio_holdings` tables
+  to the architecture table; deleted a duplicated `errors.py` line from the
+  project tree; noted that no API keys are needed and `.env` is optional;
+  expanded the test-running section.
+- `CLAUDE.md`: added a "Current State (read this first)" section with concrete
+  counts and an explicit list of what is *not* built, plus tooling facts a fresh
+  session would otherwise guess at (no ruff/black/mypy, no pre-commit, no
+  migrations). Added a "Verification workflow" block. Corrected the Key Docs
+  entry for `docs/frontend_plan.md`, which still claimed the frontend was not
+  started. Added `app/config.py` to the module table.
+
+**Verification**
+
+- `python -m pytest` — 1876 passed.
+- `python -m app.main AAPL` — full report rendered against live data.
+- `cd frontend && npm test` — 93 passed; `npm run build` and `npm run lint` clean.
+
 ## 2026-08-04 — Fix: current price lost to in-progress trading-day rows
 
 Narrow bug fix for the current-price issue flagged in the discovery milestone

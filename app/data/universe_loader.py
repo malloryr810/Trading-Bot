@@ -27,8 +27,9 @@ from app.utils.helpers import normalize_ticker
 
 UNIVERSE_DIR: Path = Path(__file__).resolve().parent / "universes"
 
+# Only ``ticker`` is required; company_name / sector / industry are read
+# opportunistically per row and default to None when absent.
 REQUIRED_COLUMNS: tuple[str, ...] = ("ticker",)
-OPTIONAL_COLUMNS: tuple[str, ...] = ("company_name", "sector", "industry")
 
 STARTER_LARGE_CAP = "starter_large_cap"
 

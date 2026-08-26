@@ -72,7 +72,7 @@ export interface WatchlistAnalysisResponse {
   errors: WatchlistAnalysisError[]
 }
 
-// --- Saved analysis snapshots (Phase 6) ------------------------------------
+// --- Saved analysis snapshots ----------------------------------------------
 
 export interface WatchlistSnapshotSummary {
   id: number

@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
-import pytest
-
 from app.models.rating import ConfidenceLevel, RatingCategory
 from app.models.signal import Signal, SignalCategory, SignalDirection, SignalStrength
 from app.models.stock_report import StockReport

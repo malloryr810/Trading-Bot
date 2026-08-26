@@ -1,7 +1,5 @@
 """Tests for app/utils/helpers.py — safe_float and normalize_ticker."""
 
-import math
-
 import pytest
 
 from app.utils.helpers import normalize_ticker, safe_float

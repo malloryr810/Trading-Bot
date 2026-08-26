@@ -23,7 +23,7 @@ from typing import Any
 from sqlalchemy import insert, select
 from sqlalchemy.engine import Engine
 
-from app.data.database import analysis_reports, build_engine
+from app.data.database import analysis_reports, as_utc, build_engine
 from app.models.stock_report import StockReport
 
 _engine: Engine | None = None
@@ -36,18 +36,6 @@ def _get_engine() -> Engine:
     return _engine
 
 
-def _as_utc(value: datetime) -> datetime:
-    """Return a timezone-aware UTC datetime.
-
-    SQLite does not store timezone info, so datetimes read back via SQLAlchemy
-    are naive.  This helper re-attaches UTC so all returned datetimes are
-    consistent regardless of which code path produced them.
-    """
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
-
-
 def _summary_from_row(row: Any) -> dict:
     return {
         "id": row.id,
@@ -56,7 +44,7 @@ def _summary_from_row(row: Any) -> dict:
         "category": row.category,
         "score": row.score,
         "confidence": row.confidence,
-        "created_at": _as_utc(row.created_at),
+        "created_at": as_utc(row.created_at),
     }
 
 
@@ -177,6 +165,6 @@ def get_saved_report(
         "category": row.category,
         "score": row.score,
         "confidence": row.confidence,
-        "created_at": _as_utc(row.created_at),
+        "created_at": as_utc(row.created_at),
         "report": report.model_dump(mode="json"),
     }

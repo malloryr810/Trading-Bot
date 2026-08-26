@@ -13,7 +13,15 @@ A modular, personal stock research and decision-support tool built in Python.
 
 Analyze individual stocks using market data, technical indicators, company
 fundamentals, news sentiment, and risk signals — then produce a structured,
-scored plain-text research report. Run a single ticker or scan an entire watchlist.
+scored research report. Run a single ticker, scan an entire watchlist, track
+holdings you entered by hand, or surface candidates from a controlled stock
+universe.
+
+There are three ways in, all backed by the same analysis pipeline:
+
+- a **CLI** (`python -m app.main`) that prints or saves reports,
+- a **FastAPI backend** that exposes the pipeline over HTTP and persists results to SQLite,
+- a **React + Vite frontend** that reads that API.
 
 This tool prints reports. It does not place trades.
 
@@ -68,6 +76,13 @@ python3 -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
+
+No API keys are required. The only data provider is yfinance, which needs none.
+A `.env` file is optional — copy `.env.example` if you want to override
+`DATABASE_PATH` or `ENVIRONMENT`; every setting has a working default.
+
+Dependencies (`requirements.txt`): pandas, numpy, requests, yfinance, pydantic,
+python-dotenv, pytest, fastapi, uvicorn, httpx, sqlalchemy.
 
 ---
 
@@ -269,6 +284,7 @@ The app opens at `http://localhost:5173`.
 
 **Current frontend scope:**
 - Dark app shell with a left sidebar; routing via React Router
+- Discover page (`/discover`) — pick a mode, universe, result count, and analysis budget, then run a bounded discovery pass and read the ranked candidates with their match reasons; skipped tickers are listed as warnings rather than failing the run
 - Dashboard page — a personal **Portfolio panel** (create/select/edit/delete portfolios; add/edit/remove holdings; summary cards for market value, cost basis, unrealized gain/loss, return, and holdings count; a holdings table valued at current prices with per-row Analyze/Edit/Remove; explicit loading, empty, partial-price-failure, and error states) plus backend health/source status, disclaimer, and summary cards over real saved reports and watchlists (rating breakdown, top candidates, recent reports). The Market Overview strip remains a clearly labeled "coming soon" placeholder
 - Analyze page — enter a ticker, choose "Analyze only" (POST /api/analyze) or "Analyze and save" (POST /api/reports/analyze), view the StockReport result and a daily closing-price chart
 - Watchlists page — create, rename, and delete named watchlists; add and remove tickers (CRUD over the watchlist API). "Analyze watchlist" runs the pipeline on demand and shows per-ticker results/failures (not saved); "Analyze & save snapshot" records a historical snapshot. Saved snapshots list with a snapshot-trend chart (success count / average score toggle)
@@ -291,10 +307,14 @@ npm test             # Vitest unit tests (pure utilities — no browser/DOM)
 ## Running Backend Tests
 
 ```bash
-pytest
+pytest                                   # full suite
+pytest tests/test_risk_analysis.py       # one file
+pytest tests/test_watchlist_service.py tests/test_watchlist_api.py
 ```
 
-All tests are deterministic — no live API calls.
+All tests are deterministic — they build DataFrames and typed models locally and
+never call a live API. There is no linter or formatter configured for the Python
+side; `python -m py_compile <module>` is a quick syntax check.
 
 ---
 
@@ -310,8 +330,8 @@ app/data/ → app/analysis/ → app/analysis/scoring.py → app/reports/ → app
 | `app/analysis/` | Compute independent signal lists from data |
 | `app/analysis/scoring.py` | Aggregate signals into a composite Rating |
 | `app/reports/` | Format a Rating into a human-readable StockReport |
-| `app/services/` | Public service boundary — `analyze_stock` (analysis), `report_persistence_service` (saved-report I/O), `watchlist_service` (watchlist CRUD), `watchlist_analysis_service` (on-demand scan), `watchlist_analysis_snapshot_service` (saved snapshots + `average_score`), `market_data_service` (price-history responses) |
-| `app/data/database.py` | SQLAlchemy Core schema and engine factory (`analysis_reports`, `watchlists`, `watchlist_tickers`, `watchlist_analysis_snapshots`, `watchlist_analysis_snapshot_results`); no business logic |
+| `app/services/` | Public service boundary — `analyze_stock` (analysis), `report_persistence_service` (saved-report I/O), `watchlist_service` (watchlist CRUD), `watchlist_analysis_service` (on-demand scan), `watchlist_analysis_snapshot_service` (saved snapshots + `average_score`), `market_data_service` (price-history responses), `portfolio_service` / `portfolio_summary_service` (manual holdings + priced summary), `discovery_service` / `discovery_screening` / `discovery_ranking` (bounded candidate discovery) |
+| `app/data/database.py` | SQLAlchemy Core schema, engine factory, and the shared `as_utc` datetime reader (`analysis_reports`, `watchlists`, `watchlist_tickers`, `watchlist_analysis_snapshots`, `watchlist_analysis_snapshot_results`, `portfolios`, `portfolio_holdings`); no business logic |
 | `app/watchlist.py` | Orchestrate the pipeline across multiple tickers |
 | `app/main.py` | Thin argparse CLI shell; delegates to `app/services/` |
 | `app/api/` | Thin FastAPI layer; delegates to `app/services/` |
@@ -375,7 +395,6 @@ app/
       market_data.py               # PricePoint, PriceHistoryResponse schemas
       portfolios.py                # Portfolio/holding CRUD + priced-summary schemas
       discovery.py                 # Names the discovery domain models for the HTTP layer
-    errors.py                      # Shared KNOWN_ANALYSIS_ERRORS tuple
   services/
     stock_analysis_service.py      # analyze_stock — public entry point for CLI and API
     report_persistence_service.py  # save_stock_report, list_saved_reports, get_saved_report
@@ -393,7 +412,7 @@ app/
     fundamentals.py                # Company fundamentals
     news_data.py                   # Recent news headlines
     storage.py                     # Saves reports and JSON results to disk
-    database.py                    # SQLAlchemy Core engine; analysis_reports, watchlists, watchlist_tickers, watchlist_analysis_snapshots(+_results), portfolios, portfolio_holdings
+    database.py                    # SQLAlchemy Core engine + as_utc; analysis_reports, watchlists, watchlist_tickers, watchlist_analysis_snapshots(+_results), portfolios, portfolio_holdings
     universe_loader.py             # Loads/validates the static stock universes
     universes/
       starter_large_cap.csv        # Starter universe (liquid large-cap U.S. equities)
@@ -463,51 +482,43 @@ frontend/                          # React + Vite + TypeScript frontend
 
 ## Current Status
 
-The single-ticker and watchlist analysis pipelines are complete. The tool
-produces scored reports with technical, fundamental, news, and risk signals.
-A FastAPI backend (`app/api/`) exposes the analysis through `POST /api/analyze`
-(analysis only) and `POST /api/reports/analyze` (analyze and persist). A SQLite
-persistence layer stores StockReport JSON snapshots with a history and detail
-endpoint for retrieval. All routes are backed by the same service layer used by
-the CLI.
+Everything listed under **Features** above is built, tested, and working end to
+end. The sections below summarise where each area stands.
 
-Watchlist management is implemented at a basic CRUD level across all layers:
-SQLite tables (`watchlists`, `watchlist_tickers`), a `watchlist_service`, the
-`/api/watchlists` endpoints, and a Watchlists page in the frontend. Users can
-create, rename, and delete named watchlists and add or remove tickers. This is
-storage only — no analysis, scans, alerts, or trades run from a watchlist.
+### Built
 
-On-demand watchlist analysis is built: `POST /api/watchlists/{id}/analyze` runs
-the pipeline over saved tickers (partial success, not saved), and the
-analyze-and-save snapshot flow persists historical runs to two snapshot tables,
-surfaced through the snapshot list, snapshot-detail view, and snapshot-trend
-charts. A read-only market-data history endpoint backs the daily price chart.
+| Area | State |
+|------|-------|
+| Analysis pipeline | Complete — technical, fundamental, news, and risk signals scored into a composite `Rating` and rendered as a `StockReport` |
+| CLI (`python -m app.main`) | Complete — single ticker and watchlist file modes, with `--save-report` / `--save-markdown` / `--save-json` |
+| FastAPI backend (`app/api/`) | Complete for the features above — 8 route modules, all thin, all delegating to `app/services/` |
+| SQLite persistence | Saved reports, watchlists + tickers, watchlist analysis snapshots, portfolios + holdings. Schema created via `metadata.create_all()`; no migration tool |
+| Watchlists | CRUD, on-demand analysis (not saved), and explicitly saved historical snapshots with trend charts |
+| Market-data chart | Read-only daily OHLCV history endpoint + Analyze-page price chart |
+| Personal portfolios | Manual holdings CRUD (storage-only) plus a separate priced-summary service; partial price failures degrade gracefully |
+| Stock discovery | Static universe → bounded pre-screen → existing analysis pipeline → deterministic per-mode ranking, surfaced on the Discover page. Nothing saved or scheduled |
+| React + Vite frontend | Dashboard, Discover, Analyze, Watchlists, Snapshot Detail, Saved Reports, and Report Detail pages, all wired to the API. Display-only |
 
-Personal portfolio tracking (Milestone 1) is implemented across all layers:
-SQLite tables (`portfolios`, `portfolio_holdings`), a storage-only
-`portfolio_service` (decimal-safe holding validation, one ticker per portfolio,
-cascade delete), a separate `portfolio_summary_service` that prices holdings via
-the existing market-data layer and computes cost basis, market value, unrealized
-gain/loss, return, and weight, the `/api/portfolios` CRUD + summary endpoints,
-and a Dashboard portfolio panel. Holdings are entered manually for tracking;
-there is no brokerage connection and no trading. Partial price failures degrade
-gracefully (per-holding `price_available` + summary `warnings`).
+### Known gaps and rough edges
 
-A React + Vite frontend (`frontend/`) is in active development with a dark app
-shell and sidebar. The Dashboard, Analyze, Watchlists, Snapshot Detail, Saved
-Reports, and Report Detail pages are built and connected to the backend. The
-frontend is display-only and never recomputes analysis, scores, or averages.
+- **Research notes** — planned for the report-history area; not started.
+- **Scoring calibration** — weights and thresholds are still the original hand-picked values (see `docs/scoring_calibration_plan.md`).
+- **Staleness detection** — the market-data layer does not yet reject unreasonably old price history (a documented `TODO` in `app/data/market_data.py`).
+- **Discovery universe** — one static universe (`starter_large_cap`); adding more means dropping a CSV in `app/data/universes/` and registering it.
+- **Frontend tests** — Vitest covers the pure helpers in `src/lib/` and `src/api/client.ts` only. There are no component or end-to-end tests.
+- **Dashboard "Market Overview"** — still a clearly labelled "coming soon" placeholder.
 
 ## Planned Future Work
 
 These areas are on the roadmap but not yet built:
 
+- **Research notes** — free-text notes attached to saved reports and watchlists
 - **Improved scoring calibration** — better-calibrated weights and thresholds (see `docs/scoring_calibration_plan.md`)
 - **Better data validation** — richer error messages for missing or stale data fields
-- **Manual portfolio tracking** — hand-entered holdings (no broker linking, no automated trading)
 - **Backtesting** — validate signals against historical outcomes (requires careful design)
 - **Paper trading simulation** — test signal-driven strategies without real capital (requires backtesting first)
 - **ML/LLM sentiment** — replace keyword matching with a trained model (later phase)
 
 Phases involving live or paper trading require additional review and explicit approval
-before any implementation begins.
+before any implementation begins. Live trading, broker integrations, and order
+execution remain permanently out of scope — see **What Is Not Included** above.

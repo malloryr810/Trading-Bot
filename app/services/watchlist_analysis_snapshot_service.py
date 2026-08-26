@@ -37,6 +37,7 @@ from sqlalchemy import insert, select
 from sqlalchemy.engine import Engine
 
 from app.data.database import (
+    as_utc,
     build_engine,
     watchlist_analysis_snapshot_results,
     watchlist_analysis_snapshots,
@@ -52,13 +53,6 @@ def _get_engine() -> Engine:
     if _engine is None:
         _engine = build_engine()
     return _engine
-
-
-def _as_utc(value: datetime) -> datetime:
-    """Return a timezone-aware UTC datetime (SQLite stores naive datetimes)."""
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
 
 
 # ---------------------------------------------------------------------------
@@ -252,12 +246,12 @@ def _summary_from_row(row: Any, *, average_score: float | None = None) -> dict:
         "id": row.id,
         "watchlist_id": row.watchlist_id,
         "watchlist_name": row.watchlist_name,
-        "analyzed_at": _as_utc(row.analyzed_at),
+        "analyzed_at": as_utc(row.analyzed_at),
         "total_tickers": row.total_tickers,
         "success_count": row.success_count,
         "failure_count": row.failure_count,
         "average_score": average_score,
-        "created_at": _as_utc(row.created_at),
+        "created_at": as_utc(row.created_at),
     }
 
 

@@ -48,7 +48,7 @@ from typing import Any
 from sqlalchemy import delete, insert, select, update
 from sqlalchemy.engine import Engine
 
-from app.data.database import build_engine, portfolio_holdings, portfolios
+from app.data.database import as_utc, build_engine, portfolio_holdings, portfolios
 from app.utils.helpers import normalize_ticker
 
 _engine: Engine | None = None
@@ -79,18 +79,6 @@ def _get_engine() -> Engine:
     if _engine is None:
         _engine = build_engine()
     return _engine
-
-
-def _as_utc(value: datetime) -> datetime:
-    """Return a timezone-aware UTC datetime.
-
-    SQLite stores naive datetimes; this re-attaches UTC so every returned
-    datetime is consistent regardless of code path.  Mirrors the helper in
-    watchlist_service / report_persistence_service.
-    """
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
 
 
 # ---------------------------------------------------------------------------
@@ -222,8 +210,8 @@ def _holding_from_row(row: Any) -> dict:
         "average_cost": float(Decimal(row.average_cost)),
         "purchase_date": row.purchase_date,
         "notes": row.notes,
-        "created_at": _as_utc(row.created_at),
-        "updated_at": _as_utc(row.updated_at),
+        "created_at": as_utc(row.created_at),
+        "updated_at": as_utc(row.updated_at),
     }
 
 
@@ -246,8 +234,8 @@ def _detail_for(conn: Any, portfolio_id: int) -> dict | None:
         "id": row.id,
         "name": row.name,
         "description": row.description,
-        "created_at": _as_utc(row.created_at),
-        "updated_at": _as_utc(row.updated_at),
+        "created_at": as_utc(row.created_at),
+        "updated_at": as_utc(row.updated_at),
         "holdings": _holdings_for(conn, portfolio_id),
     }
 
@@ -306,8 +294,8 @@ def list_portfolios(*, engine: Engine | None = None) -> list[dict]:
                 "id": row.id,
                 "name": row.name,
                 "description": row.description,
-                "created_at": _as_utc(row.created_at),
-                "updated_at": _as_utc(row.updated_at),
+                "created_at": as_utc(row.created_at),
+                "updated_at": as_utc(row.updated_at),
                 "holdings_count": len(_holdings_for(conn, row.id)),
             }
             for row in rows

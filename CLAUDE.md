@@ -18,6 +18,34 @@ Do not implement any of the following:
 - ML/LLM sentiment models
 - Backtesting (unless explicitly scoped and approved)
 
+## Current State (read this first)
+
+Everything in **Currently Implemented** below is built and tested. Concretely,
+as of 2026-08-26:
+
+- **Backend:** the full analysis pipeline, 8 API route modules, 11 service
+  modules, and a SQLite layer with 7 tables. `pytest` runs 1876 deterministic
+  tests, all passing.
+- **Frontend:** 7 pages wired to the API. `npm test` runs 93 Vitest tests over
+  `src/lib/` and `src/api/client.ts` only — the pure helpers. There are **no**
+  component tests, no DOM tests, and no e2e tests.
+- **CLI:** `python -m app.main` works for single tickers and watchlist files.
+
+What is *not* built, so you do not go looking for it:
+
+- Research notes (Phase 6's remaining half).
+- Scoring calibration changes — the weights and thresholds are still the
+  original hand-picked values. `docs/scoring_calibration_plan.md` and the other
+  `docs/*calibration*` files are **proposals**, not shipped behavior.
+- Market-data staleness detection (a deliberate `TODO` in `app/data/market_data.py`).
+- Any second discovery universe. `starter_large_cap` is the only one.
+- `app/simulation/` and `app/ml/` (Phases 7 and 8 — do not create them).
+
+Tooling notes: there is **no** Python linter or formatter configured (no ruff,
+black, or mypy) and no pre-commit hooks. There are no database migrations —
+schema comes from `metadata.create_all()`. Do not add any of these without an
+explicitly scoped task.
+
 ## Commands
 
 ```bash
@@ -82,6 +110,21 @@ Frontend Node version: use the active LTS line (Node 22, ≥ 22.13) per
 is documented in `docs/development_log.md`; do not run `npm audit fix --force`
 (it would downgrade Vitest and break the test harness).
 
+### Verification workflow
+
+Run these after any meaningful change, in this order:
+
+```bash
+python -m pytest                      # backend — must stay fully green
+python -m app.main AAPL               # CLI smoke test (hits the network)
+cd frontend && npm test               # only if frontend files changed
+cd frontend && npm run build          # tsc -b catches contract drift
+cd frontend && npm run lint
+```
+
+`npm run build` is the only type-check — run it whenever a backend schema and a
+`frontend/src/types/*` file could have drifted apart.
+
 ## Currently Implemented
 
 | Module | Purpose |
@@ -120,7 +163,7 @@ is documented in `docs/development_log.md`; do not run `npm audit fix --force`
 | `app/services/discovery_service.py` | `run_discovery`, `list_discovery_modes`, `list_discovery_universes` — universe → bounded pre-screen → `analyze_stock_rating` → mode ranking → `DiscoveryRun`. Bounded by `max_full_analysis`; per-ticker failures become warnings; `DiscoveryValidationError` → 400. Optional `analyze`/`prescreen` kwargs for tests. Nothing saved, nothing scheduled |
 | `app/data/universe_loader.py` | Loads the static, versioned universe CSVs in `app/data/universes/` (`load_universe`, `load_universe_file`, `list_universes`); validates ticker uniqueness/normalization; caches per key. No network access |
 | `app/data/universes/starter_large_cap.csv` | The only universe today: a hand-maintained set of liquid large-cap U.S. equities (`ticker,company_name,sector,industry`) |
-| `app/data/database.py` | SQLAlchemy Core engine factory (`build_engine`) and table definitions: `analysis_reports`, `watchlists`, `watchlist_tickers`, `watchlist_analysis_snapshots`, `watchlist_analysis_snapshot_results`, `portfolios`, `portfolio_holdings` |
+| `app/data/database.py` | SQLAlchemy Core engine factory (`build_engine`), the shared `as_utc(dt)` reader (SQLite stores naive datetimes; every persistence service normalises through it), and table definitions: `analysis_reports`, `watchlists`, `watchlist_tickers`, `watchlist_analysis_snapshots`, `watchlist_analysis_snapshot_results`, `portfolios`, `portfolio_holdings` |
 | `app/api/main.py` | FastAPI app factory; `uvicorn app.api.main:app` entry point |
 | `app/api/routes/health.py` | `GET /api/health` |
 | `app/api/routes/analysis.py` | `POST /api/analyze` — analysis only; calls `analyze_stock`, does not save |
@@ -138,6 +181,7 @@ is documented in `docs/development_log.md`; do not run `npm audit fix --force`
 | `app/api/schemas/market_data.py` | `PricePoint`, `PriceHistoryResponse` — nullable OHLCV transport shapes |
 | `app/api/schemas/portfolios.py` | Portfolio/holding request+response schemas (`CreatePortfolioRequest`, `UpdatePortfolioRequest`, `AddHoldingRequest`, `UpdateHoldingRequest`, `PortfolioSummary`, `PortfolioDetail`, `HoldingResponse`, `DeleteResponse`) plus priced summary (`PortfolioSummaryResponse`, `HoldingValuation`, `PortfolioSummaryWarning`). Shares/avg-cost accepted as `Decimal` |
 | `app/api/errors.py` | `KNOWN_ANALYSIS_ERRORS` — shared tuple of pipeline error types used by both API routes for 422 mapping |
+| `app/config.py` | Env-var settings via python-dotenv: `DATABASE_PATH`, `ENVIRONMENT`, plus reserved (currently unread) API-key placeholders. yfinance needs no key |
 | `app/main.py` | Thin argparse CLI shell — delegates entirely to `app/services/` |
 | `frontend/` | React + Vite + TypeScript browser frontend; dark app shell with sidebar |
 | `frontend/src/api/client.ts` | Base fetch wrapper (`get`/`post`/`patch`/`del` over one shared `request` helper); `ApiError` class; `VITE_API_BASE_URL` env var |
@@ -163,7 +207,7 @@ data/ → analysis/ → scoring.py → reports/ → services/ → CLI / API
 | Layer | Package | Responsibility |
 |-------|---------|---------------|
 | Data | `app/data/` | Fetch and validate raw data; return typed models or DataFrames |
-| Database | `app/data/database.py` | SQLAlchemy Core engine and schema; no business logic |
+| Database | `app/data/database.py` | SQLAlchemy Core engine, schema, and the shared `as_utc` datetime reader; no business logic |
 | Analysis | `app/analysis/` | Compute signals from data; modules stay independent of each other |
 | Scoring | `app/analysis/scoring.py` | Aggregate signals into a composite Rating using weighted formula |
 | Reports | `app/reports/` | Format a Rating and its Signals into a human-readable StockReport |
@@ -227,7 +271,7 @@ Each analysis module follows the same pattern:
 - Keep tests deterministic — build DataFrames and typed models locally, never call live APIs in unit tests.
 - Update `docs/development_log.md` after meaningful changes.
 - Do not add dependencies without a clear need.
-- All API keys and secrets live in `.env` (never committed). Access them only through `app/config.py`.
+- All API keys and secrets live in `.env` (never committed). Access them only through `app/config.py`. Today no provider needs a key — yfinance is the only data source — so `.env` is optional.
 - Review diffs before committing.
 
 ## Phase Status
@@ -284,7 +328,7 @@ These apply to every phase and every task:
 - `docs/project_plan.md` — version roadmap
 - `docs/architecture.md` — full layer diagram
 - `docs/full_stack_product_architecture.md` — full-stack product plan and phase roadmap
-- `docs/frontend_plan.md` — frontend design and milestone plan (React + Vite; implementation not yet started)
+- `docs/frontend_plan.md` — original frontend design and milestone plan (historical; the frontend is built — trust the code and this file over the plan where they disagree)
 - `docs/scoring_rules.md` — score weights and rating thresholds
 - `docs/data_sources.md` — provider options and selection criteria
 - `docs/development_log.md` — append an entry for each meaningful change

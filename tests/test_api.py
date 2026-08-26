@@ -11,7 +11,6 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from app.analysis.fundamentals_analysis import FundamentalAnalysisError
 from app.analysis.news_analysis import NewsAnalysisError
 from app.analysis.risk_analysis import RiskAnalysisError
 from app.analysis.scoring import ScoringError
