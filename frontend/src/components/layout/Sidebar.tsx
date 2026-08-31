@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { to: '/discover', label: 'Discover', end: false },
   { to: '/analyze', label: 'Analyze', end: false },
   { to: '/watchlists', label: 'Watchlists', end: false },
+  { to: '/paper-trading', label: 'Paper Trading', end: false },
   { to: '/reports', label: 'Reports', end: false },
 ]
 

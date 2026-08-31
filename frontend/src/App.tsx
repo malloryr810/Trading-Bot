@@ -3,6 +3,7 @@ import { AppShell } from './components/layout/AppShell'
 import { AnalyzePage } from './pages/AnalyzePage'
 import { DashboardPage } from './pages/DashboardPage'
 import { DiscoverPage } from './pages/DiscoverPage'
+import { PaperTradingPage } from './pages/PaperTradingPage'
 import { ReportDetailPage } from './pages/ReportDetailPage'
 import { SavedReportsPage } from './pages/SavedReportsPage'
 import { WatchlistSnapshotDetailPage } from './pages/WatchlistSnapshotDetailPage'
@@ -21,6 +22,7 @@ export default function App() {
             path="/watchlists/:watchlistId/snapshots/:snapshotId"
             element={<WatchlistSnapshotDetailPage />}
           />
+          <Route path="/paper-trading" element={<PaperTradingPage />} />
           <Route path="/reports" element={<SavedReportsPage />} />
           <Route path="/reports/:id" element={<ReportDetailPage />} />
         </Routes>

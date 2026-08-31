@@ -29,14 +29,15 @@ the paper trading entries in **Layer Rules** and **Non-Negotiable Guardrails**.
 ## Current State (read this first)
 
 Everything in **Currently Implemented** below is built and tested. Concretely,
-as of 2026-08-26:
+as of 2026-08-31:
 
 - **Backend:** the full analysis pipeline, 9 API route modules, 13 service
   modules, and a SQLite layer with 10 tables. `pytest` runs 2056 deterministic
   tests, all passing.
-- **Frontend:** 7 pages wired to the API. `npm test` runs 93 Vitest tests over
-  `src/lib/` and `src/api/client.ts` only — the pure helpers. There are **no**
-  component tests, no DOM tests, and no e2e tests.
+- **Frontend:** 8 pages wired to the API, including the Paper Trading page.
+  `npm test` runs 128 Vitest tests over `src/lib/` and `src/api/client.ts`
+  only — the pure helpers. There are **no** component tests, no DOM tests, and
+  no e2e tests.
 - **CLI:** `python -m app.main` works for single tickers and watchlist files.
 
 What is *not* built, so you do not go looking for it:
@@ -47,9 +48,6 @@ What is *not* built, so you do not go looking for it:
   `docs/*calibration*` files are **proposals**, not shipped behavior.
 - Market-data staleness detection (a deliberate `TODO` in `app/data/market_data.py`).
 - Any second discovery universe. `starter_large_cap` is the only one.
-- Any **paper trading frontend**. The backend vertical is complete and tested,
-  but there is no Paper Trading page and no `paperTradingApi.ts` — the feature
-  is API-only today.
 - `app/ml/` (Phase 8 — do not create it). `app/simulation/` was never created
   either: Phase 7 shipped as a service vertical (`paper_trading_service`), not
   as a new top-level package.
@@ -208,10 +206,11 @@ cd frontend && npm run lint
 | `frontend/src/api/marketDataApi.ts` | `getPriceHistory` — read-only daily price history |
 | `frontend/src/api/portfolioApi.ts` | Portfolio + holding CRUD and `getPortfolioSummary` — one per `/api/portfolios*` endpoint |
 | `frontend/src/api/discoveryApi.ts` | `listDiscoveryModes`, `listDiscoveryUniverses`, `runDiscovery` — one per `/api/discovery*` endpoint |
-| `frontend/src/components/` | Presentational only: `LoadingState`, `ErrorMessage`, `StockReportView`; `layout/` (`AppShell`, `Sidebar`, `PageHeader`); `charts/` (`StockPriceChart`, `WatchlistSnapshotTrendChart`); `dashboard/` (`ComingSoonCard`); `watchlist/` (`WatchlistCard`, `AnalysisResultCard`); `portfolio/` (`PortfolioPanel` container + `PortfolioSelector`, `PortfolioSummaryCards`, `HoldingsTable`, `HoldingForm`); `discovery/` (`DiscoveryControls`, `DiscoveryCandidateCard`, `DiscoveryWarnings`) |
-| `frontend/src/lib/` | Pure, tested helpers: `format`, `errors`, `sort`, `dashboard`, `watchlist`, `chartData`, `snapshotTrend`, `portfolio` (money/percent/share formatting + holding-form validation), `discovery` (query building, mode labels, score/price formatting, run + warning summaries). Display-only — never recompute scores/categories/averages/portfolio totals/discovery ranking |
-| `frontend/src/pages/` | `DashboardPage` (portfolio panel, summary cards, health/source status), `DiscoverPage` (`/discover` — mode/universe/limit controls + ranked candidates), `AnalyzePage` (analyze + report + price chart), `WatchlistsPage` (CRUD + on-demand analyze + save snapshot + snapshot list/trend chart), `WatchlistSnapshotDetailPage` (`/watchlists/:watchlistId/snapshots/:snapshotId`), `SavedReportsPage` (`/reports`), `ReportDetailPage` (`/reports/:id`) |
-| `frontend/src/types/` | `report.ts`, `watchlist.ts` (incl. snapshot summary/detail + `average_score`), `marketData.ts`, `portfolio.ts`, `discovery.ts` — mirror backend schemas |
+| `frontend/src/api/paperTradingApi.ts` | One function per `/api/paper-trading` endpoint (`listAccounts`, `createAccount`, `getAccount`, `getAccountSummary`, `getAccountPositions`, `listTransactions`, `recordBuy`, `recordSell`) plus `loadAccountView(id)`, a composite reader that fetches detail + summary + transactions in parallel |
+| `frontend/src/components/` | Presentational only: `LoadingState`, `ErrorMessage`, `StockReportView`; `layout/` (`AppShell`, `Sidebar`, `PageHeader`); `charts/` (`StockPriceChart`, `WatchlistSnapshotTrendChart`); `dashboard/` (`ComingSoonCard`); `watchlist/` (`WatchlistCard`, `AnalysisResultCard`); `portfolio/` (`PortfolioPanel` container + `PortfolioSelector`, `PortfolioSummaryCards`, `HoldingsTable`, `HoldingForm`); `discovery/` (`DiscoveryControls`, `DiscoveryCandidateCard`, `DiscoveryWarnings`); `paperTrading/` (`PaperAccountSelector`, `PaperAccountSummaryCards`, `PaperPositionsTable`, `TransactionLedger`, `TradeForm`) |
+| `frontend/src/lib/` | Pure, tested helpers: `format`, `errors`, `sort`, `dashboard`, `watchlist`, `chartData`, `snapshotTrend`, `portfolio` (money/percent/share formatting + holding-form validation), `discovery` (query building, mode labels, score/price formatting, run + warning summaries), `paperTrading` (account/trade form validation, trade-request shaping, transaction labels, price-warning summaries). Display-only — never recompute scores/categories/averages/portfolio totals/discovery ranking/paper-trading accounting |
+| `frontend/src/pages/` | `DashboardPage` (portfolio panel, summary cards, health/source status), `DiscoverPage` (`/discover` — mode/universe/limit controls + ranked candidates), `AnalyzePage` (analyze + report + price chart), `WatchlistsPage` (CRUD + on-demand analyze + save snapshot + snapshot list/trend chart), `WatchlistSnapshotDetailPage` (`/watchlists/:watchlistId/snapshots/:snapshotId`), `SavedReportsPage` (`/reports`), `ReportDetailPage` (`/reports/:id`), `PaperTradingPage` (`/paper-trading` — account picker/create, priced summary cards, open positions, buy/sell forms, transaction ledger) |
+| `frontend/src/types/` | `report.ts`, `watchlist.ts` (incl. snapshot summary/detail + `average_score`), `marketData.ts`, `portfolio.ts`, `discovery.ts`, `paperTrading.ts` — mirror backend schemas |
 
 ## Architecture
 
@@ -322,7 +321,7 @@ Each analysis module follows the same pattern:
 | — | Market-data chart (read-only) | **Done** — `market_data_service` + `GET /api/market-data/{ticker}/history`; daily price chart on the Analyze page (Lightweight Charts) |
 | — | Personal portfolio holdings (manual) | **Milestone 1 complete** — `portfolios`/`portfolio_holdings` tables, `portfolio_service` (CRUD) + `portfolio_summary_service` (priced summary), `/api/portfolios` CRUD + `GET /{id}/summary`, Dashboard `PortfolioPanel`. Manual entry only; current-price valuation via existing market-data layer; partial-price-failure tolerant. No broker links, cash, realized gains, dividends, tax lots, or trading |
 | — | Stock discovery engine | **Milestone 1 complete** — static `starter_large_cap` universe + `universe_loader`, stage-1 pre-screen, bounded full analysis (`max_full_analysis`, default 25/ceiling 50), six deterministic ranking modes (`overall`, `momentum`, `quality`, `value`, `defensive`, `avoid`), `GET /api/discovery(+/modes,/universes)`, Discover page. Rule-based and explainable; no ML, no LLM picks, no scoring changes, nothing saved or scheduled |
-| 7 | Paper trading simulation | **Milestone 1 complete (backend only)** — `paper_trading_accounts`/`_transactions`/`_positions` tables, `paper_trading_service` (accounts + buy/sell accounting + ledger, storage-only) and `paper_trading_summary_service` (priced positions + valued summary), 8 `/api/paper-trading` endpoints. Stored positions over an append-only ledger; Decimal-exact, cent-quantised money. Implemented as a service vertical, **not** as `app/simulation/`. Simulated only — no broker, no real order, no real account, nothing automatic. **No frontend UI yet** |
+| 7 | Paper trading simulation | **Complete (backend + frontend)** — `paper_trading_accounts`/`_transactions`/`_positions` tables, `paper_trading_service` (accounts + buy/sell accounting + ledger, storage-only) and `paper_trading_summary_service` (priced positions + valued summary), 8 `/api/paper-trading` endpoints. Stored positions over an append-only ledger; Decimal-exact, cent-quantised money. Implemented as a service vertical, **not** as `app/simulation/`. Frontend: Paper Trading page (`/paper-trading`) — account create/select, priced summary cards, positions table, buy/sell forms, transaction ledger. Simulated only — no broker, no real order, no real account, nothing automatic |
 | 8 | ML research layer (`app/ml/`) | Not started |
 | 9 | Deployment and hardening | Not started |
 
@@ -340,8 +339,9 @@ Portfolio holdings are manual-entry tracking only — do not extend them toward
 cash, realized P&L, dividends, tax lots, or broker links without an explicitly
 scoped task. Cash and realized gains belong to the **paper trading** vertical,
 which is separate and shares no tables with it; do not merge the two.
-Paper trading is backend-only today — building its frontend is the next scoped
-task, not an excuse to widen the backend.
+Paper trading now has both backend and frontend — do not widen either without
+an explicitly scoped task (e.g. no "paper buy from Discover" action, no
+per-position charts, no CSV export).
 
 ## Non-Negotiable Guardrails
 

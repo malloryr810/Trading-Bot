@@ -1,5 +1,44 @@
 # Development Log
 
+## 2026-08-31 — Paper trading frontend (Phase 7 complete)
+
+Added the Paper Trading page over the existing `/api/paper-trading` backend
+(2026-08-26 entry below). Frontend only — no backend file changed.
+
+- `frontend/src/types/paperTrading.ts` — mirrors `app/api/schemas/paper_trading.py`.
+- `frontend/src/api/paperTradingApi.ts` — one function per endpoint
+  (`listAccounts`, `createAccount`, `getAccount`, `getAccountSummary`,
+  `getAccountPositions`, `listTransactions`, `recordBuy`, `recordSell`) plus
+  `loadAccountView(id)`, a composite reader that fetches detail + summary +
+  transactions in parallel. The positions endpoint stays available for callers
+  that want it, but the page renders positions from the summary response
+  (which already carries them) rather than calling it separately, to avoid
+  repeating the same market-data work.
+- `frontend/src/lib/paperTrading.ts` — pure display and form-validation
+  helpers (`validateAccountForm`, `validateTradeForm`, `toTradeRequest`,
+  `transactionTypeLabel`/`Tone`, `priceWarningsSummary`, `heldTickers`,
+  `accountPositionsLabel`).
+- `frontend/src/pages/PaperTradingPage.tsx` (route `/paper-trading`) — create
+  and select a simulated account, priced summary cards (cash, open-position
+  value, realized/unrealized gain/loss, total value and return), an
+  open-positions table, buy and sell forms, and the transaction ledger
+  (newest first). Unavailable prices render as an em dash with an
+  explanatory note, never zero. Backend 400/404/409 errors surface verbatim.
+- `frontend/src/components/paperTrading/` — `PaperAccountSelector`,
+  `PaperAccountSummaryCards`, `PaperPositionsTable`, `TransactionLedger`,
+  `TradeForm`.
+- `App.tsx` (route) and `Sidebar.tsx` ("Paper Trading" nav item) updated;
+  `styles.css` gained a paper-trading section.
+
+Same simulation boundary as the backend: every buy/sell the page submits is a
+row at a price the user typed in, nothing contacts a market, and this stays
+separate from manual portfolio tracking (`/api/portfolios`).
+
+**Tests:** `frontend/src/api/paperTradingApi.test.ts` (15),
+`frontend/src/lib/paperTrading.test.ts` (20). `npm test` — 128 passed (was 93).
+`npm run build` and `npm run lint` clean. `python -m pytest` unaffected (2056
+passed, no backend file touched).
+
 ## 2026-08-26 — Paper trading backend (Phase 7, Milestone 1)
 
 Added a **simulated** trading vertical: hand-entered buys and sells against a

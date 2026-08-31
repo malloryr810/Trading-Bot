@@ -52,7 +52,7 @@ This tool prints reports. It does not place trades.
 - **Daily price chart** — read-only market-data history endpoint rendered as a daily closing-price chart on the Analyze page
 - **Personal portfolios** — create named portfolios and manually enter the holdings you own (ticker, shares, average cost, optional purchase date/notes); a priced summary values each holding at the current end-of-day price and computes cost basis, market value, unrealized gain/loss, return %, and portfolio weight. Manual entry only — no brokerage connection and no trading
 - **Stock discovery** — a Discover page that ranks research candidates from a controlled, static stock universe instead of only tickers you type in. Six deterministic modes (`overall`, `momentum`, `quality`, `value`, `defensive`, `avoid`), each result showing the score, category, confidence, sub-scores, key positives, key risks, and a plain-text reason it surfaced. Rule-based and bounded — no ML, no LLM picks, nothing scheduled or saved
-- **Paper trading (backend only)** — open a **simulated** trading account with a made-up starting cash balance, record paper buys and sells at prices you supply, and read back positions, cash, realized and unrealized gain/loss, total value, and a full transaction ledger. Entirely simulated: there is no broker integration, no real account link, and no real order anywhere in this project. **No frontend UI yet** — this milestone is API + services + tests only
+- **Paper trading** — open a **simulated** trading account with a made-up starting cash balance, record paper buys and sells at prices you supply, and read back positions, cash, realized and unrealized gain/loss, total value, and a full transaction ledger, all from a dedicated Paper Trading page. Entirely simulated: there is no broker integration, no real account link, and no real order anywhere in this project
 - **Dark dashboard** — app shell with sidebar; dashboard summary cards over real saved reports and watchlists, plus the portfolio panel
 
 ## What Is Not Included (By Design)
@@ -265,8 +265,10 @@ CORS is configured to allow `http://localhost:5173` and `http://127.0.0.1:5173`
 > failure returns 200 with the position marked `price_available: false` and
 > listed in `warnings`.
 >
-> **Backend only in this milestone** — there is no Paper Trading page in the
-> frontend yet.
+> The Paper Trading page (`/paper-trading`) covers all of this: account
+> create/select, priced summary cards, an open-positions table, buy and sell
+> forms, and the transaction ledger. Unavailable prices render as an em dash
+> with an explanatory note, never as zero.
 
 **Analysis only (no persistence):**
 
@@ -333,6 +335,7 @@ The app opens at `http://localhost:5173`.
 - Watchlists page — create, rename, and delete named watchlists; add and remove tickers (CRUD over the watchlist API). "Analyze watchlist" runs the pipeline on demand and shows per-ticker results/failures (not saved); "Analyze & save snapshot" records a historical snapshot. Saved snapshots list with a snapshot-trend chart (success count / average score toggle)
 - Snapshot Detail page (`/watchlists/:watchlistId/snapshots/:snapshotId`) — full read-only view of one saved watchlist analysis snapshot
 - Saved Reports page (`/reports`) — list of previously saved analysis snapshots; each links to a Report Detail page (`/reports/:id`) that renders the full saved report. Display-only — no analysis is run here.
+- Paper Trading page (`/paper-trading`) — open a simulated account with a made-up starting cash balance, select an account, view priced summary cards (cash, open-position value, realized/unrealized gain/loss, total value and return), an open-positions table, buy and sell forms, and the full transaction ledger (newest first). Unavailable prices render as an em dash with an explanatory note, never zero; backend 400/404/409 errors surface verbatim. A simulation only — no broker, no real order, no real account
 
 > The frontend is display-only: it formats values the backend produced and never recomputes scores, categories, weights, or averages.
 
@@ -499,6 +502,7 @@ frontend/                          # React + Vite + TypeScript frontend
       marketDataApi.ts             # getPriceHistory (read-only)
       portfolioApi.ts              # Portfolio + holding CRUD + getPortfolioSummary
       discoveryApi.ts              # listDiscoveryModes, listDiscoveryUniverses, runDiscovery
+      paperTradingApi.ts           # One function per /api/paper-trading endpoint + loadAccountView (parallel composite read)
     components/
       LoadingState.tsx             # Spinner with accessible role/aria attributes
       ErrorMessage.tsx             # Accessible error display
@@ -509,7 +513,8 @@ frontend/                          # React + Vite + TypeScript frontend
       watchlist/                   # WatchlistCard, AnalysisResultCard
       portfolio/                   # PortfolioPanel, PortfolioSelector, PortfolioSummaryCards, HoldingsTable, HoldingForm
       discovery/                   # DiscoveryControls, DiscoveryCandidateCard, DiscoveryWarnings
-    lib/                           # Pure, tested helpers: format, errors, sort, dashboard, watchlist, chartData, snapshotTrend, portfolio, discovery
+      paperTrading/                # PaperAccountSelector, PaperAccountSummaryCards, PaperPositionsTable, TransactionLedger, TradeForm
+    lib/                           # Pure, tested helpers: format, errors, sort, dashboard, watchlist, chartData, snapshotTrend, portfolio, discovery, paperTrading
     pages/
       DashboardPage.tsx            # Portfolio panel + summary cards over saved reports/watchlists; health/source status
       DiscoverPage.tsx             # Discovery controls + ranked candidate list (/discover)
@@ -518,7 +523,8 @@ frontend/                          # React + Vite + TypeScript frontend
       WatchlistSnapshotDetailPage.tsx  # One saved snapshot rendered in full
       SavedReportsPage.tsx         # List of saved report snapshots (/reports)
       ReportDetailPage.tsx         # One saved report rendered in full (/reports/:id)
-    types/                         # report.ts, watchlist.ts, marketData.ts, portfolio.ts, discovery.ts (mirror backend schemas)
+      PaperTradingPage.tsx         # Simulated account picker/create, priced summary, positions, buy/sell forms, ledger (/paper-trading)
+    types/                         # report.ts, watchlist.ts, marketData.ts, portfolio.ts, discovery.ts, paperTrading.ts (mirror backend schemas)
     App.tsx                        # BrowserRouter + AppShell (sidebar) + route table
     main.tsx                       # Vite entry point
     styles.css                     # Plain CSS — no framework
@@ -544,8 +550,8 @@ end. The sections below summarise where each area stands.
 | Market-data chart | Read-only daily OHLCV history endpoint + Analyze-page price chart |
 | Personal portfolios | Manual holdings CRUD (storage-only) plus a separate priced-summary service; partial price failures degrade gracefully |
 | Stock discovery | Static universe → bounded pre-screen → existing analysis pipeline → deterministic per-mode ranking, surfaced on the Discover page. Nothing saved or scheduled |
-| Paper trading | **Backend only.** Simulated accounts, hand-entered buys/sells at caller-supplied prices, stored positions over an append-only ledger, cash, realized + unrealized gain/loss, and a valued summary. 8 endpoints under `/api/paper-trading`. **No frontend UI yet.** Simulation only — no broker, no real order, no real account |
-| React + Vite frontend | Dashboard, Discover, Analyze, Watchlists, Snapshot Detail, Saved Reports, and Report Detail pages, all wired to the API. Display-only |
+| Paper trading | Simulated accounts, hand-entered buys/sells at caller-supplied prices, stored positions over an append-only ledger, cash, realized + unrealized gain/loss, and a valued summary. 8 endpoints under `/api/paper-trading`, plus a Paper Trading page (account create/select, summary cards, positions, buy/sell forms, ledger). Simulation only — no broker, no real order, no real account |
+| React + Vite frontend | Dashboard, Discover, Analyze, Watchlists, Snapshot Detail, Saved Reports, Report Detail, and Paper Trading pages, all wired to the API. Display-only |
 
 ### Known gaps and rough edges
 
@@ -553,8 +559,7 @@ end. The sections below summarise where each area stands.
 - **Scoring calibration** — weights and thresholds are still the original hand-picked values (see `docs/scoring_calibration_plan.md`).
 - **Staleness detection** — the market-data layer does not yet reject unreasonably old price history (a documented `TODO` in `app/data/market_data.py`).
 - **Discovery universe** — one static universe (`starter_large_cap`); adding more means dropping a CSV in `app/data/universes/` and registering it.
-- **Paper trading UI** — the backend is complete, but there is no Paper Trading page in the frontend and no `frontend/src/api/paperTradingApi.ts` yet. The feature is API-only today.
-- **Frontend tests** — Vitest covers the pure helpers in `src/lib/` and `src/api/client.ts` only. There are no component or end-to-end tests.
+- **Frontend tests** — Vitest covers the pure helpers in `src/lib/` and `src/api/client.ts` only, including `paperTrading.ts` and `paperTradingApi.ts`. There are no component or end-to-end tests.
 - **Dashboard "Market Overview"** — still a clearly labelled "coming soon" placeholder.
 
 ## Planned Future Work
@@ -564,7 +569,6 @@ These areas are on the roadmap but not yet built:
 - **Research notes** — free-text notes attached to saved reports and watchlists
 - **Improved scoring calibration** — better-calibrated weights and thresholds (see `docs/scoring_calibration_plan.md`)
 - **Better data validation** — richer error messages for missing or stale data fields
-- **Paper trading frontend UI** — a Paper Trading page over the existing `/api/paper-trading` endpoints: account picker, cash and value cards, positions table, buy/sell forms, and the transaction ledger. Backend-complete already; this is display + forms only
 - **Backtesting** — validate signals against historical outcomes (requires careful design)
 - **ML/LLM sentiment** — replace keyword matching with a trained model (later phase)
 
