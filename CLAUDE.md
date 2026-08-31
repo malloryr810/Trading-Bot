@@ -372,3 +372,20 @@ These apply to every phase and every task:
 - `docs/scoring_rules.md` — score weights and rating thresholds
 - `docs/data_sources.md` — provider options and selection criteria
 - `docs/development_log.md` — append an entry for each meaningful change
+
+## Required Post-Implementation Workflow
+
+After every meaningful code change, use the relevant subagents:
+
+1. Use the code-reviewer subagent to check for bugs, architecture issues, scope creep, security issues, and Investment Bot guardrail violations.
+2. Use the test-runner subagent to run the narrowest relevant tests and summarize results.
+3. Use the docs-maintainer subagent to update documentation only if the change makes existing docs stale.
+
+Do not skip this workflow unless the user explicitly says to skip review, tests, or docs.
+
+For every completed task, report:
+- Files changed
+- Tests run
+- Subagents used
+- Issues found
+- Documentation updated or not needed
