@@ -18,9 +18,7 @@ router = APIRouter()
 
 
 @router.post("/analyze", response_model=StockReport)
-async def analyze(request: AnalyzeRequest) -> StockReport:
-    # analyze_stock is synchronous; acceptable for a single-user personal tool.
-    # Wrap in asyncio.to_thread if concurrent request handling is needed later.
+def analyze(request: AnalyzeRequest) -> StockReport:
     try:
         return analyze_stock(request.ticker)
     except KNOWN_ANALYSIS_ERRORS as exc:

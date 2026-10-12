@@ -1,8 +1,8 @@
 """
 Stock analysis service layer.
 
-Provides reusable analysis functions that can be called by both the CLI
-(app/main.py) and a future UI without importing from app.main.
+The single entry point to the analysis pipeline, shared by the CLI
+(app/main.py) and the API routes.
 
 Functions:
     _analyze_ticker — internal; run the full pipeline; return a Rating.
@@ -87,8 +87,8 @@ def _analyze_ticker(ticker: str) -> Rating:
 def analyze_stock(ticker: str) -> StockReport:
     """Run the full analysis pipeline and return a StockReport.
 
-    Convenience function for callers (e.g. a future UI) that want a
-    fully assembled, report-ready object rather than the raw Rating.
+    Used by the CLI and the API, which want a fully assembled,
+    report-ready object rather than the raw Rating.
 
     Args:
         ticker: Stock ticker symbol (e.g. "AAPL").

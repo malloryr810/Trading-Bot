@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   addHolding,
   createPortfolio,
@@ -51,16 +51,25 @@ export function PortfolioPanel() {
   const [showAddHolding, setShowAddHolding] = useState(false)
   const [editingHoldingId, setEditingHoldingId] = useState<number | null>(null)
 
+  // Identifies the newest in-flight summary load. The priced summary fetches
+  // live prices and can take seconds, so a slow response for a previously
+  // selected portfolio is dropped rather than shown under the current one.
+  const summaryRequestId = useRef(0)
+
   async function loadSummary(id: number) {
+    const requestId = ++summaryRequestId.current
     setSummaryLoading(true)
     setSummaryError(null)
     try {
-      setSummary(await getPortfolioSummary(id))
+      const next = await getPortfolioSummary(id)
+      if (requestId !== summaryRequestId.current) return
+      setSummary(next)
     } catch (err) {
+      if (requestId !== summaryRequestId.current) return
       setSummary(null)
       setSummaryError(getErrorMessage(err, 'Failed to load portfolio summary.'))
     } finally {
-      setSummaryLoading(false)
+      if (requestId === summaryRequestId.current) setSummaryLoading(false)
     }
   }
 

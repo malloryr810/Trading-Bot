@@ -61,31 +61,31 @@ router = APIRouter(prefix="/paper-trading", tags=["paper-trading"])
 
 
 @router.post("/accounts", response_model=AccountDetail, status_code=201)
-async def post_account(request: CreateAccountRequest) -> dict:
+def post_account(request: CreateAccountRequest) -> dict:
     """Open a simulated trading account with a starting cash balance."""
     try:
         return create_account(request.name, request.starting_cash)
-    except (PaperTradingValidationError, ValueError) as exc:
+    except PaperTradingValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/accounts", response_model=list[AccountSummary])
-async def get_accounts() -> list[dict]:
+def get_accounts() -> list[dict]:
     """Return all simulated trading accounts, newest first."""
     return list_accounts()
 
 
 @router.get("/accounts/{account_id}", response_model=AccountDetail)
-async def get_one_account(account_id: int) -> dict:
+def get_one_account(account_id: int) -> dict:
     """Return one account with its open positions (no market data)."""
     try:
         return get_account(account_id)
-    except (PaperTradingAccountNotFoundError, LookupError) as exc:
+    except PaperTradingAccountNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.get("/accounts/{account_id}/summary", response_model=AccountSummaryResponse)
-async def get_summary(account_id: int) -> dict:
+def get_summary(account_id: int) -> dict:
     """Return the account valued at current prices.
 
     A missing account is 404.  Per-ticker market-data failures never fail the
@@ -94,16 +94,16 @@ async def get_summary(account_id: int) -> dict:
     """
     try:
         return get_account_summary(account_id)
-    except (PaperTradingAccountNotFoundError, LookupError) as exc:
+    except PaperTradingAccountNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.get("/accounts/{account_id}/positions", response_model=PositionsResponse)
-async def get_positions(account_id: int) -> dict:
+def get_positions(account_id: int) -> dict:
     """Return the account's open positions with current-price calculations."""
     try:
         return get_priced_positions(account_id)
-    except (PaperTradingAccountNotFoundError, LookupError) as exc:
+    except PaperTradingAccountNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
 
@@ -111,11 +111,11 @@ async def get_positions(account_id: int) -> dict:
     "/accounts/{account_id}/transactions",
     response_model=list[TransactionResponse],
 )
-async def get_transactions(account_id: int) -> list[dict]:
+def get_transactions(account_id: int) -> list[dict]:
     """Return the account's full transaction ledger, newest first."""
     try:
         return list_transactions(account_id)
-    except (PaperTradingAccountNotFoundError, LookupError) as exc:
+    except PaperTradingAccountNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
 
@@ -124,7 +124,7 @@ async def get_transactions(account_id: int) -> list[dict]:
     response_model=TransactionResponse,
     status_code=201,
 )
-async def post_buy(account_id: int, request: TradeRequest) -> dict:
+def post_buy(account_id: int, request: TradeRequest) -> dict:
     """Record a simulated buy at the caller-supplied price.
 
     Insufficient cash is rejected with HTTP 409.
@@ -139,9 +139,9 @@ async def post_buy(account_id: int, request: TradeRequest) -> dict:
         )
     except InsufficientFundsError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
-    except (PaperTradingAccountNotFoundError, LookupError) as exc:
+    except PaperTradingAccountNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-    except (PaperTradingValidationError, ValueError) as exc:
+    except PaperTradingValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
 
@@ -150,7 +150,7 @@ async def post_buy(account_id: int, request: TradeRequest) -> dict:
     response_model=TransactionResponse,
     status_code=201,
 )
-async def post_sell(account_id: int, request: TradeRequest) -> dict:
+def post_sell(account_id: int, request: TradeRequest) -> dict:
     """Record a simulated sell at the caller-supplied price.
 
     Selling more than the account holds — or a ticker it does not hold at all —
@@ -166,7 +166,7 @@ async def post_sell(account_id: int, request: TradeRequest) -> dict:
         )
     except InsufficientSharesError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
-    except (PaperTradingAccountNotFoundError, LookupError) as exc:
+    except PaperTradingAccountNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-    except (PaperTradingValidationError, ValueError) as exc:
+    except PaperTradingValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

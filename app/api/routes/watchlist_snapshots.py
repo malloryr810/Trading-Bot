@@ -39,7 +39,7 @@ router = APIRouter(tags=["watchlist-snapshots"])
     response_model=WatchlistSnapshotDetail,
     status_code=201,
 )
-async def post_analysis_snapshot(watchlist_id: int) -> dict:
+def post_analysis_snapshot(watchlist_id: int) -> dict:
     """Analyze every ticker once and save the run as a snapshot.
 
     Explicit save action. Per-ticker failures are recorded in the snapshot;
@@ -47,9 +47,9 @@ async def post_analysis_snapshot(watchlist_id: int) -> dict:
     """
     try:
         return analyze_and_save_snapshot(watchlist_id)
-    except (WatchlistNotFoundError, LookupError) as exc:
+    except WatchlistNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-    except (WatchlistValidationError, ValueError) as exc:
+    except WatchlistValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
 
@@ -57,11 +57,11 @@ async def post_analysis_snapshot(watchlist_id: int) -> dict:
     "/watchlists/{watchlist_id}/analysis-snapshots",
     response_model=list[WatchlistSnapshotSummary],
 )
-async def get_analysis_snapshots(watchlist_id: int) -> list[dict]:
+def get_analysis_snapshots(watchlist_id: int) -> list[dict]:
     """List saved snapshots for a watchlist, newest first."""
     try:
         return list_watchlist_snapshots(watchlist_id)
-    except (WatchlistNotFoundError, LookupError) as exc:
+    except WatchlistNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
 
@@ -69,7 +69,7 @@ async def get_analysis_snapshots(watchlist_id: int) -> list[dict]:
     "/watchlist-analysis-snapshots/{snapshot_id}",
     response_model=WatchlistSnapshotDetail,
 )
-async def get_analysis_snapshot(snapshot_id: int) -> dict:
+def get_analysis_snapshot(snapshot_id: int) -> dict:
     """Return one snapshot's full detail by id."""
     detail = get_watchlist_snapshot(snapshot_id)
     if detail is None:

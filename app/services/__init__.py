@@ -1,6 +1,7 @@
 """
 Service layer for the Investment Bot.
 
-Exposes reusable analysis functions that can be called by both the CLI
-and a future UI, without depending on app.main.
+Business logic shared by the CLI (app/main.py) and the API (app/api/):
+the analysis pipeline entry points, persistence, enrichment, and discovery.
+Nothing here depends on app.main or on API schemas.
 """

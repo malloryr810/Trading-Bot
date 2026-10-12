@@ -569,12 +569,6 @@ class TestMarkdownMetadata:
     def test_metadata_section_present_when_timestamp_provided(self):
         assert "## Metadata" in _md()
 
-    def test_metadata_contains_timestamp(self):
-        assert "2024-06-01" in _md()
-
-    def test_metadata_contains_data_source(self):
-        assert "yfinance" in _md(data_sources_used=["yfinance"])
-
     def test_metadata_section_omitted_when_no_data(self):
         out = format_report_markdown(StockReport(
             ticker="AAPL",

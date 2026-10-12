@@ -11,7 +11,7 @@ lives here.  ``POST /api/analyze`` (the analysis-only endpoint) is unaffected.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.api.errors import KNOWN_ANALYSIS_ERRORS
 from app.api.schemas.analysis import AnalyzeRequest
@@ -25,9 +25,12 @@ from app.services.stock_analysis_service import analyze_stock
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
+# Bounds the history query; SQLite treats a negative LIMIT as "no limit".
+MAX_HISTORY_LIMIT = 500
+
 
 @router.post("/analyze", response_model=SavedReportDetail)
-async def analyze_and_save(request: AnalyzeRequest) -> dict:
+def analyze_and_save(request: AnalyzeRequest) -> dict:
     """Analyze a ticker and persist the resulting StockReport snapshot."""
     try:
         report = analyze_stock(request.ticker)
@@ -43,13 +46,15 @@ async def analyze_and_save(request: AnalyzeRequest) -> dict:
 
 
 @router.get("/history", response_model=list[SavedReportSummary])
-async def get_report_history(limit: int = 50) -> list[dict]:
+def get_report_history(
+    limit: int = Query(50, ge=1, le=MAX_HISTORY_LIMIT),
+) -> list[dict]:
     """Return saved report summaries, newest first."""
     return list_saved_reports(limit=limit)
 
 
 @router.get("/{report_id}", response_model=SavedReportDetail)
-async def get_report(report_id: int) -> dict:
+def get_report(report_id: int) -> dict:
     """Return one full saved StockReport snapshot by id."""
     result = get_saved_report(report_id)
     if result is None:

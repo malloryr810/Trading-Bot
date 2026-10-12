@@ -11,8 +11,11 @@ order.
 
 from __future__ import annotations
 
+import threading
+import time
 from datetime import datetime, timezone
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 from sqlalchemy import select
@@ -24,6 +27,7 @@ from app.data.database import (
     paper_trading_positions,
     paper_trading_transactions,
 )
+from app.services import paper_trading_service
 from app.services.paper_trading_service import (
     InsufficientFundsError,
     InsufficientSharesError,
@@ -575,3 +579,39 @@ class TestAccountIsolation:
         record_buy(b["id"], "AAPL", "10", "200", engine=engine)
         assert list_positions(a["id"], engine=engine)[0]["average_cost"] == 100.0
         assert list_positions(b["id"], engine=engine)[0]["average_cost"] == 200.0
+
+
+# ---------------------------------------------------------------------------
+# Concurrency — API handlers run in a threadpool
+# ---------------------------------------------------------------------------
+
+
+class TestConcurrentTrades:
+    def test_concurrent_buys_do_not_lose_a_cash_update(self, engine):
+        # Arrange: pause every trade right after it reads the account, so two
+        # trades would both see the same starting cash unless the transaction
+        # holds the write lock from its first read.
+        account = _account(engine, starting_cash="1000")
+        real_account_row = paper_trading_service._account_row
+
+        def _slow_account_row(conn, account_id):
+            row = real_account_row(conn, account_id)
+            time.sleep(0.05)
+            return row
+
+        def _buy(ticker):
+            record_buy(account["id"], ticker, "1", "100", engine=engine)
+
+        # Act
+        with patch.object(paper_trading_service, "_account_row", _slow_account_row):
+            threads = [
+                threading.Thread(target=_buy, args=(ticker,)) for ticker in ("AAPL", "MSFT")
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+
+        # Assert: cash == starting_cash - Σ(buy gross)
+        assert get_account(account["id"], engine=engine)["cash_balance"] == 800.0
+        assert len(list_transactions(account["id"], engine=engine)) == 2

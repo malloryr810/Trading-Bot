@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import pandas as pd
 
-from app.api.schemas.market_data import PriceHistoryResponse, PricePoint
 from app.data.market_data import get_price_history
+from app.models.market_data import PriceHistoryResponse, PricePoint
 from app.utils.helpers import normalize_ticker, safe_float
 
 # Conservative, daily-or-coarser windows for now. Intraday intervals are

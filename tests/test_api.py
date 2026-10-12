@@ -6,9 +6,11 @@ All calls to analyze_stock are mocked — no network calls.
 
 from __future__ import annotations
 
+import inspect
 from unittest.mock import patch
 
 import pytest
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from app.analysis.news_analysis import NewsAnalysisError
@@ -224,3 +226,35 @@ class TestCors:
             headers={"Origin": "http://evil.com"},
         )
         assert response.headers.get("access-control-allow-origin") is None
+
+
+# ---------------------------------------------------------------------------
+# Handler execution model and error mapping (all routes)
+# ---------------------------------------------------------------------------
+
+
+class TestRouteHandlers:
+    def test_no_handler_is_a_coroutine(self):
+        # Services block on SQLite / yfinance. An async handler would run that
+        # work on the event loop and stall every other request.
+        from app.api.main import app
+
+        async_handlers = [
+            route.path
+            for route in app.routes
+            if isinstance(route, APIRoute)
+            and inspect.iscoroutinefunction(route.endpoint)
+        ]
+        assert async_handlers == []
+
+    def test_internal_lookup_error_is_500_not_404(self):
+        # Routes map only domain not-found errors to 404; a stray KeyError from
+        # a bug must not masquerade as "not found".
+        from app.api.main import app
+
+        client = TestClient(app, raise_server_exceptions=False)
+        with patch(
+            "app.api.routes.watchlists.get_watchlist", side_effect=KeyError("id")
+        ):
+            response = client.get("/api/watchlists/1")
+        assert response.status_code == 500

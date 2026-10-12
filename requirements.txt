@@ -1,11 +1,14 @@
+# Runtime
 pandas
-numpy
-requests
 yfinance
 pydantic
 python-dotenv
-pytest
 fastapi
 uvicorn
-httpx
 sqlalchemy
+
+# Tests (pytest; httpx backs FastAPI's TestClient; numpy is imported directly
+# by tests and is also installed transitively by pandas)
+pytest
+httpx
+numpy

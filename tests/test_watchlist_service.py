@@ -12,6 +12,12 @@ from sqlalchemy import select
 from sqlalchemy.engine import Engine
 
 from app.data.database import build_engine, watchlist_tickers
+from app.models.rating import ConfidenceLevel, RatingCategory
+from app.models.stock_report import StockReport
+from app.services.report_persistence_service import (
+    get_saved_report,
+    save_stock_report,
+)
 from app.services.watchlist_service import (
     WatchlistNotFoundError,
     WatchlistValidationError,
@@ -238,6 +244,27 @@ class TestDeleteWatchlist:
         add_ticker_to_watchlist(keep["id"], "AAPL", engine=engine)
         delete_watchlist(drop["id"], engine=engine)
         assert get_watchlist(keep["id"], engine=engine)["tickers"] == ["AAPL"]
+
+    def test_does_not_delete_saved_reports(self, engine):
+        report = StockReport(
+            ticker="AAPL",
+            final_category=RatingCategory.WATCHLIST,
+            score=60.0,
+            confidence_level=ConfidenceLevel.MEDIUM,
+        )
+        saved = save_stock_report(report, engine=engine)
+        wl = create_watchlist("Tech", engine=engine)
+        add_ticker_to_watchlist(wl["id"], "AAPL", engine=engine)
+
+        delete_watchlist(wl["id"], engine=engine)
+
+        assert get_saved_report(saved["id"], engine=engine) is not None
+
+    def test_deleted_id_is_not_reused(self, engine):
+        first = create_watchlist("First", engine=engine)
+        delete_watchlist(first["id"], engine=engine)
+        second = create_watchlist("Second", engine=engine)
+        assert second["id"] > first["id"]
 
 
 # ---------------------------------------------------------------------------

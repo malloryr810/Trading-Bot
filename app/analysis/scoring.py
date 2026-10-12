@@ -1,8 +1,8 @@
 """
 Scoring engine.
 
-Implements technical-only scoring (score_technical_signals) and composite
-scoring across technical, fundamental, news, and risk signals (score_signals).
+Implements composite scoring across technical, fundamental, news, and risk
+signals (score_signals).
 Base weights: Technical 35%, Fundamental 25%, News 25%, Risk 15%; sum to 1.00;
 re-normalised to active categories when any category is absent.
 """
@@ -203,81 +203,6 @@ def score_signals(
     )
 
 
-def score_technical_signals(
-    ticker: str,
-    signals: list[Signal],
-    data_timestamp: datetime | None = None,
-    data_sources_used: list[str] | None = None,
-) -> Rating:
-    """Score a list of technical signals and return a typed Rating.
-
-    Only technical signals (SignalCategory.TECHNICAL) are accepted.
-    Fundamental, news, and risk sub-scores are set to 0.0 because this is a
-    technical-only scoring path. Use score_signals() for composite scoring.
-
-    Args:
-        ticker: Stock ticker symbol (e.g. "AAPL").
-        signals: Non-empty list of technical Signal objects.
-        data_timestamp: Optional timestamp of the underlying price data.
-        data_sources_used: Optional list of data source names.
-
-    Returns:
-        A Rating with technical_score == score, all other sub-scores 0.0.
-
-    Raises:
-        ScoringError: If ticker is invalid, signals is not a non-empty list
-            of technical Signal objects.
-    """
-    _validate_scoring_inputs(ticker, signals)
-    sources = list(data_sources_used) if data_sources_used is not None else []
-
-    technical_score = _signals_to_score(signals)
-    category = _map_score_to_category(technical_score)
-    confidence = _map_confidence(signals)
-    confidence_diag = _build_confidence_diagnostics(signals)
-
-    positive_factors = _build_positive_factors(signals)
-    risk_factors = _build_risk_factors(signals)
-
-    n = len(signals)
-    explanation = (
-        f"Technical-only rating for {ticker.strip().upper()} based on {n} technical "
-        "signals. Use score_signals() to include fundamental and risk analysis."
-    )
-    technical_summary = (
-        f"Technical score: {technical_score:.1f}/100 based on trend, RSI, MACD, "
-        "moving-average, and volume signals."
-    )
-    active_categories = frozenset({SignalCategory.TECHNICAL})
-    buy_trigger = _build_buy_trigger(
-        category, technical_score, 0.0, 0.0, 0.0, active_categories,
-    )
-    sell_or_avoid_trigger = _build_sell_avoid_trigger(
-        category, technical_score, 0.0, 0.0, 0.0, active_categories,
-    )
-
-    return Rating(
-        ticker=ticker,
-        final_category=category,
-        score=technical_score,
-        confidence=confidence,
-        confidence_diagnostics=confidence_diag,
-        explanation=explanation,
-        technical_score=technical_score,
-        fundamental_score=0.0,
-        news_score=0.0,
-        risk_score=0.0,
-        technical_summary=technical_summary,
-        key_positive_factors=positive_factors,
-        key_risks=risk_factors,
-        buy_trigger=buy_trigger,
-        sell_or_avoid_trigger=sell_or_avoid_trigger,
-        data_timestamp=data_timestamp,
-        data_sources_used=sources,
-        signals_used=list(signals),
-    )
-
-
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
@@ -293,25 +218,6 @@ def _validate_composite_inputs(ticker: object, signals: object) -> None:
         if not isinstance(item, Signal):
             raise ScoringError(
                 f"signals[{i}] is not a Signal instance (got {type(item).__name__})."
-            )
-
-
-def _validate_scoring_inputs(ticker: object, signals: object) -> None:
-    if not isinstance(ticker, str) or not ticker.strip():
-        raise ScoringError(f"ticker must be a non-empty string, got {ticker!r}.")
-    if not isinstance(signals, list):
-        raise ScoringError(f"signals must be a list, got {type(signals).__name__}.")
-    if not signals:
-        raise ScoringError("signals must not be empty.")
-    for i, item in enumerate(signals):
-        if not isinstance(item, Signal):
-            raise ScoringError(
-                f"signals[{i}] is not a Signal instance (got {type(item).__name__})."
-            )
-        if item.category != SignalCategory.TECHNICAL:
-            raise ScoringError(
-                f"signals[{i}] has category '{item.category.value}'; "
-                "score_technical_signals only accepts TECHNICAL signals."
             )
 
 

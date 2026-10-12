@@ -1,5 +1,113 @@
 # Development Log
 
+## 2026-10-12 — Full-repository code review and cleanup
+
+Reviewed the whole repository (backend layers, API, CLI, frontend, tests,
+dependencies, config, docs). Conservative scope: no features, no scoring
+changes, no new dependencies.
+
+**Bugs fixed**
+- All 37 API handlers were `async def` over blocking services (SQLite,
+  yfinance), so a discovery run or watchlist analysis froze the whole server,
+  health checks included. Handlers are now plain `def`, which FastAPI runs in a
+  threadpool. Live check: `/api/health` answered in 2 ms during a 5 s
+  discovery run.
+- That concurrency exposed a yfinance hazard: `yf.download` resets
+  module-level result dicts on every call. `get_price_history` now serializes
+  downloads behind a lock.
+- Routes caught bare `LookupError`/`ValueError` next to the domain errors, so an
+  internal `KeyError` surfaced as a 404. They now catch only the domain
+  exceptions (which already subclass those builtins).
+- `GET /api/reports/history?limit=` was unbounded (SQLite treats `LIMIT -1` as
+  "all"). It is now bounded to 1–500 at the route.
+- `PortfolioPanel` could show a slow priced summary for a previously selected
+  portfolio. It now drops stale responses, as `PaperTradingPage` already did.
+- Found by the post-change review, and caused by the move to concurrent
+  handlers:
+  - Paper `record_buy`/`record_sell` read cash before pysqlite opened its
+    transaction, so two simultaneous trades could lose a cash update (a test
+    reproduced $900 instead of $800). Both now start with
+    `begin_write_transaction` (`BEGIN IMMEDIATE`).
+  - Several services building their engines at once raced on `CREATE TABLE`
+    (143 "table already exists" errors in 180 parallel builds). `build_engine`
+    now serializes schema creation.
+
+**Architecture**: `market_data_service` imported its response models from
+`app.api.schemas`, the only service to do so. The models moved to
+`app/models/market_data.py`, and the API schema module re-exports them (the
+discovery pattern).
+
+**Dead code / redundancy removed**
+- `scoring.score_technical_signals` and `_validate_scoring_inputs`: a
+  Phase-1 technical-only path no production code called. `test_scoring.py` now
+  exercises the same shared helpers through `score_signals`.
+- Unused `ENVIRONMENT`, `MARKET_DATA_API_KEY`, and `NEWS_API_KEY` settings
+  (never read; `.env.example` trimmed to match).
+- `requests` from `requirements.txt`: never imported, and still installed by
+  yfinance. Runtime and test dependencies are now labeled.
+- 9 byte-identical duplicate tests. `test_column_check_runs_before_nullability_check`
+  now actually exercises the ordering it names.
+- Stale "future UI" docstrings.
+
+**Deliberately left alone** (see the review report): the duplicated
+price/rounding helpers in the two summary services (documented isolation rule),
+five identical `_get_engine` singletons, `outputs/` sample files (cited by the
+calibration notes), "coming soon" UI placeholders (product decision), and the
+pre-screen + analysis double price fetch in discovery (no caching in scope).
+
+**Tests:** 8 new (thread-safe download, no async handlers, `KeyError` → 500,
+3 history-limit bounds, concurrent paper buys, parallel engine builds).
+`pytest`: 2066 passed (2068 − 10 removed + 8 added), also green with network
+sockets blocked. `npm test`: 128 passed.
+`npm run build` and `npm run lint`: clean.
+
+**Docs:** README.md rewritten to be concise and current. CLAUDE.md restructured
+into the authoritative guide (layers, dependency direction, sync-handler and
+error-mapping rules, data model, feature status, testing guidance).
+`docs/data_sources.md` no longer claims yfinance is used for options.
+`docs/full_stack_product_architecture.md` now marks Phase 7 as shipped
+(`/api/paper-trading`, not `app/simulation/` or `mock_*` tables) and flags that
+its original "link paper trades to analysis_reports" idea was not adopted.
+
+## 2026-10-12 — Fix: deleted watchlist ids reused, orphaned snapshots inherited
+
+Narrow bug fix. No new features, no API or frontend change.
+
+The bug: the `watchlists` table did not declare `AUTOINCREMENT`, so SQLite
+reused the highest id after a delete. Saved analysis snapshots intentionally
+outlive their watchlist and are queried by `watchlist_id`, so a newly created
+watchlist could be handed a deleted watchlist's id and silently inherit its
+saved snapshots.
+
+The fix, all in `app/data/database.py`:
+
+- `watchlists` now declares `sqlite_autoincrement=True`, so ids are never
+  reused. Snapshots are still preserved when a watchlist is deleted.
+- `build_engine` now calls `_upgrade_legacy_watchlists_table` after
+  `metadata.create_all()`. `create_all` never alters an existing table, so
+  databases created before this fix would otherwise keep reusing ids. The
+  upgrade is a one-time, idempotent in-place rebuild of a non-AUTOINCREMENT
+  `watchlists` table (no-op once upgraded). It preserves every row and id, and
+  seeds the id counter past the highest id still referenced by a snapshot, so
+  history orphaned by an earlier delete cannot be inherited either. The rebuild
+  runs in a single explicit `BEGIN IMMEDIATE` transaction (re-checked under the
+  lock), so a failure part-way leaves the original table intact.
+- No migration framework was added; this is a single targeted upgrade, not
+  Alembic. Schema still comes from `metadata.create_all()`.
+
+Not addressed (out of scope): `portfolios`, `paper_trading_accounts`, and
+`analysis_reports` also lack AUTOINCREMENT. That is harmless today: only
+portfolios can be deleted, and their holdings are deleted with them. It would
+matter if any of these gained a delete path with history that outlives the
+parent.
+
+**Tests:** 12 new — `tests/test_database.py` (8: fresh schema, legacy upgrade,
+orphaned-snapshot seeding, idempotency, rollback on failure, leftover rebuild
+table), 2 in `tests/test_watchlist_analysis_snapshot_service.py` (the exact
+delete → recreate → inherited-snapshots repro), and 2 in
+`tests/test_watchlist_service.py` (id not reused; delete leaves saved reports
+alone). `python -m pytest` — 2068 passed (was 2056).
+
 ## 2026-08-31 — Paper trading frontend (Phase 7 complete)
 
 Added the Paper Trading page over the existing `/api/paper-trading` backend

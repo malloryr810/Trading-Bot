@@ -21,7 +21,7 @@ router = APIRouter(prefix="/market-data", tags=["market-data"])
 
 
 @router.get("/{ticker}/history", response_model=PriceHistoryResponse)
-async def get_history(
+def get_history(
     ticker: str,
     period: str = DEFAULT_PERIOD,
     interval: str = DEFAULT_INTERVAL,

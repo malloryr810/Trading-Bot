@@ -44,74 +44,74 @@ router = APIRouter(prefix="/watchlists", tags=["watchlists"])
 
 
 @router.get("", response_model=list[WatchlistSummary])
-async def get_watchlists() -> list[dict]:
+def get_watchlists() -> list[dict]:
     """Return all saved watchlists, newest first."""
     return list_watchlists()
 
 
 @router.post("", response_model=WatchlistDetail, status_code=201)
-async def post_watchlist(request: CreateWatchlistRequest) -> dict:
+def post_watchlist(request: CreateWatchlistRequest) -> dict:
     """Create a new watchlist."""
     try:
         return create_watchlist(request.name, request.description)
-    except (WatchlistValidationError, ValueError) as exc:
+    except WatchlistValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/{watchlist_id}", response_model=WatchlistDetail)
-async def get_one_watchlist(watchlist_id: int) -> dict:
+def get_one_watchlist(watchlist_id: int) -> dict:
     """Return one watchlist with its tickers."""
     try:
         return get_watchlist(watchlist_id)
-    except (WatchlistNotFoundError, LookupError) as exc:
+    except WatchlistNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.patch("/{watchlist_id}", response_model=WatchlistDetail)
-async def patch_watchlist(watchlist_id: int, request: UpdateWatchlistRequest) -> dict:
+def patch_watchlist(watchlist_id: int, request: UpdateWatchlistRequest) -> dict:
     """Update a watchlist's name and/or description (partial update)."""
     try:
         return update_watchlist(watchlist_id, request.name, request.description)
-    except (WatchlistNotFoundError, LookupError) as exc:
+    except WatchlistNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-    except (WatchlistValidationError, ValueError) as exc:
+    except WatchlistValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.delete("/{watchlist_id}", response_model=DeleteResponse)
-async def delete_one_watchlist(watchlist_id: int) -> dict:
+def delete_one_watchlist(watchlist_id: int) -> dict:
     """Delete a watchlist and its tickers."""
     try:
         delete_watchlist(watchlist_id)
-    except (WatchlistNotFoundError, LookupError) as exc:
+    except WatchlistNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     return {"status": "deleted", "id": watchlist_id}
 
 
 @router.post("/{watchlist_id}/tickers", response_model=WatchlistDetail)
-async def post_ticker(watchlist_id: int, request: AddTickerRequest) -> dict:
+def post_ticker(watchlist_id: int, request: AddTickerRequest) -> dict:
     """Add a ticker to a watchlist (idempotent for duplicates)."""
     try:
         return add_ticker_to_watchlist(watchlist_id, request.ticker)
-    except (WatchlistNotFoundError, LookupError) as exc:
+    except WatchlistNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-    except (WatchlistValidationError, ValueError) as exc:
+    except WatchlistValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.delete("/{watchlist_id}/tickers/{ticker}", response_model=WatchlistDetail)
-async def delete_ticker(watchlist_id: int, ticker: str) -> dict:
+def delete_ticker(watchlist_id: int, ticker: str) -> dict:
     """Remove a ticker from a watchlist (idempotent if absent)."""
     try:
         return remove_ticker_from_watchlist(watchlist_id, ticker)
-    except (WatchlistNotFoundError, LookupError) as exc:
+    except WatchlistNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-    except (WatchlistValidationError, ValueError) as exc:
+    except WatchlistValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.post("/{watchlist_id}/analyze", response_model=WatchlistAnalysisResponse)
-async def post_watchlist_analyze(watchlist_id: int) -> dict:
+def post_watchlist_analyze(watchlist_id: int) -> dict:
     """Analyze every ticker in a watchlist; partial success, no save.
 
     Per-ticker failures are captured in the response ``errors`` list. The
@@ -119,7 +119,7 @@ async def post_watchlist_analyze(watchlist_id: int) -> dict:
     """
     try:
         return analyze_watchlist(watchlist_id)
-    except (WatchlistNotFoundError, LookupError) as exc:
+    except WatchlistNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-    except (WatchlistValidationError, ValueError) as exc:
+    except WatchlistValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

@@ -26,6 +26,7 @@ from app.services.watchlist_service import (
     WatchlistValidationError,
     add_ticker_to_watchlist,
     create_watchlist,
+    delete_watchlist,
 )
 
 _ANALYZE = "app.services.watchlist_analysis_service.analyze_stock"
@@ -265,3 +266,45 @@ class TestAverageScore:
         snaps = list_watchlist_snapshots(wl_id, engine=engine)
         # Newest first: second snapshot (80) then first (20).
         assert [s["average_score"] for s in snaps] == [80.0, 20.0]
+
+
+# ---------------------------------------------------------------------------
+# Deleted-watchlist ID isolation (regression: SQLite rowid reuse)
+# ---------------------------------------------------------------------------
+
+
+class TestDeletedWatchlistIdIsolation:
+    def test_new_watchlist_does_not_inherit_deleted_watchlists_snapshots(
+        self, engine
+    ):
+        # Arrange: A is the highest-id watchlist, so a plain SQLite rowid
+        # would hand its id straight to the next insert.
+        a_id = _make_watchlist(engine, ["AAPL"], name="A")
+        with patch(_ANALYZE, side_effect=_fake_analyze("AAPL")):
+            a_snapshot = analyze_and_save_snapshot(a_id, engine=engine)
+        delete_watchlist(a_id, engine=engine)
+
+        # Act
+        b_id = _make_watchlist(engine, ["MSFT"], name="B")
+
+        # Assert
+        assert b_id != a_id
+        assert list_watchlist_snapshots(b_id, engine=engine) == []
+        # The historical snapshot itself is intentionally preserved.
+        preserved = get_watchlist_snapshot(a_snapshot["id"], engine=engine)
+        assert preserved is not None
+        assert preserved["watchlist_id"] == a_id
+        assert preserved["watchlist_name"] == "A"
+
+    def test_existing_watchlist_history_unaffected_by_other_delete(self, engine):
+        keep_id = _make_watchlist(engine, ["AAPL"], name="Keep")
+        drop_id = _make_watchlist(engine, ["AAPL"], name="Drop")
+        with patch(_ANALYZE, side_effect=_fake_analyze("AAPL")):
+            kept = analyze_and_save_snapshot(keep_id, engine=engine)
+            analyze_and_save_snapshot(drop_id, engine=engine)
+        delete_watchlist(drop_id, engine=engine)
+
+        snaps = list_watchlist_snapshots(keep_id, engine=engine)
+
+        assert [s["id"] for s in snaps] == [kept["id"]]
+        assert get_watchlist_snapshot(kept["id"], engine=engine) is not None

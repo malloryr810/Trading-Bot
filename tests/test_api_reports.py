@@ -326,6 +326,14 @@ class TestGetReportHistory:
         client.get("/api/reports/history?limit=10")
         mock_list.assert_called_once_with(limit=10)
 
+    @pytest.mark.parametrize("limit", [0, -1, 501])
+    def test_out_of_range_limit_rejected(self, client, mock_list, limit):
+        # SQLite treats a negative LIMIT as "no limit", so bounds are enforced
+        # at the API boundary.
+        response = client.get(f"/api/reports/history?limit={limit}")
+        assert response.status_code == 422
+        mock_list.assert_not_called()
+
     def test_empty_history_returns_empty_list(self, client):
         with patch(_LIST, return_value=[]):
             assert client.get("/api/reports/history").json() == []

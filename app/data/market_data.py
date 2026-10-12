@@ -24,6 +24,8 @@ Validation pipeline (in order):
 
 from __future__ import annotations
 
+import threading
+
 import pandas as pd
 import yfinance as yf
 
@@ -31,6 +33,11 @@ from app.utils.helpers import normalize_ticker, safe_float
 
 
 REQUIRED_COLUMNS: frozenset[str] = frozenset({"open", "high", "low", "close", "volume"})
+
+# ``yf.download`` collects results in module-level dicts that every call resets,
+# so two concurrent downloads (API handlers run in a threadpool) can clobber
+# each other's data.  Serialize them.
+_DOWNLOAD_LOCK = threading.Lock()
 
 
 class DataFetchError(Exception):
@@ -98,7 +105,8 @@ def get_price_history(
         raise DataFetchError(str(exc)) from exc
 
     try:
-        raw = yf.download(symbol, period=period, interval=interval, progress=False)
+        with _DOWNLOAD_LOCK:
+            raw = yf.download(symbol, period=period, interval=interval, progress=False)
     except Exception as exc:
         raise DataFetchError(
             f"yfinance raised an error fetching '{symbol}' "

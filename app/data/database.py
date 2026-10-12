@@ -23,6 +23,7 @@ Usage::
 
 from __future__ import annotations
 
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -39,7 +40,7 @@ from sqlalchemy import (
     UniqueConstraint,
     create_engine,
 )
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Connection, Engine
 
 metadata = MetaData()
 
@@ -60,6 +61,12 @@ analysis_reports = Table(
 # Named lists of tickers the user intends to research later.  Storage only:
 # no prices, scores, report ids, or analysis snapshots live here.  See
 # docs/watchlist_management_plan.md.
+#
+# ``sqlite_autoincrement`` emits SQLite's AUTOINCREMENT keyword so a deleted
+# watchlist's id is never handed out again.  Snapshots deliberately outlive
+# their watchlist and are looked up by ``watchlist_id``; a reused id would
+# silently give a new watchlist the deleted one's history.  (The column-level
+# ``autoincrement=True`` alone does not emit the keyword.)
 
 watchlists = Table(
     "watchlists",
@@ -69,6 +76,7 @@ watchlists = Table(
     Column("description", String, nullable=True),
     Column("created_at", DateTime, nullable=False),
     Column("updated_at", DateTime, nullable=False),
+    sqlite_autoincrement=True,
 )
 
 watchlist_tickers = Table(
@@ -258,6 +266,12 @@ paper_trading_positions = Table(
 )
 
 
+# Each persistence service lazily builds its own engine, and API handlers run in
+# a threadpool, so several first requests can reach build_engine at once.
+# Serialize schema creation so they never race on CREATE TABLE.
+_SCHEMA_LOCK = threading.Lock()
+
+
 def build_engine(db_path: Path | str | None = None) -> Engine:
     """Create a SQLite engine and ensure the schema exists.
 
@@ -281,8 +295,75 @@ def build_engine(db_path: Path | str | None = None) -> Engine:
         url = f"sqlite:///{path}"
 
     engine = create_engine(url, connect_args={"check_same_thread": False})
-    metadata.create_all(engine)
+    with _SCHEMA_LOCK:
+        metadata.create_all(engine)
+        _upgrade_legacy_watchlists_table(engine)
     return engine
+
+
+_WATCHLISTS_REBUILD = "watchlists_autoincrement_rebuild"
+
+
+def _upgrade_legacy_watchlists_table(engine: Engine) -> None:
+    """Rebuild a pre-AUTOINCREMENT ``watchlists`` table in place, once.
+
+    ``create_all`` never alters an existing table, so databases created before
+    ``sqlite_autoincrement`` was added still reuse deleted ids.  This copies the
+    rows into an AUTOINCREMENT table (same columns, same ids) and seeds its id
+    counter past every id a snapshot still references, so orphaned history
+    from an already-deleted watchlist can never be inherited either.  It is a
+    no-op once the table is upgraded.  Foreign keys are not enforced in this
+    project, so dropping and renaming the parent table leaves child rows intact.
+    """
+    with engine.connect() as conn:
+        if _watchlists_has_autoincrement(conn):
+            return
+
+    rebuild = watchlists.to_metadata(MetaData(), name=_WATCHLISTS_REBUILD)
+    columns = ", ".join(column.name for column in watchlists.columns)
+    with engine.begin() as conn:
+        # pysqlite would otherwise run the DDL below in autocommit; under the
+        # lock every step commits or rolls back together.
+        begin_write_transaction(conn)
+        # Another process may have upgraded the table while we waited.
+        if _watchlists_has_autoincrement(conn):
+            return
+        # Clears a leftover from an interrupted earlier attempt.
+        rebuild.drop(conn, checkfirst=True)
+        rebuild.create(conn)
+        conn.exec_driver_sql(
+            f"INSERT INTO {_WATCHLISTS_REBUILD} ({columns}) "
+            f"SELECT {columns} FROM watchlists"
+        )
+        conn.exec_driver_sql("DROP TABLE watchlists")
+        conn.exec_driver_sql(f"ALTER TABLE {_WATCHLISTS_REBUILD} RENAME TO watchlists")
+        conn.exec_driver_sql("DELETE FROM sqlite_sequence WHERE name = 'watchlists'")
+        conn.exec_driver_sql(
+            "INSERT INTO sqlite_sequence (name, seq) SELECT 'watchlists', MAX("
+            "(SELECT COALESCE(MAX(id), 0) FROM watchlists), "
+            "(SELECT COALESCE(MAX(watchlist_id), 0) "
+            "FROM watchlist_analysis_snapshots))"
+        )
+
+
+def _watchlists_has_autoincrement(conn: Connection) -> bool:
+    """Return True if the stored ``watchlists`` DDL declares AUTOINCREMENT."""
+    table_sql = conn.exec_driver_sql(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='watchlists'"
+    ).scalar_one()
+    return "AUTOINCREMENT" in table_sql.upper()
+
+
+def begin_write_transaction(conn: Connection) -> None:
+    """Start the current transaction with SQLite's write lock held.
+
+    Call first inside ``engine.begin()`` for any read-then-write sequence.
+    pysqlite defers ``BEGIN`` until the first INSERT/UPDATE/DELETE, so reads
+    before that run unlocked and two threads can both act on the same stale
+    value. ``BEGIN IMMEDIATE`` takes the write lock up front; a concurrent
+    writer waits (up to the driver's busy timeout) instead of interleaving.
+    """
+    conn.exec_driver_sql("BEGIN IMMEDIATE")
 
 
 def as_utc(value: datetime) -> datetime:

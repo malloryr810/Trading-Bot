@@ -36,13 +36,13 @@ router = APIRouter(prefix="/discovery", tags=["discovery"])
 
 
 @router.get("/modes", response_model=list[DiscoveryModeResponse])
-async def get_modes() -> list[DiscoveryModeResponse]:
+def get_modes() -> list[DiscoveryModeResponse]:
     """Return every supported discovery mode and how it ranks candidates."""
     return list_discovery_modes()
 
 
 @router.get("/universes", response_model=list[DiscoveryUniverseResponse])
-async def get_universes() -> list[DiscoveryUniverseResponse]:
+def get_universes() -> list[DiscoveryUniverseResponse]:
     """Return every registered stock universe with its size."""
     try:
         return list_discovery_universes()
@@ -51,7 +51,7 @@ async def get_universes() -> list[DiscoveryUniverseResponse]:
 
 
 @router.get("", response_model=DiscoveryResponse)
-async def get_discovery(
+def get_discovery(
     mode: str = DEFAULT_MODE.value,
     universe: str = DEFAULT_UNIVERSE,
     limit: int = DEFAULT_LIMIT,

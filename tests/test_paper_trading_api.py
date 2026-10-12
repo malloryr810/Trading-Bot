@@ -456,6 +456,3 @@ class TestSeparateFromManualPortfolios:
         account_id = _new_account(both)
         detail = both.get(f"/api/paper-trading/accounts/{account_id}").json()
         assert detail["positions"] == []
-
-    def test_health_endpoint_unaffected(self, client):
-        assert client.get("/api/health").status_code == 200

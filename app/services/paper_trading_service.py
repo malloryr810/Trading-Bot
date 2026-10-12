@@ -72,6 +72,7 @@ from sqlalchemy.engine import Engine
 
 from app.data.database import (
     as_utc,
+    begin_write_transaction,
     build_engine,
     paper_trading_accounts,
     paper_trading_positions,
@@ -440,6 +441,8 @@ def record_buy(
     now = datetime.now(tz=timezone.utc)
 
     with _e.begin() as conn:
+        # Lock before reading cash/position: the update below is computed from it.
+        begin_write_transaction(conn)
         account = _account_row(conn, account_id)
         cash = Decimal(account.cash_balance)
         if gross > cash:
@@ -546,6 +549,8 @@ def record_sell(
     now = datetime.now(tz=timezone.utc)
 
     with _e.begin() as conn:
+        # Lock before reading cash/position: the update below is computed from it.
+        begin_write_transaction(conn)
         account = _account_row(conn, account_id)
 
         existing = _position_row(conn, account_id, clean_ticker)

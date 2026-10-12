@@ -1,391 +1,295 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file is the implementation guide for Claude Code (claude.ai/code) in this
+repository. Trust the code first, then this file. Older planning docs in `docs/`
+are historical.
 
-## What This Project Is
+## Project purpose
 
-A modular Python stock research decision-support tool. It fetches market data,
-computes signals, scores them, and produces structured plain-text research reports
-for individual stocks and watchlists. **It is not an automated trading system.**
+A personal, full-stack stock research and decision-support platform. A Python
+pipeline fetches market data, computes signals, and scores them with a
+transparent rule-based engine. The results reach a CLI, a FastAPI + SQLite
+backend, and a display-only React frontend.
 
-Do not implement any of the following:
+**It is not an automated trading system.** Do not implement:
 - Broker API calls or integrations (Vanguard, Schwab, Plaid, Alpaca, Robinhood, IBKR, or any other)
-- Real order execution of any kind
-- Live trading
-- Real account linking or position syncing
-- Automatic trading, automatic rebalancing, or automatic position management
-- Trade alerts or allocation advice
+- Real order execution, live trading, real account linking, or position syncing
+- Automatic trading, rebalancing, or position management; trade alerts or allocation advice
 - Margin, options, or short selling
-- Portfolio automation
-- ML/LLM sentiment models
+- ML/LLM models (`app/ml/` is Phase 8 — do not create it)
 - Backtesting (unless explicitly scoped and approved)
 
-**Paper trading is the one exception, and it is a simulation.** Phase 7 shipped a
-self-contained paper trading vertical: hand-entered buys and sells against a
-made-up cash balance, at prices the caller supplies. It contacts no market and
-places no real order. Everything in the list above still applies to it — see
-the paper trading entries in **Layer Rules** and **Non-Negotiable Guardrails**.
-
-## Current State (read this first)
-
-Everything in **Currently Implemented** below is built and tested. Concretely,
-as of 2026-08-31:
-
-- **Backend:** the full analysis pipeline, 9 API route modules, 13 service
-  modules, and a SQLite layer with 10 tables. `pytest` runs 2056 deterministic
-  tests, all passing.
-- **Frontend:** 8 pages wired to the API, including the Paper Trading page.
-  `npm test` runs 128 Vitest tests over `src/lib/` and `src/api/client.ts`
-  only — the pure helpers. There are **no** component tests, no DOM tests, and
-  no e2e tests.
-- **CLI:** `python -m app.main` works for single tickers and watchlist files.
-
-What is *not* built, so you do not go looking for it:
-
-- Research notes (Phase 6's remaining half).
-- Scoring calibration changes — the weights and thresholds are still the
-  original hand-picked values. `docs/scoring_calibration_plan.md` and the other
-  `docs/*calibration*` files are **proposals**, not shipped behavior.
-- Market-data staleness detection (a deliberate `TODO` in `app/data/market_data.py`).
-- Any second discovery universe. `starter_large_cap` is the only one.
-- `app/ml/` (Phase 8 — do not create it). `app/simulation/` was never created
-  either: Phase 7 shipped as a service vertical (`paper_trading_service`), not
-  as a new top-level package.
-
-Tooling notes: there is **no** Python linter or formatter configured (no ruff,
-black, or mypy) and no pre-commit hooks. There are no database migrations —
-schema comes from `metadata.create_all()`. Do not add any of these without an
-explicitly scoped task.
+**Paper trading is the one simulation.** The user hand-enters buys and sells
+against a made-up cash balance, at prices they supply. It contacts no market and
+places no real order. Everything above still applies to it.
 
 ## Commands
 
 ```bash
-# Create and activate virtual environment
-python3 -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+# Setup
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt          # runtime + test deps (sections commented)
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the FastAPI server (http://127.0.0.1:8000, docs at /docs)
+# API server (http://127.0.0.1:8000, docs at /docs)
 uvicorn app.api.main:app --reload
 
-# Single-ticker analysis (print report to terminal)
-python -m app.main AAPL
-
-# Single-ticker with save flags
-python -m app.main AAPL --save-report
-python -m app.main AAPL --save-json
-python -m app.main AAPL --save-markdown
-python -m app.main AAPL --save-report --save-json --save-markdown
-
-# Watchlist scanning (print ranked summary table)
-python -m app.main --watchlist watchlists/default.txt
-
-# Watchlist with save flags
-python -m app.main --watchlist watchlists/default.txt --save-report
-python -m app.main --watchlist watchlists/default.txt --save-json
-python -m app.main --watchlist watchlists/default.txt --save-markdown
-python -m app.main --watchlist watchlists/default.txt --save-report --save-json --save-markdown
-
-# Show CLI help
+# CLI
+python -m app.main AAPL [--save-report] [--save-json] [--save-markdown]
+python -m app.main --watchlist watchlists/default.txt [--save-report] [--save-json] [--save-markdown]
 python -m app.main --help
 
-# Run all tests
+# Backend tests
 pytest
-
-# Run a single test file
-pytest tests/test_risk_analysis.py
-
-# Run the watchlist suites specifically
-pytest tests/test_watchlist_service.py tests/test_watchlist_api.py
-
-# Compile-check a module without running it
+pytest tests/test_risk_analysis.py       # one file
 python -m py_compile app/analysis/scoring.py
-```
 
-### Frontend commands
-
-```bash
+# Frontend (Node 22 LTS ≥ 22.13 per frontend/.nvmrc)
 cd frontend
-nvm use              # Node 22 LTS from frontend/.nvmrc (engines: node >=22.13.0)
-npm install          # first-time setup (cp .env.example .env if needed)
-npm run dev          # Vite dev server at http://localhost:5173 (backend must be running)
-npm run build        # type-check (tsc -b) + production build to frontend/dist/
-npm run lint         # ESLint
-npm test             # Vitest unit tests (pure logic only — src/**/*.test.ts)
+nvm use && npm install                   # first time; cp .env.example .env if needed
+npm run dev                              # http://localhost:5173 (backend must be running)
+npm test                                 # Vitest — pure helpers only
+npm run build                            # tsc -b type-check + production build
+npm run lint                             # ESLint
 ```
 
-Frontend Node version: use the active LTS line (Node 22, ≥ 22.13) per
-`frontend/.nvmrc`. A known dev-only npm-audit advisory (esbuild via Vite/Vitest)
-is documented in `docs/development_log.md`; do not run `npm audit fix --force`
-(it would downgrade Vitest and break the test harness).
+Never run `npm audit fix --force`. The known dev-only esbuild advisory is
+documented in `docs/development_log.md`, and the forced fix downgrades Vitest
+and breaks the test harness.
 
 ### Verification workflow
 
-Run these after any meaningful change, in this order:
+Run after any meaningful change, in this order:
 
 ```bash
-python -m pytest                      # backend — must stay fully green
+python -m pytest                      # must stay fully green
 python -m app.main AAPL               # CLI smoke test (hits the network)
-cd frontend && npm test               # only if frontend files changed
-cd frontend && npm run build          # tsc -b catches contract drift
+cd frontend && npm test               # if frontend files changed
+cd frontend && npm run build          # the only type-check; catches backend↔frontend contract drift
 cd frontend && npm run lint
 ```
 
-`npm run build` is the only type-check — run it whenever a backend schema and a
-`frontend/src/types/*` file could have drifted apart.
+## Directory architecture
 
-## Currently Implemented
+| Path | Responsibility |
+|------|----------------|
+| `app/data/` | Fetch and validate raw data. `market_data.py` (yfinance OHLCV + `latest_valid_close`, the canonical current-price reader, which never returns 0 for "unavailable"; `yf.download` is serialized behind a lock because it shares module-level state), `fundamentals.py`, `news_data.py`, `storage.py` (CLI file output to `outputs/`), `universe_loader.py` + `universes/*.csv` (static discovery universes, no network), `database.py` (SQLAlchemy Core schema, `build_engine`, `as_utc`, `begin_write_transaction`) |
+| `app/analysis/` | `technicals.py`, `fundamentals_analysis.py`, `news_analysis.py`, `risk_analysis.py` each return `list[Signal]`. `scoring.py` has `score_signals()`, the only scoring entry point |
+| `app/models/` | Pydantic domain models: `Signal`, `Rating`, `ConfidenceDiagnostics`, `StockReport`, `CompanyFundamentals`, `NewsItem`, `UniverseEntry/Info`, discovery models, price-history models (`market_data.py`) |
+| `app/reports/` | `report_generator.build_stock_report()` (Rating → StockReport) and `templates.py` (plain text, Markdown, watchlist Markdown) |
+| `app/services/` | Every use case. See the service table below |
+| `app/api/` | `main.py` (app factory + CORS for the Vite origins), `routes/` (9 thin modules, 37 endpoints), `schemas/` (request/response shapes; discovery and market-data schemas re-export domain models), `errors.py` (`KNOWN_ANALYSIS_ERRORS` → 422) |
+| `app/main.py` | argparse CLI. Calls `app/services/` only |
+| `app/watchlist.py` | CLI watchlist *file* loader, multi-ticker scanner, and summary-table formatter. Separate from the DB-backed watchlist service, and the two must stay separate |
+| `app/config.py` | `DATABASE_PATH` (default `data/investment_bot.db`). Any future secret goes here, read from `.env` |
+| `frontend/src/api/` | `client.ts` (the only `fetch`; `ApiError`; `VITE_API_BASE_URL`) + one module per API group, one function per endpoint |
+| `frontend/src/pages/` | Dashboard, Discover, Analyze, Watchlists, Snapshot Detail, Saved Reports, Report Detail, Paper Trading |
+| `frontend/src/components/` | Presentational components (`layout/`, `charts/`, `dashboard/`, `watchlist/`, `portfolio/`, `discovery/`, `paperTrading/`). `PortfolioPanel` is the one container component |
+| `frontend/src/lib/` | Pure, unit-tested display helpers (formatting, sorting, chart shaping, form pre-validation) |
+| `frontend/src/types/` | TypeScript mirrors of backend schemas |
+| `tests/` | pytest suite, one file per module or route group |
+| `docs/` | `development_log.md` (append per change), `scoring_rules.md`, `architecture.md`, `data_sources.md`; plans and calibration docs are historical/proposals |
 
-| Module | Purpose |
-|--------|---------|
-| `app/data/market_data.py` | Fetches, validates, and normalizes OHLCV price data from yfinance. Also owns `latest_valid_close(df)` — the canonical current-price reader: newest-first scan for the first finite close, so an in-progress session row (volume present, OHLC still null) never reads as "no price". Returns `None` when nothing is usable, never `0` |
-| `app/data/fundamentals.py` | Fetches company fundamentals (P/E, margins, growth, D/E, FCF, beta) from yfinance |
-| `app/data/news_data.py` | Fetches recent news headlines from yfinance; returns typed `NewsItem` objects |
-| `app/data/storage.py` | Saves plain-text (`.txt`), Markdown (`.md`), and structured JSON (`.json`) outputs to local disk |
-| `app/models/signal.py` | Typed `Signal` Pydantic model; shared contract across the analysis layer |
-| `app/models/rating.py` | Typed `Rating` Pydantic model; output of the scoring engine |
-| `app/models/fundamentals.py` | Typed `CompanyFundamentals` Pydantic model; output of the fundamentals data layer |
-| `app/models/news.py` | Typed `NewsItem` Pydantic model; output of the news data layer |
-| `app/models/stock_report.py` | Typed `StockReport` Pydantic model; top-level output of a full analysis run |
-| `app/models/confidence_diagnostics.py` | Typed `ConfidenceDiagnostics` Pydantic model; read-only breakdown of confidence inputs (diagnostic only — never affects score or label) |
-| `app/analysis/technicals.py` | Computes SMA 20/50/200, RSI 14, MACD, volume SMA; builds 7 typed Signals |
-| `app/analysis/fundamentals_analysis.py` | Builds 5 typed Signals from valuation, profitability, growth, debt, and cash flow |
-| `app/analysis/risk_analysis.py` | Builds 4–5 typed Signals from volatility, drawdown, recent trend, liquidity, and beta |
-| `app/analysis/news_analysis.py` | Builds exactly 3 NEWS Signals (Sentiment, Risk Headlines, Coverage) via keyword matching |
-| `app/analysis/scoring.py` | Composite scoring engine; `score_signals()` aggregates all signal categories into a Rating |
-| `app/reports/report_generator.py` | `build_stock_report()` assembles a StockReport from a Rating; `generate_plain_text_report()` delegates to templates |
-| `app/reports/templates.py` | Three public formatters: `format_plain_text_report()` (terminal), `format_report_markdown()` (single-ticker Markdown), `format_watchlist_markdown()` (watchlist Markdown) |
-| `app/watchlist.py` | Loads watchlist files, scans multiple tickers, formats ranked summary tables, and serializes results |
-| `app/utils/helpers.py` | Shared low-level helpers: `safe_float` and `normalize_ticker` |
-| `app/models/universe.py` | Typed `UniverseEntry` / `UniverseInfo` Pydantic models; one row of a stock-universe file and universe metadata |
-| `app/models/discovery.py` | Typed discovery models: `DiscoveryMode` enum, `DiscoveryModeInfo`, `DiscoveryCandidate`, `DiscoveryStage`, `DiscoveryWarning`, `DiscoveryRun`. Every scored field is copied from `Rating`; discovery owns only `rank` + `match_reason` |
-| `app/services/stock_analysis_service.py` | `analyze_stock` — public entry point for all callers (CLI and API); attaches `current_price` via `latest_valid_close`; `analyze_stock_rating` — same pipeline returning the raw `Rating` (sub-scores) for discovery ranking; `_analyze_ticker` is internal |
-| `app/services/report_persistence_service.py` | `save_stock_report`, `list_saved_reports`, `get_saved_report` — SQLite persistence boundary |
-| `app/services/watchlist_service.py` | Watchlist + ticker CRUD over SQLite (storage only); `WatchlistValidationError`/`WatchlistNotFoundError`; optional `engine` kwarg for tests |
-| `app/services/watchlist_analysis_service.py` | `analyze_watchlist` — reuses `get_watchlist` + `analyze_stock` to analyze every ticker in a saved watchlist; partial success (per-ticker errors captured); analysis-only, nothing saved. Surfaced in the UI via the Watchlists page "Analyze watchlist" button |
-| `app/services/watchlist_analysis_snapshot_service.py` | `analyze_and_save_snapshot`, `save_watchlist_analysis_snapshot`, `list_watchlist_snapshots`, `get_watchlist_snapshot` — saves/reads historical snapshots of explicit analyze-and-save runs; derives `average_score` from stored success-row scores (`_mean_score`). Not a scheduled scan |
-| `app/services/market_data_service.py` | `get_price_history_response` — builds the read-only price-history response (JSON-safe nullable OHLCV) from `market_data`; no analysis/scoring |
-| `app/services/portfolio_service.py` | Portfolio + holding CRUD over SQLite (storage only; no market data). Decimal-safe `shares`/`average_cost` validation; `PortfolioValidationError`/`PortfolioNotFoundError`/`HoldingNotFoundError`/`DuplicateHoldingError`; one ticker per portfolio; cascade-deletes holdings; optional `engine` kwarg for tests |
-| `app/services/portfolio_summary_service.py` | `get_portfolio_summary` — enriches a portfolio with current prices (reuses `market_data` + `latest_valid_close`) and computes holding + portfolio values with `Decimal` math. Prices fetched only here, never during CRUD. Partial/complete price failure is non-fatal (per-holding `price_available` + `warnings`); market-value-dependent totals exclude unpriced holdings and are `None` (never zero) when nothing is priced. Optional `price_lookup`/`engine` kwargs for tests |
-| `app/services/discovery_screening.py` | `prescreen_ticker` — stage-1 lightweight validity check (fetchable history, ≥60 settled closes, positive latest *valid* close via `latest_valid_close`, usable average volume). Returns a `PrescreenResult`; never raises, never scores |
-| `app/services/discovery_ranking.py` | Pure per-mode ranking strategies over existing `Rating` objects (`rank_ratings`, `match_reason`, `valuation_lean`, `list_mode_info`). Ordering only — no scoring, ties broken by ticker |
-| `app/services/paper_trading_service.py` | **Simulated** trading accounts, buys/sells, positions, and the transaction ledger over SQLite (storage + accounting only; no market data). Decimal-safe; money quantised to cents, weighted average cost to 8 dp. Cash, position, and ledger row are written in one DB transaction. `PaperTradingValidationError`/`PaperTradingAccountNotFoundError`/`InsufficientFundsError`/`InsufficientSharesError`; optional `engine` kwarg for tests. No broker, no real order |
-| `app/services/paper_trading_summary_service.py` | `get_account_summary`, `get_priced_positions` — values open paper positions at current prices (reuses `market_data` + `latest_valid_close`) and computes unrealized gain/loss, open-position value, total value, and total return with `Decimal` math. Prices fetched only here, never during account CRUD or trade recording. Partial price failure is non-fatal (per-position `price_available` + `warnings`); value-dependent totals are `None` (never zero) when a held position could not be priced. Optional `price_lookup`/`engine` kwargs for tests |
-| `app/services/discovery_service.py` | `run_discovery`, `list_discovery_modes`, `list_discovery_universes` — universe → bounded pre-screen → `analyze_stock_rating` → mode ranking → `DiscoveryRun`. Bounded by `max_full_analysis`; per-ticker failures become warnings; `DiscoveryValidationError` → 400. Optional `analyze`/`prescreen` kwargs for tests. Nothing saved, nothing scheduled |
-| `app/data/universe_loader.py` | Loads the static, versioned universe CSVs in `app/data/universes/` (`load_universe`, `load_universe_file`, `list_universes`); validates ticker uniqueness/normalization; caches per key. No network access |
-| `app/data/universes/starter_large_cap.csv` | The only universe today: a hand-maintained set of liquid large-cap U.S. equities (`ticker,company_name,sector,industry`) |
-| `app/data/database.py` | SQLAlchemy Core engine factory (`build_engine`), the shared `as_utc(dt)` reader (SQLite stores naive datetimes; every persistence service normalises through it), and table definitions: `analysis_reports`, `watchlists`, `watchlist_tickers`, `watchlist_analysis_snapshots`, `watchlist_analysis_snapshot_results`, `portfolios`, `portfolio_holdings`, `paper_trading_accounts`, `paper_trading_transactions`, `paper_trading_positions` |
-| `app/api/main.py` | FastAPI app factory; `uvicorn app.api.main:app` entry point |
-| `app/api/routes/health.py` | `GET /api/health` |
-| `app/api/routes/analysis.py` | `POST /api/analyze` — analysis only; calls `analyze_stock`, does not save |
-| `app/api/routes/reports.py` | `POST /api/reports/analyze`, `GET /api/reports/history`, `GET /api/reports/{id}` |
-| `app/api/routes/watchlists.py` | Watchlist CRUD routes — `GET/POST /api/watchlists`, `GET/PATCH/DELETE /api/watchlists/{id}`, `POST` / `DELETE` `/api/watchlists/{id}/tickers[/{ticker}]`, `POST /api/watchlists/{id}/analyze` (analyze-watchlist, partial success); thin, delegate to services |
-| `app/api/routes/watchlist_snapshots.py` | `POST`/`GET /api/watchlists/{id}/analysis-snapshots`, `GET /api/watchlist-analysis-snapshots/{id}` — saved snapshot save/list/detail; thin, delegate to snapshot service |
-| `app/api/routes/market_data.py` | `GET /api/market-data/{ticker}/history` — read-only daily OHLCV history |
-| `app/api/routes/portfolios.py` | Portfolio + holding CRUD — `GET/POST /api/portfolios`, `GET/PATCH/DELETE /api/portfolios/{id}`, `POST /api/portfolios/{id}/holdings`, `PATCH`/`DELETE` `/api/portfolios/{id}/holdings/{holding_id}`, `GET /api/portfolios/{id}/summary` (priced). Thin; validation→400, duplicate ticker→409, missing→404; summary stays 200 on price failure |
-| `app/api/routes/discovery.py` | `GET /api/discovery` (ranked candidates; `mode`, `universe`, `limit`, `max_full_analysis`), `GET /api/discovery/modes`, `GET /api/discovery/universes`. Thin; invalid params → 400, partial ticker failures stay 200 with `warnings` |
-| `app/api/routes/paper_trading.py` | Paper trading — `POST`/`GET /api/paper-trading/accounts`, `GET /api/paper-trading/accounts/{id}` (`/summary`, `/positions`, `/transactions`), `POST` `/buy` and `/sell`. Thin; validation→400, account missing→404, state conflict (insufficient cash/shares)→409; priced reads stay 200 on price failure |
-| `app/api/schemas/paper_trading.py` | Paper trading request/response schemas (`CreateAccountRequest`, `TradeRequest`, `AccountSummary`, `AccountDetail`, `PositionResponse`, `TransactionResponse`) plus priced views (`PricedPosition`, `PositionsResponse`, `AccountSummaryResponse`, `PriceWarning`). Starting cash, quantity, and price accepted as `Decimal` |
-| `app/api/schemas/analysis.py` | `AnalyzeRequest` — validates and normalizes ticker at the API boundary |
-| `app/api/schemas/discovery.py` | Names the discovery domain models for the HTTP layer (`DiscoveryResponse`, `DiscoveryModeResponse`, `DiscoveryUniverseResponse`); no duplicate field definitions |
-| `app/api/schemas/reports.py` | `SavedReportSummary`, `SavedReportDetail` — response schemas for persistence endpoints |
-| `app/api/schemas/watchlists.py` | Watchlist request/response schemas (`CreateWatchlistRequest`, `UpdateWatchlistRequest`, `AddTickerRequest`, `WatchlistSummary`, `WatchlistDetail`, `DeleteResponse`, plus analyze-watchlist: `WatchlistAnalysisResponse`/`Result`/`Error`) |
-| `app/api/schemas/watchlist_snapshots.py` | `WatchlistSnapshotSummary` (incl. `average_score: float \| null`), `WatchlistSnapshotDetail` |
-| `app/api/schemas/market_data.py` | `PricePoint`, `PriceHistoryResponse` — nullable OHLCV transport shapes |
-| `app/api/schemas/portfolios.py` | Portfolio/holding request+response schemas (`CreatePortfolioRequest`, `UpdatePortfolioRequest`, `AddHoldingRequest`, `UpdateHoldingRequest`, `PortfolioSummary`, `PortfolioDetail`, `HoldingResponse`, `DeleteResponse`) plus priced summary (`PortfolioSummaryResponse`, `HoldingValuation`, `PortfolioSummaryWarning`). Shares/avg-cost accepted as `Decimal` |
-| `app/api/errors.py` | `KNOWN_ANALYSIS_ERRORS` — shared tuple of pipeline error types used by both API routes for 422 mapping |
-| `app/config.py` | Env-var settings via python-dotenv: `DATABASE_PATH`, `ENVIRONMENT`, plus reserved (currently unread) API-key placeholders. yfinance needs no key |
-| `app/main.py` | Thin argparse CLI shell — delegates entirely to `app/services/` |
-| `frontend/` | React + Vite + TypeScript browser frontend; dark app shell with sidebar |
-| `frontend/src/api/client.ts` | Base fetch wrapper (`get`/`post`/`patch`/`del` over one shared `request` helper); `ApiError` class; `VITE_API_BASE_URL` env var |
-| `frontend/src/api/analysisApi.ts` | `checkHealth`, `analyzeOnly`, `analyzeAndSave` |
-| `frontend/src/api/watchlistApi.ts` | Watchlist CRUD + `analyzeWatchlist`, `analyzeAndSaveSnapshot`, `listWatchlistSnapshots`, `getWatchlistSnapshot` — one per `/api/watchlists*` endpoint |
-| `frontend/src/api/reportsApi.ts` | `listSavedReports`, `getSavedReport` — read-only saved-report history |
-| `frontend/src/api/marketDataApi.ts` | `getPriceHistory` — read-only daily price history |
-| `frontend/src/api/portfolioApi.ts` | Portfolio + holding CRUD and `getPortfolioSummary` — one per `/api/portfolios*` endpoint |
-| `frontend/src/api/discoveryApi.ts` | `listDiscoveryModes`, `listDiscoveryUniverses`, `runDiscovery` — one per `/api/discovery*` endpoint |
-| `frontend/src/api/paperTradingApi.ts` | One function per `/api/paper-trading` endpoint (`listAccounts`, `createAccount`, `getAccount`, `getAccountSummary`, `getAccountPositions`, `listTransactions`, `recordBuy`, `recordSell`) plus `loadAccountView(id)`, a composite reader that fetches detail + summary + transactions in parallel |
-| `frontend/src/components/` | Presentational only: `LoadingState`, `ErrorMessage`, `StockReportView`; `layout/` (`AppShell`, `Sidebar`, `PageHeader`); `charts/` (`StockPriceChart`, `WatchlistSnapshotTrendChart`); `dashboard/` (`ComingSoonCard`); `watchlist/` (`WatchlistCard`, `AnalysisResultCard`); `portfolio/` (`PortfolioPanel` container + `PortfolioSelector`, `PortfolioSummaryCards`, `HoldingsTable`, `HoldingForm`); `discovery/` (`DiscoveryControls`, `DiscoveryCandidateCard`, `DiscoveryWarnings`); `paperTrading/` (`PaperAccountSelector`, `PaperAccountSummaryCards`, `PaperPositionsTable`, `TransactionLedger`, `TradeForm`) |
-| `frontend/src/lib/` | Pure, tested helpers: `format`, `errors`, `sort`, `dashboard`, `watchlist`, `chartData`, `snapshotTrend`, `portfolio` (money/percent/share formatting + holding-form validation), `discovery` (query building, mode labels, score/price formatting, run + warning summaries), `paperTrading` (account/trade form validation, trade-request shaping, transaction labels, price-warning summaries). Display-only — never recompute scores/categories/averages/portfolio totals/discovery ranking/paper-trading accounting |
-| `frontend/src/pages/` | `DashboardPage` (portfolio panel, summary cards, health/source status), `DiscoverPage` (`/discover` — mode/universe/limit controls + ranked candidates), `AnalyzePage` (analyze + report + price chart), `WatchlistsPage` (CRUD + on-demand analyze + save snapshot + snapshot list/trend chart), `WatchlistSnapshotDetailPage` (`/watchlists/:watchlistId/snapshots/:snapshotId`), `SavedReportsPage` (`/reports`), `ReportDetailPage` (`/reports/:id`), `PaperTradingPage` (`/paper-trading` — account picker/create, priced summary cards, open positions, buy/sell forms, transaction ledger) |
-| `frontend/src/types/` | `report.ts`, `watchlist.ts` (incl. snapshot summary/detail + `average_score`), `marketData.ts`, `portfolio.ts`, `discovery.ts`, `paperTrading.ts` — mirror backend schemas |
+### Services
 
-## Architecture
+| Module | Role |
+|--------|------|
+| `stock_analysis_service` | `analyze_stock` (→ StockReport) and `analyze_stock_rating` (→ Rating with sub-scores, for discovery): the only pipeline entry points. `analyze_watchlist_file` for the CLI |
+| `report_persistence_service` | Save, list, and get saved reports |
+| `watchlist_service` | Watchlist + ticker CRUD (storage only) |
+| `watchlist_analysis_service` | `analyze_watchlist`: runs `analyze_stock` per ticker; partial success; saves nothing |
+| `watchlist_analysis_snapshot_service` | Save, list, and get snapshots of explicit analyze-and-save runs; derives `average_score` |
+| `market_data_service` | Validated, JSON-safe price-history response |
+| `portfolio_service` / `portfolio_summary_service` | Holdings CRUD (no market data) / priced summary (the only place portfolio prices are fetched and portfolio math runs) |
+| `discovery_service` / `discovery_screening` / `discovery_ranking` | Universe → bounded pre-screen → `analyze_stock_rating` → per-mode ordering |
+| `paper_trading_service` / `paper_trading_summary_service` | Accounts, trades, positions, ledger (no market data) / priced positions + valued summary |
 
-Data flows in one direction through five layers:
+Persistence services take an optional `engine=` keyword for tests. Production
+callers omit it and get a lazily built module-level engine. Summary services
+also take `price_lookup=`, and discovery takes `analyze=`/`prescreen=`.
+
+## Dependency direction
 
 ```
-data/ → analysis/ → scoring.py → reports/ → services/ → CLI / API
+app/data ─► app/analysis ─► scoring.py ─► app/reports ─► app/services ─► app/main.py (CLI)
+   ▲                                                         │      └──► app/api ─► frontend (HTTP)
+   └──────────────── app/models (shared by all layers) ◄─────┘
 ```
 
-| Layer | Package | Responsibility |
-|-------|---------|---------------|
-| Data | `app/data/` | Fetch and validate raw data; return typed models or DataFrames |
-| Database | `app/data/database.py` | SQLAlchemy Core engine, schema, and the shared `as_utc` datetime reader; no business logic |
-| Analysis | `app/analysis/` | Compute signals from data; modules stay independent of each other |
-| Scoring | `app/analysis/scoring.py` | Aggregate signals into a composite Rating using weighted formula |
-| Reports | `app/reports/` | Format a Rating and its Signals into a human-readable StockReport |
-| Services | `app/services/` | `analyze_stock` — analysis pipeline entry point; `report_persistence_service` — DB boundary |
-| CLI | `app/main.py` | Thin argparse shell; calls `analyze_stock` from services |
-| API | `app/api/` | Thin FastAPI layer; routes call service functions; no pipeline or DB logic in route handlers |
-| Frontend | `frontend/` | React + Vite display layer; calls API endpoints; never duplicates analysis or scoring logic |
+- Lower layers never import upward. Nothing outside `app/api/` imports
+  `app.api.*`, and nothing imports `app.main`.
+- Models are domain types. API schemas may re-export them; services must not
+  import API schemas.
+- `stock_analysis_service` may use `app/watchlist.py`'s pure scanner for the
+  CLI. Nothing in the API path depends on it.
 
-`app/watchlist.py` orchestrates the single-stock pipeline across multiple tickers.
+## Architectural rules
 
-Stock discovery wraps the same pipeline in one extra flow:
-
-```
-universes/*.csv → universe_loader → discovery pre-screen → bounded shortlist
-    → analyze_stock_rating (existing pipeline) → discovery_ranking → /api/discovery → Discover page
-```
-
-## Layer Rules
-
-- **Data modules** fetch and clean data only. No analysis or scoring logic.
-- **Analysis modules** accept a DataFrame or typed model as input. Never call yfinance or other external APIs directly.
-- **Analysis modules** are independent — `technicals.py` does not call `fundamentals_analysis.py`, etc.
-- **Scoring** stays in `scoring.py`. Analysis modules produce signals; they do not score them.
-- **Reports** consume scoring outputs. Report modules do not run analysis or scoring.
-- **Watchlist** reuses the single-stock pipeline; it adds no analysis logic of its own.
-- **API route handlers** must stay thin — call service functions, handle errors, return the result. No pipeline or persistence logic in route handlers.
-- **API persistence routes** (`/api/reports/*`) call `analyze_stock` from `stock_analysis_service` and the persistence functions from `report_persistence_service`. They never duplicate pipeline logic.
-- **`POST /api/analyze`** is analysis-only and must never save to the database. Saving is exclusively done via `POST /api/reports/analyze`.
-- **CLI** must remain functional. Adding API or frontend layers must not break `python -m app.main`.
-- **Database** uses SQLAlchemy Core (not ORM). The `analysis_reports` table stores full `StockReport` JSON snapshots alongside indexed summary columns. The `watchlists` and `watchlist_tickers` tables store named ticker lists. The `portfolios` and `portfolio_holdings` tables store manually entered holdings (`shares`/`average_cost` persisted as canonical decimal strings for exact precision; one ticker per portfolio via a unique constraint). The database file lives at `data/investment_bot.db` (configurable via `DATABASE_PATH` env var). Schema is created directly via `metadata.create_all()`; there are no migrations (do not add Alembic without a scoped task).
-- **Persistence service functions** accept an optional `engine` keyword argument for test injection. Production callers omit it; a shared engine is lazily initialised on first call.
-- **Watchlist management** (`watchlist_service` + `/api/watchlists`) is storage/CRUD only — it never runs analysis, scans, alerts, or trades. It is separate from `app/watchlist.py`, which is the CLI multi-ticker analysis scanner. Do not merge the two; do not add analysis to the watchlist CRUD layer without an explicitly scoped task.
-- **Portfolio holdings** (`portfolio_service` + `/api/portfolios`) are manually entered, real holdings for tracking only. `portfolio_service` is storage/CRUD and fetches no market data; `portfolio_summary_service` is the only place current prices are fetched (reusing `app/data/market_data`) and the only place portfolio math runs. Keep these two separate — do not fetch prices during CRUD, and do not put calculations in routes. This is decision-support only: never add broker links, order execution, cash balances, realized gains, dividends, tax lots, or automatic trading.
-- **Stock discovery** (`discovery_service` + `/api/discovery`) is a layer *around* the existing analysis engine, never a second one. It must not define scores, weights, thresholds, categories, or confidence logic — `discovery_ranking` may only reorder existing `Rating` objects and explain the ordering. Every run stays bounded by `max_full_analysis` (ceiling 50) and is synchronous, on-demand, and unsaved: no scheduled scans, no background jobs, no persistence. Universes are static CSVs in `app/data/universes/` — never scraped or fetched at runtime. Per-ticker failures become `warnings`, never a failed request.
-- **Paper trading** (`paper_trading_service` + `paper_trading_summary_service` +
-  `/api/paper-trading`) is a **simulation vertical that sits entirely outside the
-  research spine**. It must never affect — or be read by — ratings, scores,
-  reports, discovery ranking, watchlist analysis, or portfolio summaries, and
-  `analyze_stock` must never touch it. It shares **no tables and no code** with
-  manual portfolio tracking: `portfolios`/`portfolio_holdings` record real
-  holdings and carry no cash or ledger. Keep the same two-module split as
-  portfolios — `paper_trading_service` is storage + accounting and fetches **no**
-  market data; `paper_trading_summary_service` is the only place prices are
-  fetched and the only place valuation math runs. The transaction table is an
-  append-only ledger and the source of truth; the positions table is a derived
-  cache updated atomically in the same DB transaction as the cash movement. Two
-  invariants must hold after every trade and are covered by tests:
+- **Data modules** fetch and clean only: no analysis or scoring. Missing or
+  invalid prices are `None`, never 0.
+- **Analysis modules** take a DataFrame or typed model, never call yfinance,
+  and never import each other. Missing fields produce a neutral `Signal` with
+  `confidence=0.30` rather than raising. Each module has its own exception class.
+  News fetch failures are non-fatal in the pipeline (`analyze_news([])`).
+- **Scoring** lives only in `scoring.py`. It is transparent and rule-based. Do
+  not change weights, thresholds, or confidence logic without an explicitly
+  scoped task.
+- **Reports** consume a `Rating`; they never run analysis or scoring.
+- **API route handlers are plain `def`, not `async def`.** Every service blocks
+  (SQLite, yfinance), and FastAPI runs sync handlers in a threadpool; an async
+  handler would stall the whole server. A test enforces this. Because requests
+  now run concurrently, any service that reads a value and then writes
+  something computed from it must call `begin_write_transaction(conn)` first
+  inside `engine.begin()` (paper trades do). Schema creation in `build_engine`
+  is serialized by a lock.
+- **Routes stay thin.** Validate input, call one service, and map *domain*
+  errors to status codes: `*ValidationError` → 400, `*NotFoundError` → 404,
+  duplicate / insufficient funds or shares → 409, `KNOWN_ANALYSIS_ERRORS` → 422,
+  anything else → 500. Do not catch bare `ValueError`/`LookupError` next to a
+  domain error, which would turn bugs into 400/404s. (The one deliberate
+  exception: the market-data route maps the service's documented `ValueError`
+  for an unsupported period or interval to 422.) No pipeline, persistence, or
+  math in a route.
+- **`POST /api/analyze` never saves.** Saving is only via `POST /api/reports/analyze`.
+- **Watchlist CRUD** never runs analysis. On-demand analysis and snapshots are
+  separate services. Snapshots are only written by an explicit user action, and
+  never by a schedule.
+- **Portfolio holdings** are manual-entry tracking of real holdings: no cash,
+  realized P&L, dividends, tax lots, or broker links. Keep CRUD and pricing in
+  their separate modules.
+- **Discovery** is a layer *around* the engine. It may only reorder existing
+  `Rating`s and explain the order; it must not define scores, weights,
+  thresholds, or categories. Every run is synchronous, on-demand, unsaved, and
+  bounded by `max_full_analysis` (ceiling `MAX_FULL_ANALYSIS_CEILING` = 50).
+  Universes are static CSVs. Per-ticker failures become `warnings`, never a
+  failed request.
+- **Paper trading** sits entirely outside the research spine. It is never read
+  by, and never affects, ratings, reports, discovery, watchlists, or portfolio
+  summaries, and it shares no tables or code with portfolio tracking (the
+  duplicated price/rounding helpers in the two summary services are deliberate).
+  The transaction table is an append-only ledger and the source of truth.
+  Positions are a derived cache written in the same DB transaction as the cash
+  movement. Two invariants must hold after every trade, and tests cover both:
   `cash_balance == starting_cash - Σ(buy gross) + Σ(sell gross)` and
-  `realized_gain_loss == Σ(transaction realized)`. Routes stay thin — no
-  accounting in a route handler. This is decision-support simulation only: never
-  add a broker API, a real account link, real order execution, automatic trading,
-  rebalancing, alerts, allocation advice, margin, options, or short selling.
-- **Frontend** owns no business logic: it calls the typed API client and formats results for display. It must not recalculate scores, categories, weights, portfolio totals, discovery ranking, or re-validate domain rules the backend already enforces (the holding-form check in `lib/portfolio` is pre-submit UX only; the backend stays authoritative).
+  `realized_gain_loss == Σ(transaction realized)`.
+- **Frontend** owns no business logic. All HTTP goes through `src/api/client.ts`
+  via the per-group API modules. It formats for display and never recomputes
+  scores, categories, weights, averages, totals, rankings, or accounting.
+  Client-side form checks are UX only; the backend stays authoritative. Async
+  loads that can be superseded (selection changes) must drop stale responses
+  (see `PaperTradingPage.refreshView`, `PortfolioPanel.loadSummary`).
+- **Dependencies:** add none without a clear need. No Redux/Zustand/React
+  Query, no second chart library, no ORM, and no migration framework (no
+  Alembic) without a scoped task.
 
-## Scoring Weights
+## Data model (SQLite, `app/data/database.py`)
 
-Base weights (re-normalised to 100% when a category is absent):
+The schema comes from `metadata.create_all()`; there are no migrations. The one
+exception is `_upgrade_legacy_watchlists_table`, which `build_engine` runs: a
+one-time, idempotent in-place rebuild that gives pre-existing databases an
+AUTOINCREMENT `watchlists` table. Foreign keys are declared but not enforced
+(no `PRAGMA foreign_keys`), so services delete child rows explicitly.
 
-| Category | Base Weight |
-|----------|-------------|
-| Technical | 35% |
-| Fundamental | 25% |
-| News | 25% |
-| Risk | 15% |
+| Table | Contents |
+|-------|----------|
+| `analysis_reports` | Saved `StockReport` JSON plus indexed summary columns |
+| `watchlists` | Named ticker lists. **AUTOINCREMENT**: deleted ids are never reused, because snapshots outlive their watchlist and are looked up by `watchlist_id` |
+| `watchlist_tickers` | Tickers per watchlist (unique per list); deleted with the list |
+| `watchlist_analysis_snapshots` | One row per explicit analyze-and-save run; `watchlist_name` denormalized; **kept** when the watchlist is deleted |
+| `watchlist_analysis_snapshot_results` | Per-ticker success/failure rows of a snapshot |
+| `portfolios` / `portfolio_holdings` | Manual holdings; `shares`/`average_cost` stored as canonical decimal strings; one ticker per portfolio; holdings deleted with the portfolio |
+| `paper_trading_accounts` | Simulated cash, starting cash, cumulative realized gain/loss (decimal strings) |
+| `paper_trading_transactions` | Append-only BUY/SELL ledger |
+| `paper_trading_positions` | Derived open positions (one per ticker per account; deleted when fully sold) |
 
-## Signal Pattern
+SQLite returns naive datetimes. Every service normalizes them through `as_utc`.
 
-Each analysis module follows the same pattern:
-- Accepts a validated input (DataFrame, typed model, or list of NewsItem)
-- Returns a `list[Signal]` using `SignalCategory.TECHNICAL`, `FUNDAMENTAL`, `NEWS`, or `RISK`
-- Never raises on missing data fields — produces a neutral `Signal` with `confidence=0.30` instead
-- Has its own exception class (e.g. `TechnicalAnalysisError`, `NewsAnalysisError`, `RiskAnalysisError`) that callers catch
-- News fetch failures are non-fatal in `_analyze_ticker` (service layer): the pipeline continues with `analyze_news([])`
+## API status
 
-## Development Standards
+Route groups (all under `/api`): health; analysis; reports (analyze + save,
+history with `limit` 1–500, detail); watchlists (CRUD, tickers, on-demand
+analyze); watchlist snapshots; market-data history; portfolios (CRUD, holdings,
+priced summary); discovery (run, modes, universes); paper trading (accounts,
+detail, summary, positions, transactions, buy, sell). Priced reads return 200
+on partial price failure, with `warnings`.
 
-- Add or update tests for every meaningful code change.
-- Keep tasks narrow — prefer one clean, tested feature over a large multi-feature PR.
-- Keep tests deterministic — build DataFrames and typed models locally, never call live APIs in unit tests.
-- Update `docs/development_log.md` after meaningful changes.
-- Do not add dependencies without a clear need.
-- All API keys and secrets live in `.env` (never committed). Access them only through `app/config.py`. Today no provider needs a key — yfinance is the only data source — so `.env` is optional.
-- Review diffs before committing.
+## Feature status
 
-## Phase Status
+| Feature | Status |
+|---------|--------|
+| Analysis pipeline, CLI, report formats | Complete |
+| Saved reports (API + Saved Reports / Report Detail pages) | Complete |
+| Watchlists: CRUD, on-demand analysis, saved snapshots + trend chart | Complete |
+| Market-data price chart (Analyze page) | Complete |
+| Manual portfolio tracking (Dashboard panel) | Complete (milestone 1) |
+| Stock discovery (Discover page) | Complete (milestone 1); one universe |
+| Paper trading (backend + page) | Complete |
+| Research notes (Phase 6 remainder) | Not started |
+| Scoring calibration (`docs/*calibration*` are proposals) | Not started |
+| Market-data staleness detection (`TODO` in `market_data.py`) | Not started |
+| Dashboard "Market Overview" | Labeled placeholder only. No live data; don't build it without a scoped task |
+| ML (Phase 8), deployment/hardening (Phase 9), auth, backtesting | Not started |
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| 1 | Architecture and technical design doc | Done |
-| 2 | FastAPI backend — `GET /api/health`, `POST /api/analyze` | Done |
-| 3 | SQLite persistence — save StockReport snapshots, report history endpoints | **Milestone 1 complete** — `POST /api/reports/analyze`, `GET /api/reports/history`, `GET /api/reports/{id}` |
-| 4 | React + Vite frontend — Milestone 1: shell with API connectivity | **Complete** — Dashboard + Analyze pages, health check, analyze-only and analyze-and-save flows |
-| 5 | Watchlist management (frontend + backend routes) | **Complete (CRUD + analyze + snapshots)** — `watchlists`/`watchlist_tickers` tables, `watchlist_service`, `/api/watchlists` CRUD, Watchlists page. Analyze-watchlist (`watchlist_analysis_service` + `POST /api/watchlists/{id}/analyze`, partial success, not saved). Saved snapshots (`watchlist_analysis_snapshots(+_results)` tables, `watchlist_analysis_snapshot_service`, snapshot save/list/detail endpoints) with snapshot-detail page and success/average-score trend charts (`average_score` derived in the service) |
-| 6 | Research notes and report history UI | **Report history UI done** — Saved Reports list (`/reports`) and Report Detail (`/reports/:id`) over the existing read endpoints. Research notes not started |
-| — | Market-data chart (read-only) | **Done** — `market_data_service` + `GET /api/market-data/{ticker}/history`; daily price chart on the Analyze page (Lightweight Charts) |
-| — | Personal portfolio holdings (manual) | **Milestone 1 complete** — `portfolios`/`portfolio_holdings` tables, `portfolio_service` (CRUD) + `portfolio_summary_service` (priced summary), `/api/portfolios` CRUD + `GET /{id}/summary`, Dashboard `PortfolioPanel`. Manual entry only; current-price valuation via existing market-data layer; partial-price-failure tolerant. No broker links, cash, realized gains, dividends, tax lots, or trading |
-| — | Stock discovery engine | **Milestone 1 complete** — static `starter_large_cap` universe + `universe_loader`, stage-1 pre-screen, bounded full analysis (`max_full_analysis`, default 25/ceiling 50), six deterministic ranking modes (`overall`, `momentum`, `quality`, `value`, `defensive`, `avoid`), `GET /api/discovery(+/modes,/universes)`, Discover page. Rule-based and explainable; no ML, no LLM picks, no scoring changes, nothing saved or scheduled |
-| 7 | Paper trading simulation | **Complete (backend + frontend)** — `paper_trading_accounts`/`_transactions`/`_positions` tables, `paper_trading_service` (accounts + buy/sell accounting + ledger, storage-only) and `paper_trading_summary_service` (priced positions + valued summary), 8 `/api/paper-trading` endpoints. Stored positions over an append-only ledger; Decimal-exact, cent-quantised money. Implemented as a service vertical, **not** as `app/simulation/`. Frontend: Paper Trading page (`/paper-trading`) — account create/select, priced summary cards, positions table, buy/sell forms, transaction ledger. Simulated only — no broker, no real order, no real account, nothing automatic |
-| 8 | ML research layer (`app/ml/`) | Not started |
-| 9 | Deployment and hardening | Not started |
+## Testing guidance
 
-See `docs/full_stack_product_architecture.md` for full scope of each phase.
+- Every meaningful change ships with tests, one file per module or route
+  group (`tests/test_<module>.py`; API tests in `test_<group>_api.py`).
+- Tests must be deterministic: build DataFrames and models locally, patch
+  yfinance (`app.data.market_data.yf.download`, etc.), and never call a live
+  service. (Verified once by running the suite with sockets blocked; no
+  fixture enforces it.)
+- Persistence tests use `build_engine(tmp_path / "test.db")` and pass `engine=`.
+  API tests either patch the service functions a route imports, or monkeypatch
+  every involved service module's `_engine` to a temp engine. No test touches
+  `data/investment_bot.db`.
+- Assert behavior through public functions. Use `pytest.mark.parametrize` for
+  boundary tables rather than copy-pasted tests. Add a regression test for
+  every bug fixed (e.g. `tests/test_database.py` for watchlist id reuse).
+- Frontend: Vitest covers `src/lib/` and `src/api/` only. New display logic
+  belongs in a pure `lib/` helper with a test.
 
-**Current priority: code quality and research quality, not more dashboard polish.**
-Do not start the next visual feature (e.g. per-ticker sparklines, batch
-price-history endpoint) without an explicitly scoped task.
-Snapshot/report/watchlist/portfolio/discovery/paper-trading concerns are separate
-and must stay separate.
-Discovery is a bounded, on-demand research surface — do not extend it toward
-scheduled scans, alerts, saved discovery runs, larger universes, ML, or
-LLM-generated picks without an explicitly scoped task.
-Portfolio holdings are manual-entry tracking only — do not extend them toward
-cash, realized P&L, dividends, tax lots, or broker links without an explicitly
-scoped task. Cash and realized gains belong to the **paper trading** vertical,
-which is separate and shares no tables with it; do not merge the two.
-Paper trading now has both backend and frontend — do not widen either without
-an explicitly scoped task (e.g. no "paper buy from Discover" action, no
-per-position charts, no CSV export).
+## Non-negotiable guardrails
 
-## Non-Negotiable Guardrails
+- **No live trading, no broker APIs, no real order execution.** A paper trade
+  is a database row at a user-supplied price; never fetch a price to "execute"
+  a trade, and never route an order.
+- **No real account linking or position syncing**, in either the portfolio or
+  paper-trading verticals.
+- **No automatic trading, rebalancing, or position management**, and no trade
+  alerts or allocation advice.
+- **No margin, options, or short selling.** A paper sell may never exceed the
+  shares the account holds.
+- **Discovery is research, not advice.** No ML/LLM picks, no scoring changes to
+  make discovery "work", no scheduled scans, and never more than
+  `MAX_FULL_ANALYSIS_CEILING` analyses per request.
+- **No route-handler logic, no CLI regression** (`python -m app.main` must
+  always work), and **no frontend business logic**.
+- Secrets live only in `.env` (never committed) and are read through `app/config.py`.
 
-These apply to every phase and every task:
+## Next logical work
 
-- **No live trading** — never connect to a broker or execute a real order
-- **No broker APIs** — no Vanguard, Schwab, Plaid, Alpaca, Robinhood, IBKR, or any brokerage integration, in the research pipeline or the paper trading vertical
-- **No real order execution** — no scheduled or triggered buy/sell of any kind. A paper trade is a database row, never an order
-- **No options, margin, or short selling** — equities only; no derivatives or leveraged positions, and a paper sell may never exceed the shares the account holds
-- **Portfolio is manual + read-only** — holdings are hand-entered for tracking; never connect a brokerage account, sync positions, or trade. No cash balances, realized gains, dividends, or tax lots
-- **Discovery is research, not advice** — discovery output is a rule-based, explainable candidate list. Never generate picks with an LLM or ML model, never change scoring rules to make discovery "work", and never let a discovery run trigger an order, an alert, or a scheduled scan
-- **No unbounded scans** — a single discovery request may never analyze more than `MAX_FULL_ANALYSIS_CEILING` tickers
-- **No route-handler logic** — API routes call services; they never contain pipeline logic
-- **No CLI regression** — `python -m app.main` must always work after any change
-- **No premature ML** — do not add `app/ml/` until Phase 8 is explicitly scoped
-- **Paper trading is a simulation, never a market connection** — every paper trade is a row the user submitted at a price the user supplied. Never fetch a price in order to "execute" a trade, never route an order, and never add a broker API (Vanguard, Schwab, Plaid, Alpaca, Robinhood, Interactive Brokers, or any other), a real account link, or position syncing. No automatic trading, automatic rebalancing, trade alerts, allocation advice, margin, options, or short selling — a sell may never exceed the shares the account holds
-- **Paper trading stays out of the research spine** — it may read no analysis output and influence no analysis output
-- **Frontend must not duplicate backend logic** — no scoring, signal calculation, category derivation, or persistence in frontend code; display only
-- **Frontend data ownership** — frontend formats dates/numbers for display; it must never recalculate ratings, categories, or weights; all analysis stays in the backend
-- **Frontend stack** — React + Vite + TypeScript; plain CSS; native fetch; React Router; see `docs/frontend_plan.md` for the full plan
+Only start these with an explicitly scoped task:
+- Research notes on saved reports and watchlists (Phase 6 remainder).
+- Market-data staleness detection (needs care with weekends and holidays).
+- Component-level frontend tests for the container flows (PortfolioPanel,
+  PaperTradingPage, WatchlistsPage).
+- Scoring calibration, only through the documented proposal process.
 
-## Key Docs
+Do not start the next visual feature (per-ticker sparklines, batch price
+history, live market overview), widen paper trading (no "paper buy from
+Discover", per-position charts, or CSV export), or extend discovery (scheduled
+scans, saved runs, more universes) without a scoped task.
 
-- `docs/project_plan.md` — version roadmap
-- `docs/architecture.md` — full layer diagram
-- `docs/full_stack_product_architecture.md` — full-stack product plan and phase roadmap
-- `docs/frontend_plan.md` — original frontend design and milestone plan (historical; the frontend is built — trust the code and this file over the plan where they disagree)
-- `docs/scoring_rules.md` — score weights and rating thresholds
-- `docs/data_sources.md` — provider options and selection criteria
-- `docs/development_log.md` — append an entry for each meaningful change
+## Required post-implementation workflow
 
-## Required Post-Implementation Workflow
+After every meaningful code change, use the project subagents in `.claude/agents/`:
 
-After every meaningful code change, use the relevant subagents:
+1. **code-reviewer**: bugs, architecture issues, scope creep, security, and
+   guardrail violations.
+2. **test-runner**: the narrowest relevant tests, then a summary.
+3. **docs-maintainer**: update docs only if the change made them stale.
 
-1. Use the code-reviewer subagent to check for bugs, architecture issues, scope creep, security issues, and Investment Bot guardrail violations.
-2. Use the test-runner subagent to run the narrowest relevant tests and summarize results.
-3. Use the docs-maintainer subagent to update documentation only if the change makes existing docs stale.
+Do not skip this unless the user explicitly says to skip review, tests, or docs.
 
-Do not skip this workflow unless the user explicitly says to skip review, tests, or docs.
-
-For every completed task, report:
-- Files changed
-- Tests run
-- Subagents used
-- Issues found
-- Documentation updated or not needed
+For every completed task, report: files changed, tests run, subagents used,
+issues found, and documentation updated (or not needed). Append an entry to
+`docs/development_log.md` for each meaningful change.

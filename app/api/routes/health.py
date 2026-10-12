@@ -10,5 +10,5 @@ router = APIRouter()
 
 
 @router.get("/health")
-async def health() -> dict:
+def health() -> dict:
     return {"status": "ok", "service": "investment-bot-api"}

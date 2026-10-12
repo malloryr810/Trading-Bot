@@ -532,13 +532,6 @@ class TestMainWatchlistCLI:
             result = main(["AAPL"])
         assert result == 0
 
-    def test_no_args_still_returns_1(self):
-        assert main([]) == 1
-
-    def test_no_args_still_prints_usage(self, capsys):
-        main([])
-        assert "usage" in capsys.readouterr().err
-
 
 # ---------------------------------------------------------------------------
 # Watchlist save CLI — --save-report

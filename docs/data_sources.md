@@ -4,7 +4,7 @@
 
 | Source  | Data                          | Access method         |
 |---------|-------------------------------|-----------------------|
-| yfinance | Price history, basic fundamentals, options | pip package, no key required |
+| yfinance | Daily OHLCV price history, company fundamentals, news headlines | pip package, no key required |
 
 ## Planned / Candidate Sources
 
@@ -25,5 +25,6 @@
 
 ## Key Management
 
-All API keys are stored in `.env` (never committed) and accessed via `app/config.py`.
-See `.env.example` for the expected variable names.
+No provider in use needs a key today. If a keyed provider is added, store the key
+in `.env` (never committed), read it through `app/config.py`, and list the
+variable name in `.env.example`.

@@ -54,46 +54,46 @@ router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
 
 @router.get("", response_model=list[PortfolioSummary])
-async def get_portfolios() -> list[dict]:
+def get_portfolios() -> list[dict]:
     """Return all portfolios, newest first."""
     return list_portfolios()
 
 
 @router.post("", response_model=PortfolioDetail, status_code=201)
-async def post_portfolio(request: CreatePortfolioRequest) -> dict:
+def post_portfolio(request: CreatePortfolioRequest) -> dict:
     """Create a new portfolio."""
     try:
         return create_portfolio(request.name, request.description)
-    except (PortfolioValidationError, ValueError) as exc:
+    except PortfolioValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/{portfolio_id}", response_model=PortfolioDetail)
-async def get_one_portfolio(portfolio_id: int) -> dict:
+def get_one_portfolio(portfolio_id: int) -> dict:
     """Return one portfolio with its holdings."""
     try:
         return get_portfolio(portfolio_id)
-    except (PortfolioNotFoundError, LookupError) as exc:
+    except PortfolioNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.patch("/{portfolio_id}", response_model=PortfolioDetail)
-async def patch_portfolio(portfolio_id: int, request: UpdatePortfolioRequest) -> dict:
+def patch_portfolio(portfolio_id: int, request: UpdatePortfolioRequest) -> dict:
     """Update a portfolio's name and/or description (partial update)."""
     try:
         return update_portfolio(portfolio_id, request.name, request.description)
-    except (PortfolioNotFoundError, LookupError) as exc:
+    except PortfolioNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-    except (PortfolioValidationError, ValueError) as exc:
+    except PortfolioValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.delete("/{portfolio_id}", response_model=DeleteResponse)
-async def delete_one_portfolio(portfolio_id: int) -> dict:
+def delete_one_portfolio(portfolio_id: int) -> dict:
     """Delete a portfolio and all of its holdings."""
     try:
         delete_portfolio(portfolio_id)
-    except (PortfolioNotFoundError, LookupError) as exc:
+    except PortfolioNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     return {"status": "deleted", "id": portfolio_id}
 
@@ -103,7 +103,7 @@ async def delete_one_portfolio(portfolio_id: int) -> dict:
     response_model=HoldingResponse,
     status_code=201,
 )
-async def post_holding(portfolio_id: int, request: AddHoldingRequest) -> dict:
+def post_holding(portfolio_id: int, request: AddHoldingRequest) -> dict:
     """Add a holding to a portfolio.
 
     Duplicate tickers within a portfolio are rejected with HTTP 409.
@@ -119,9 +119,9 @@ async def post_holding(portfolio_id: int, request: AddHoldingRequest) -> dict:
         )
     except DuplicateHoldingError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
-    except (PortfolioNotFoundError, LookupError) as exc:
+    except PortfolioNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-    except (PortfolioValidationError, ValueError) as exc:
+    except PortfolioValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
 
@@ -129,7 +129,7 @@ async def post_holding(portfolio_id: int, request: AddHoldingRequest) -> dict:
     "/{portfolio_id}/holdings/{holding_id}",
     response_model=HoldingResponse,
 )
-async def patch_holding(
+def patch_holding(
     portfolio_id: int,
     holding_id: int,
     request: UpdateHoldingRequest,
@@ -147,9 +147,9 @@ async def patch_holding(
         )
     except DuplicateHoldingError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
-    except (PortfolioNotFoundError, HoldingNotFoundError, LookupError) as exc:
+    except (PortfolioNotFoundError, HoldingNotFoundError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-    except (PortfolioValidationError, ValueError) as exc:
+    except PortfolioValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
 
@@ -157,17 +157,17 @@ async def patch_holding(
     "/{portfolio_id}/holdings/{holding_id}",
     response_model=DeleteResponse,
 )
-async def delete_one_holding(portfolio_id: int, holding_id: int) -> dict:
+def delete_one_holding(portfolio_id: int, holding_id: int) -> dict:
     """Remove one holding from a portfolio."""
     try:
         remove_holding(portfolio_id, holding_id)
-    except (PortfolioNotFoundError, HoldingNotFoundError, LookupError) as exc:
+    except (PortfolioNotFoundError, HoldingNotFoundError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     return {"status": "deleted", "id": holding_id}
 
 
 @router.get("/{portfolio_id}/summary", response_model=PortfolioSummaryResponse)
-async def get_summary(portfolio_id: int) -> dict:
+def get_summary(portfolio_id: int) -> dict:
     """Return the portfolio with current-price calculations.
 
     A missing portfolio is 404.  Per-ticker market-data failures never fail the
@@ -176,5 +176,5 @@ async def get_summary(portfolio_id: int) -> dict:
     """
     try:
         return get_portfolio_summary(portfolio_id)
-    except (PortfolioNotFoundError, LookupError) as exc:
+    except PortfolioNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))

@@ -272,6 +272,14 @@ The first ML goal should be **signal evaluation**: given historical StockReport 
 
 ## 9. Mock Trading / Simulation Guidelines
 
+> **Superseded by what shipped (Phase 7, paper trading).** It was built as a
+> service vertical (`paper_trading_service`, `paper_trading_summary_service`,
+> `/api/paper-trading`, `paper_trading_*` tables), not under `app/simulation/`, and
+> there is no `/api/mock-portfolio` or `mock_*` table. It deliberately does
+> **not** link to `analysis_reports` and reads no analysis output (contrary to
+> "Linkage to research" below). See `CLAUDE.md` for the current rules. The text
+> below is the original plan.
+
 Mock trading is a **later phase** under `app/simulation/`. It will never connect to a real broker or execute real orders.
 
 ### What mock trading is
@@ -323,7 +331,7 @@ These constraints apply to all phases and all contributors:
 | **5** | Watchlist management | Watchlist CRUD (backend + frontend) **plus** on-demand `POST /api/watchlists/{id}/analyze` with results displayed on the Watchlists page (analysis-only, not saved). ✓ Done |
 | **6** | Report history UI | Saved Reports list (`/reports`) and Report Detail (`/reports/:id`) pages over the existing read endpoints. ✓ Done (research notes not started) |
 | **6.5** | Personal portfolio holdings (manual) | `portfolios`/`portfolio_holdings` tables, `portfolio_service` (storage) + `portfolio_summary_service` (priced), `/api/portfolios` CRUD + `GET /{id}/summary`, Dashboard portfolio panel. Manual entry of real holdings for tracking; current-price valuation via the existing market-data layer. ✓ Done (Milestone 1) |
-| **7** | Mock trading simulation | `app/simulation/`, mock trade recording, portfolio summary, performance metrics. Not started — gated, requires explicit scoping |
+| **7** | Paper trading simulation | Shipped as a service vertical (`paper_trading_service`, `paper_trading_summary_service`, `/api/paper-trading`, Paper Trading page), not `app/simulation/`. ✓ Done (backend + frontend). Simulated only |
 | **8** | ML research layer | `app/ml/`, feature engineering from historical snapshots, signal evaluation models. Not started — gated, requires explicit scoping |
 | **9** | Deployment and hardening | Environment config, containerization, auth if needed, PostgreSQL migration if needed. Not started |
 
@@ -331,7 +339,7 @@ Each phase must be completable independently. A phase is not started until the p
 
 > Note: the **manual personal portfolio** (Milestone 6.5, `/api/portfolios`,
 > `portfolio_service` + `portfolio_summary_service`) is distinct from the future
-> **mock/simulated portfolio** (Phase 7, `app/simulation/`, `/api/mock-portfolio`).
+> **paper trading simulation** (Phase 7, shipped as `/api/paper-trading`).
 > The former tracks real, hand-entered holdings for valuation only — no trades,
 > no cash, no simulation. Keep them separate; do not merge manual tracking into
 > the simulation layer.
@@ -358,8 +366,8 @@ LLM-generated picks, and no change to the scoring rules.
 No code milestone is currently in progress. The remaining phases are gated and
 require explicit scoping and approval before any implementation begins:
 
-- **Phase 7 — Mock trading simulation** (`app/simulation/`): do not create or
-  populate until explicitly scoped.
+- **Phase 7 — Paper trading**: already shipped (see section 9 note); do not
+  create `app/simulation/` or widen it without an explicitly scoped task.
 - **Phase 8 — ML research layer** (`app/ml/`): do not create or populate until
   explicitly scoped.
 - **Phase 9 — Deployment and hardening.**

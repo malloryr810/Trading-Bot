@@ -3,6 +3,11 @@ FastAPI application factory.
 
 Run the API server with:
     uvicorn app.api.main:app --reload
+
+Route handlers are plain ``def``, not ``async def``: every service blocks on
+SQLite or yfinance, and FastAPI runs sync handlers in a threadpool.  An
+``async def`` handler would run that blocking work on the event loop and stall
+every other request (health checks included) until it finished.
 """
 
 from __future__ import annotations

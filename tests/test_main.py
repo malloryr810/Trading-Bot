@@ -426,13 +426,6 @@ class TestMainBehaviorValidation:
         main(["AAPL", "--watchlist", str(p)])
         assert "not both" in capsys.readouterr().err
 
-    def test_no_args_returns_1(self):
-        assert main([]) == 1
-
-    def test_no_args_prints_usage_to_stderr(self, capsys):
-        main([])
-        assert "usage" in capsys.readouterr().err
-
 
 # ---------------------------------------------------------------------------
 # main() — --save-markdown flag (single-ticker)

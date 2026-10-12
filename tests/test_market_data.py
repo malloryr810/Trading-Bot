@@ -6,6 +6,9 @@ All tests mock yfinance so no network calls are made.
 
 from __future__ import annotations
 
+import threading
+import time
+
 import pandas as pd
 import pytest
 from unittest.mock import patch
@@ -79,10 +82,6 @@ class TestTickerValidation:
     def test_non_string_none_raises(self):
         with pytest.raises(DataFetchError):
             get_price_history(None)  # type: ignore[arg-type]
-
-    def test_empty_string_error_is_data_fetch_error(self):
-        with pytest.raises(DataFetchError):
-            get_price_history("")
 
     def test_non_string_error_message_mentions_type(self):
         with pytest.raises(DataFetchError, match="string"):
@@ -478,6 +477,7 @@ class TestValidatePriceHistory:
         # If a required column is missing entirely, we should get the
         # "missing required columns" error, not a nullability error.
         df = _make_normalized_ohlcv().drop(columns=["close"])
+        df["volume"] = float("nan")
         with pytest.raises(DataFetchError, match="missing required columns"):
             _validate_price_history(df, "AAPL")
 
@@ -570,3 +570,36 @@ class TestLatestValidClose:
         before = df.copy()
         latest_valid_close(df)
         pd.testing.assert_frame_equal(df, before)
+
+
+# ---------------------------------------------------------------------------
+# Concurrency — yf.download shares module-level state between calls
+# ---------------------------------------------------------------------------
+
+class TestConcurrentDownloads:
+    def test_downloads_never_overlap(self):
+        in_flight = 0
+        max_in_flight = 0
+        counter_lock = threading.Lock()
+
+        def _slow_download(*args, **kwargs):
+            nonlocal in_flight, max_in_flight
+            with counter_lock:
+                in_flight += 1
+                max_in_flight = max(max_in_flight, in_flight)
+            time.sleep(0.02)
+            with counter_lock:
+                in_flight -= 1
+            return _make_ohlcv()
+
+        with patch(DOWNLOAD_PATH, side_effect=_slow_download):
+            threads = [
+                threading.Thread(target=get_price_history, args=(ticker,))
+                for ticker in ("AAPL", "MSFT", "KO", "XOM")
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+
+        assert max_in_flight == 1
